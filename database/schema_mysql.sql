@@ -1,12 +1,11 @@
--- =========================================================
--- Pan de Rey - Arquitectura de Base de Datos (MySQL / MariaDB)
--- =========================================================
+/* ========================================================= */
+/* Pan de Rey - Arquitectura de Base de Datos (MySQL / MariaDB) */
+/* ========================================================= */
 
--- Configuración de zona horaria y codificación
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
--- 1. CONFIGURACIÓN DEL SISTEMA & APARIENCIA (CMS / AJUSTES)
+/* 1. CONFIGURACIÓN DEL SISTEMA & APARIENCIA (CMS / AJUSTES) */
 CREATE TABLE IF NOT EXISTS SystemSettings (
     SettingKey VARCHAR(100) PRIMARY KEY,
     SettingValue TEXT NULL,
@@ -14,7 +13,7 @@ CREATE TABLE IF NOT EXISTS SystemSettings (
     UpdatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Inserción de valores iniciales (Apariencia, Redes Sociales, Misión/Visión, etc.)
+/* Inserción de valores iniciales */
 INSERT INTO SystemSettings (SettingKey, SettingValue, Description) VALUES
 ('hero_type', 'fixed', 'Tipo de visualización del Banner Principal (fixed, slider)'),
 ('hero_image_url', '/storefront.jpg', 'URL de la imagen del banner principal'),
@@ -34,19 +33,19 @@ INSERT INTO SystemSettings (SettingKey, SettingValue, Description) VALUES
 ('smtp_password', '01l93pDapK', 'Contraseña de correo de envío SMTP');
 
 
--- 2. AUTH & USUARIOS (CRM DE CLIENTES)
+/* 2. AUTH & USUARIOS (CRM DE CLIENTES) */
 CREATE TABLE IF NOT EXISTS Roles (
     Id INT AUTO_INCREMENT PRIMARY KEY,
-    Name VARCHAR(50) NOT NULL UNIQUE, -- 'Admin', 'Cliente'
+    Name VARCHAR(50) NOT NULL UNIQUE,
     Description VARCHAR(255) NULL
 );
 
 INSERT INTO Roles (Name, Description) VALUES
-('Admin', 'Administrador del sistema con acceso completo al CMS y POS'),
-('Cliente', 'Usuario comprador de la tienda web');
+('Admin', 'Administrador con acceso completo'),
+('Cliente', 'Usuario comprador');
 
 CREATE TABLE IF NOT EXISTS Users (
-    Id VARCHAR(36) PRIMARY KEY, -- UUID generado en Node.js
+    Id VARCHAR(36) PRIMARY KEY,
     Email VARCHAR(255) NOT NULL UNIQUE,
     PasswordHash VARCHAR(255) NULL,
     GoogleId VARCHAR(255) NULL,
@@ -66,12 +65,12 @@ CREATE TABLE IF NOT EXISTS UserRoles (
 );
 
 CREATE TABLE IF NOT EXISTS Addresses (
-    Id VARCHAR(36) PRIMARY KEY, -- UUID
+    Id VARCHAR(36) PRIMARY KEY,
     UserId VARCHAR(36) NOT NULL,
     Commune VARCHAR(100) NOT NULL,
     Street VARCHAR(255) NOT NULL,
     Number VARCHAR(20) NOT NULL,
-    PropertyType VARCHAR(20) DEFAULT 'House', -- 'House', 'Building'
+    PropertyType VARCHAR(20) DEFAULT 'House',
     Floor VARCHAR(10) NULL,
     Department VARCHAR(20) NULL,
     Country VARCHAR(100) DEFAULT 'Chile',
@@ -82,7 +81,7 @@ CREATE TABLE IF NOT EXISTS Addresses (
 );
 
 
--- 3. CATÁLOGO DE PRODUCTOS
+/* 3. CATÁLOGO DE PRODUCTOS */
 CREATE TABLE IF NOT EXISTS Categories (
     Id INT AUTO_INCREMENT PRIMARY KEY,
     ParentId INT NULL,
@@ -95,55 +94,55 @@ CREATE TABLE IF NOT EXISTS Categories (
 );
 
 CREATE TABLE IF NOT EXISTS Products (
-    Id VARCHAR(36) PRIMARY KEY, -- UUID
+    Id VARCHAR(36) PRIMARY KEY,
     CategoryId INT NULL,
     Name VARCHAR(150) NOT NULL,
     Slug VARCHAR(150) NOT NULL UNIQUE,
     Description TEXT NULL,
     BasePrice DECIMAL(10,2) NOT NULL,
     ImageUrl VARCHAR(255) NULL,
-    DefontanaProductCode VARCHAR(100) NULL UNIQUE, -- Código de mapeo con Defontana ERP
+    DefontanaProductCode VARCHAR(100) NULL UNIQUE,
     IsActive TINYINT DEFAULT 1,
     CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (CategoryId) REFERENCES Categories(Id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS ProductVariants (
-    Id VARCHAR(36) PRIMARY KEY, -- UUID
+    Id VARCHAR(36) PRIMARY KEY,
     ProductId VARCHAR(36) NOT NULL,
-    VariantName VARCHAR(100) NOT NULL, -- ej. 'Clásico', 'Con Semillas'
+    VariantName VARCHAR(100) NOT NULL,
     PriceAdjustment DECIMAL(10,2) DEFAULT 0.00,
-    SKU VARCHAR(100) UNIQUE NOT NULL, -- SKU comercial o código Defontana SKU
+    SKU VARCHAR(100) UNIQUE NOT NULL,
     IsActive TINYINT DEFAULT 1,
     FOREIGN KEY (ProductId) REFERENCES Products(Id) ON DELETE CASCADE
 );
 
 
--- 4. STOCK E INVENTARIO
+/* 4. STOCK E INVENTARIO */
 CREATE TABLE IF NOT EXISTS Inventory (
     VariantId VARCHAR(36) PRIMARY KEY,
     Quantity INT NOT NULL DEFAULT 0,
-    SafetyBuffer INT NOT NULL DEFAULT 2, -- Si Qty <= Buffer, pasa a Agotado
+    SafetyBuffer INT NOT NULL DEFAULT 2,
     LastUpdated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (VariantId) REFERENCES ProductVariants(Id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS InventoryMovements (
-    Id VARCHAR(36) PRIMARY KEY, -- UUID
+    Id VARCHAR(36) PRIMARY KEY,
     VariantId VARCHAR(36) NOT NULL,
-    QuantityChange INT NOT NULL, -- Positivo (Entrada), Negativo (Salida/Venta)
-    MovementType VARCHAR(50) NOT NULL, -- 'Compra', 'Venta', 'Ajuste', 'Reserva Temporal'
-    ReferenceId VARCHAR(255) NULL, -- ID de orden o ajuste
+    QuantityChange INT NOT NULL,
+    MovementType VARCHAR(50) NOT NULL,
+    ReferenceId VARCHAR(255) NULL,
     CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (VariantId) REFERENCES ProductVariants(Id) ON DELETE CASCADE
 );
 
 
--- 5. CUPONES DE DESCUENTO
+/* 5. CUPONES DE DESCUENTO */
 CREATE TABLE IF NOT EXISTS Coupons (
     Id INT AUTO_INCREMENT PRIMARY KEY,
     Code VARCHAR(50) NOT NULL UNIQUE,
-    DiscountType VARCHAR(20) NOT NULL, -- 'Percentage', 'FixedAmount'
+    DiscountType VARCHAR(20) NOT NULL,
     DiscountValue DECIMAL(10,2) NOT NULL,
     MinOrderValue DECIMAL(10,2) DEFAULT 0.00,
     MaxUses INT NULL,
@@ -158,21 +157,21 @@ CREATE TABLE IF NOT EXISTS Coupons (
 );
 
 
--- 6. VENTAS, PAGOS Y LOGÍSTICA (DELIVERY / RETIRO)
+/* 6. VENTAS, PAGOS Y LOGÍSTICA (DELIVERY / RETIRO) */
 CREATE TABLE IF NOT EXISTS Orders (
-    Id VARCHAR(36) PRIMARY KEY, -- UUID
-    UserId VARCHAR(36) NULL, -- Nullable para compras de invitados
+    Id VARCHAR(36) PRIMARY KEY,
+    UserId VARCHAR(36) NULL,
     AddressId VARCHAR(36) NULL,
     CouponId INT NULL,
     TotalAmount DECIMAL(10,2) NOT NULL,
-    Status VARCHAR(50) NOT NULL DEFAULT 'Nuevo', -- 'Nuevo', 'Preparando', 'Listo', 'En Ruta', 'Entregado', 'Cancelado'
-    ShippingMethod VARCHAR(50) NOT NULL, -- 'Retiro', 'Delivery'
+    Status VARCHAR(50) NOT NULL DEFAULT 'Nuevo',
+    ShippingMethod VARCHAR(50) NOT NULL,
     PickupTime VARCHAR(100) NULL,
     ShippingCost DECIMAL(10,2) DEFAULT 0.00,
     Notes TEXT NULL,
-    BoletaNumber VARCHAR(100) NULL, -- Folio de boleta electrónica (SII / Defontana)
-    BoletaUrl VARCHAR(255) NULL, -- Enlace PDF de la boleta
-    FiscalPrinterStatus VARCHAR(50) DEFAULT 'Pendiente', -- 'Pendiente', 'Impreso', 'Error'
+    BoletaNumber VARCHAR(100) NULL,
+    BoletaUrl VARCHAR(255) NULL,
+    FiscalPrinterStatus VARCHAR(50) DEFAULT 'Pendiente',
     CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UpdatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE SET NULL,
@@ -181,7 +180,7 @@ CREATE TABLE IF NOT EXISTS Orders (
 );
 
 CREATE TABLE IF NOT EXISTS OrderItems (
-    Id VARCHAR(36) PRIMARY KEY, -- UUID
+    Id VARCHAR(36) PRIMARY KEY,
     OrderId VARCHAR(36) NOT NULL,
     VariantId VARCHAR(36) NOT NULL,
     Quantity INT NOT NULL,
@@ -192,18 +191,18 @@ CREATE TABLE IF NOT EXISTS OrderItems (
 );
 
 CREATE TABLE IF NOT EXISTS Payments (
-    Id VARCHAR(36) PRIMARY KEY, -- UUID
+    Id VARCHAR(36) PRIMARY KEY,
     OrderId VARCHAR(36) NOT NULL,
     Amount DECIMAL(10,2) NOT NULL,
-    PaymentMethod VARCHAR(50) NOT NULL, -- 'Webpay', 'Transferencia', 'Efectivo'
-    Status VARCHAR(50) NOT NULL DEFAULT 'Pendiente', -- 'Pendiente', 'Aprobado', 'Rechazado'
-    TransactionId VARCHAR(100) NULL, -- ID de transacción de pasarela de pago (Transbank Token)
+    PaymentMethod VARCHAR(50) NOT NULL,
+    Status VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
+    TransactionId VARCHAR(100) NULL,
     CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (OrderId) REFERENCES Orders(Id) ON DELETE CASCADE
 );
 
 
--- 7. INTEGRACIONES: DEFONTANA ERP
+/* 7. INTEGRACIONES: DEFONTANA ERP */
 CREATE TABLE IF NOT EXISTS DefontanaConfig (
     Id INT AUTO_INCREMENT PRIMARY KEY,
     ClientSecret VARCHAR(255) NOT NULL,
@@ -214,8 +213,8 @@ CREATE TABLE IF NOT EXISTS DefontanaConfig (
 
 CREATE TABLE IF NOT EXISTS DefontanaSyncLogs (
     Id INT AUTO_INCREMENT PRIMARY KEY,
-    SyncType VARCHAR(50) NOT NULL, -- 'StockSync', 'SalesOrderPush', 'ProductImport'
-    Status VARCHAR(50) NOT NULL, -- 'Success', 'Error'
+    SyncType VARCHAR(50) NOT NULL,
+    Status VARCHAR(50) NOT NULL,
     Message TEXT NULL,
     CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
