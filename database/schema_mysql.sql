@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS SystemSettings (
     SettingKey VARCHAR(100) PRIMARY KEY,
     SettingValue TEXT NULL,
     Description VARCHAR(255) NULL,
-    UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    UpdatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- Inserción de valores iniciales (Apariencia, Redes Sociales, Misión/Visión, etc.)
@@ -53,8 +53,8 @@ CREATE TABLE IF NOT EXISTS Users (
     FirstName VARCHAR(100) NOT NULL,
     LastName VARCHAR(100) NOT NULL,
     Phone VARCHAR(50) NULL,
-    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UpdatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS UserRoles (
@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS Products (
     ImageUrl VARCHAR(255) NULL,
     DefontanaProductCode VARCHAR(100) NULL UNIQUE, -- Código de mapeo con Defontana ERP
     IsActive TINYINT DEFAULT 1,
-    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (CategoryId) REFERENCES Categories(Id) ON DELETE SET NULL
 );
 
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS Inventory (
     VariantId VARCHAR(36) PRIMARY KEY,
     Quantity INT NOT NULL DEFAULT 0,
     SafetyBuffer INT NOT NULL DEFAULT 2, -- Si Qty <= Buffer, pasa a Agotado
-    LastUpdated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    LastUpdated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (VariantId) REFERENCES ProductVariants(Id) ON DELETE CASCADE
 );
 
@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS InventoryMovements (
     QuantityChange INT NOT NULL, -- Positivo (Entrada), Negativo (Salida/Venta)
     MovementType VARCHAR(50) NOT NULL, -- 'Compra', 'Venta', 'Ajuste', 'Reserva Temporal'
     ReferenceId VARCHAR(255) NULL, -- ID de orden o ajuste
-    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (VariantId) REFERENCES ProductVariants(Id) ON DELETE CASCADE
 );
 
@@ -173,8 +173,8 @@ CREATE TABLE IF NOT EXISTS Orders (
     BoletaNumber VARCHAR(100) NULL, -- Folio de boleta electrónica (SII / Defontana)
     BoletaUrl VARCHAR(255) NULL, -- Enlace PDF de la boleta
     FiscalPrinterStatus VARCHAR(50) DEFAULT 'Pendiente', -- 'Pendiente', 'Impreso', 'Error'
-    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UpdatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE SET NULL,
     FOREIGN KEY (AddressId) REFERENCES Addresses(Id) ON DELETE SET NULL,
     FOREIGN KEY (CouponId) REFERENCES Coupons(Id) ON DELETE SET NULL
@@ -198,7 +198,7 @@ CREATE TABLE IF NOT EXISTS Payments (
     PaymentMethod VARCHAR(50) NOT NULL, -- 'Webpay', 'Transferencia', 'Efectivo'
     Status VARCHAR(50) NOT NULL DEFAULT 'Pendiente', -- 'Pendiente', 'Aprobado', 'Rechazado'
     TransactionId VARCHAR(100) NULL, -- ID de transacción de pasarela de pago (Transbank Token)
-    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (OrderId) REFERENCES Orders(Id) ON DELETE CASCADE
 );
 
@@ -217,7 +217,7 @@ CREATE TABLE IF NOT EXISTS DefontanaSyncLogs (
     SyncType VARCHAR(50) NOT NULL, -- 'StockSync', 'SalesOrderPush', 'ProductImport'
     Status VARCHAR(50) NOT NULL, -- 'Success', 'Error'
     Message TEXT NULL,
-    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 SET FOREIGN_KEY_CHECKS = 1;
