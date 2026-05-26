@@ -18,10 +18,10 @@ export default function HeroBanner() {
           Artesanal & Premium
         </span>
         <h1 className="font-serif text-5xl md:text-7xl font-bold text-foreground mb-8 leading-tight">
-          El Arte del Buen <br/> <span className="text-gold italic font-light">Sabor</span>
+          El Arte de la <br/> <span className="text-gold italic font-light">Fermentación Lenta</span>
         </h1>
         <p className="text-gray-300 text-lg md:text-xl mb-12 max-w-2xl mx-auto font-light leading-relaxed">
-          Descubre nuestra selección exclusiva de panes de masa madre, pastelería fina y especialidades para compartir. Cada pieza es elaborada con dedicación y los mejores ingredientes.
+          Panes de masa madre orgánica y pastelería fina horneados diariamente con fermentación natural de 48 horas.
         </p>
         <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
           <Link 

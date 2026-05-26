@@ -32,7 +32,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
     const success = await addToCart({
       productId: mockProduct.id,
       name: mockProduct.name,
-      variantName: selectedVariant.name,
+      filling: selectedVariant.name,
       price: currentPrice,
       quantity,
       imageUrl: mockProduct.imageUrl

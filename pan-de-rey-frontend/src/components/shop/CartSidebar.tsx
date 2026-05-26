@@ -16,7 +16,7 @@ export default function CartSidebar() {
       />
       
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 right-0 max-w-md w-full bg-[#0B0B0B] shadow-2xl z-[101] flex flex-col transition-transform duration-500 ease-in-out border-l border-charcoal-border ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed inset-y-0 right-0 max-w-md w-full bg-[#0B0B0B]/85 backdrop-blur-xl shadow-2xl z-[101] flex flex-col transition-transform duration-500 ease-in-out border-l border-white/5 ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         
         {/* Header */}
         <div className="p-6 flex justify-between items-center border-b border-charcoal-border bg-[#0B0B0B]">
@@ -67,10 +67,10 @@ export default function CartSidebar() {
                 </div>
                 <div className="flex-1 min-w-0 space-y-1">
                   <h3 className="font-serif text-lg text-white truncate">{item.name}</h3>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-tighter flex flex-wrap gap-x-2">
-                    {item.filling && <span>• {item.filling}</span>}
-                    {item.topping && <span>• {item.topping}</span>}
-                    {item.dietaryType && <span>• {item.dietaryType}</span>}
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {item.filling && <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-charcoal-light border border-white/5 text-gold rounded-full">{item.filling}</span>}
+                    {item.topping && <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-charcoal-light border border-white/5 text-gold rounded-full">{item.topping}</span>}
+                    {item.dietaryType && <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-charcoal-light border border-white/5 text-gold rounded-full">{item.dietaryType}</span>}
                   </div>
                   <div className="flex items-center justify-between mt-3">
                     <span className="text-gold font-bold">${(item.price * item.quantity).toLocaleString()}</span>
@@ -111,9 +111,9 @@ export default function CartSidebar() {
               <Link 
                 href="/checkout"
                 onClick={() => setIsCartOpen(false)}
-                className="w-full flex items-center justify-center gap-3 bg-gold text-black py-5 font-bold uppercase tracking-widest hover:bg-gold-hover transition-all rounded-sm shadow-xl shadow-gold/5"
+                className="w-full flex items-center justify-center gap-3 bg-gold text-black py-5 font-bold uppercase tracking-widest hover:bg-gold-hover hover:scale-[1.02] active:scale-[0.98] transition-all rounded-sm shadow-xl hover:shadow-gold/15 shadow-gold/5"
               >
-                Pagar Ahora
+                Finalizar Pedido
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <button 

@@ -80,7 +80,7 @@ export default function ShopContainer() {
   const filteredProducts = mockProducts.filter(p => activeCategory === 'all' || p.category === activeCategory);
 
   return (
-    <div className="min-h-screen bg-[#0B0B0B] text-white">
+    <div className="min-h-screen bg-gradient-to-tr from-[#0F0F0F] via-[#0B0B0B] to-[#080808] text-white">
       <Navbar />
 
       {/* Main Content */}
@@ -93,24 +93,26 @@ export default function ShopContainer() {
         ) : (
           <div className="animate-in fade-in duration-500">
             {/* Horizontal Category Filter */}
-            <div className="flex gap-4 overflow-x-auto pb-12 scrollbar-hide">
-              {categories.map((cat) => {
-                const Icon = cat.icon;
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => setActiveCategory(cat.id)}
-                    className={`flex items-center gap-3 whitespace-nowrap px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ${
-                      activeCategory === cat.id 
-                        ? 'bg-gold text-black' 
-                        : 'bg-white/5 text-gray-500 hover:text-white border border-white/5'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" /> {/* Adjusted icon size */}
-                    {cat.name}
-                  </button>
-                );
-              })}
+            <div className="relative">
+              <div className="flex gap-4 overflow-x-auto pb-12 scrollbar-hide [mask-image:linear-gradient(to_right,white_90%,transparent_100%)] pr-8">
+                {categories.map((cat) => {
+                  const Icon = cat.icon;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => setActiveCategory(cat.id)}
+                      className={`flex items-center gap-3 whitespace-nowrap px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ${
+                        activeCategory === cat.id 
+                          ? 'bg-gold text-black' 
+                           : 'bg-white/5 text-gray-500 hover:text-white border border-white/5'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" /> {/* Adjusted icon size */}
+                      {cat.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Product Grid */}
@@ -130,7 +132,7 @@ export default function ShopContainer() {
                     />
                     <button 
                       onClick={(e) => handleAddToCart(e, product)}
-                      className="absolute bottom-4 right-4 w-10 h-10 bg-gold text-black rounded-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-gold-hover shadow-xl"
+                      className="absolute bottom-4 right-4 w-10 h-10 bg-gold text-black rounded-sm flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 hover:bg-gold-hover active:scale-95 shadow-xl"
                     >
                       <Plus className="w-5 h-5" />
                     </button>

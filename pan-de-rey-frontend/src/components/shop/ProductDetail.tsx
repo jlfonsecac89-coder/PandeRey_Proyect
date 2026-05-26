@@ -76,13 +76,12 @@ export default function ProductDetail({ product, onClose }: ProductDetailProps) 
             {['Clásico', 'Con Semillas', 'Nuez y Pasas (Agotado)'].map((v) => (
               <button 
                 key={v}
-                disabled={v.includes('Agotado')}
                 onClick={() => setVariety(v)}
                 className={`px-4 py-4 border text-xs uppercase tracking-widest transition-all ${
                   variety === v 
                     ? 'border-gold text-white bg-gold/5' 
                     : 'border-white/10 text-gray-500 hover:border-white/30'
-                } ${v.includes('Agotado') ? 'opacity-30 cursor-not-allowed' : ''}`}
+                }`}
               >
                 {v}
               </button>
@@ -94,17 +93,33 @@ export default function ProductDetail({ product, onClose }: ProductDetailProps) 
         <div className="space-y-4 pt-6">
           <label className="text-[10px] uppercase tracking-[0.3em] font-bold text-gray-500">Cantidad</label>
           <div className="flex flex-col sm:flex-row gap-4 max-w-2xl">
-            <div className="flex items-center border border-white/10 bg-black/40 p-1 rounded-sm w-32">
-              <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-10 h-12 flex items-center justify-center text-gray-400 hover:text-white transition-colors"><Minus className="w-4 h-4" /></button>
-              <span className="flex-1 text-center font-serif font-bold text-xl">{quantity}</span>
-              <button onClick={() => setQuantity(quantity + 1)} className="w-10 h-12 flex items-center justify-center text-gray-400 hover:text-white transition-colors"><Plus className="w-4 h-4" /></button>
-            </div>
-            <button 
-              onClick={handleAddToCart}
-              className="flex-1 bg-gold text-black py-4 font-bold uppercase tracking-[0.2em] text-xs hover:bg-gold-hover transition-all shadow-2xl shadow-gold/10"
-            >
-              Añadir al Carrito
-            </button>
+            {variety.includes('Agotado') ? (
+              <button 
+                onClick={() => {
+                  const email = prompt("Introduce tu correo electrónico para avisarte cuando esté disponible:");
+                  if (email) {
+                    alert(`¡Gracias! Te avisaremos a ${email} en cuanto tengamos stock de ${product.name} (${variety.replace(' (Agotado)', '')}).`);
+                  }
+                }}
+                className="flex-1 bg-charcoal-light border border-gold text-gold py-4 font-bold uppercase tracking-[0.2em] text-xs hover:bg-gold/10 transition-all rounded-sm"
+              >
+                Avísame cuando esté disponible
+              </button>
+            ) : (
+              <>
+                <div className="flex items-center border border-white/10 bg-black/40 p-1 rounded-sm w-32">
+                  <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-10 h-12 flex items-center justify-center text-gray-400 hover:text-white transition-colors"><Minus className="w-4 h-4" /></button>
+                  <span className="flex-1 text-center font-serif font-bold text-xl">{quantity}</span>
+                  <button onClick={() => setQuantity(quantity + 1)} className="w-10 h-12 flex items-center justify-center text-gray-400 hover:text-white transition-colors"><Plus className="w-4 h-4" /></button>
+                </div>
+                <button 
+                  onClick={handleAddToCart}
+                  className="flex-1 bg-gold text-black py-4 font-bold uppercase tracking-[0.2em] text-xs hover:bg-gold-hover transition-all shadow-2xl shadow-gold/10"
+                >
+                  Añadir al Carrito
+                </button>
+              </>
+            )}
           </div>
         </div>
 

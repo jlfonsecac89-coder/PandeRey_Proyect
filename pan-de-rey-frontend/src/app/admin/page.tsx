@@ -192,7 +192,7 @@ export default function AdminDashboard() {
                 <YAxis stroke="#888" tick={{ fill: '#888', fontSize: 12 }} tickFormatter={(val) => mainMetric === 'ventas' ? `$${val.toLocaleString()}` : val} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }}
-                  formatter={(value: number) => [mainMetric === 'ventas' ? `$${value.toLocaleString()}` : value, mainMetric === 'ventas' ? 'Monto' : 'Cantidad']}
+                  formatter={(value: any) => [mainMetric === 'ventas' && typeof value === 'number' ? `$${value.toLocaleString()}` : value, mainMetric === 'ventas' ? 'Monto' : 'Cantidad']}
                 />
                 <Bar dataKey={mainMetric} fill="#D4AF37" radius={[4, 4, 0, 0]}>
                   <LabelList 
@@ -200,7 +200,7 @@ export default function AdminDashboard() {
                     position="top" 
                     fill="#fff" 
                     fontSize={12} 
-                    formatter={(val: number) => mainMetric === 'ventas' ? `$${(val/1000).toFixed(0)}k` : val} 
+                    formatter={(val: any) => mainMetric === 'ventas' && typeof val === 'number' ? `$${(val/1000).toFixed(0)}k` : val} 
                   />
                   {mainData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#D4AF37' : '#e6ca6e'} />
@@ -228,7 +228,7 @@ export default function AdminDashboard() {
                 <YAxis dataKey="name" type="category" stroke="#888" tick={{ fill: '#888', fontSize: 11 }} width={100} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }}
-                  formatter={(value: number) => [materialMetric === 'ventas' ? `$${value.toLocaleString()}` : value, materialMetric === 'ventas' ? 'Monto' : 'Unidades']}
+                  formatter={(value: any) => [materialMetric === 'ventas' && typeof value === 'number' ? `$${value.toLocaleString()}` : value, materialMetric === 'ventas' ? 'Monto' : 'Unidades']}
                 />
                 <Bar dataKey={materialMetric} fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24}>
                   <LabelList 
@@ -236,7 +236,7 @@ export default function AdminDashboard() {
                     position="right" 
                     fill="#fff" 
                     fontSize={10} 
-                    formatter={(val: number) => materialMetric === 'ventas' ? `$${(val/1000).toFixed(0)}k` : val} 
+                    formatter={(val: any) => materialMetric === 'ventas' && typeof val === 'number' ? `$${(val/1000).toFixed(0)}k` : val} 
                   />
                   {materialData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : index === 1 ? '#3b82f6' : '#6366f1'} />
