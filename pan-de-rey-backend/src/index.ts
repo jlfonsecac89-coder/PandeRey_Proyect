@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 import { getDbPool } from './db';
 import catalogRoutes from './routes/catalog';
 import stockRoutes from './routes/stock';
+import crmRoutes from './routes/crm';
+import settingsRoutes from './routes/settings';
+import ordersRoutes from './routes/orders';
 
 dotenv.config();
 
@@ -16,6 +19,9 @@ app.use(express.json());
 // Routes
 app.use('/api/catalog', catalogRoutes);
 app.use('/api/stock', stockRoutes);
+app.use('/api/crm', crmRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/orders', ordersRoutes);
 
 // Health check and DB init test
 app.get('/api/health', async (req, res) => {

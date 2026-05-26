@@ -1,30 +1,29 @@
-import sql from 'mssql';
+import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-export const sqlConfig = {
-    user: process.env.DB_USER || 'sa',
-    password: process.env.DB_PASSWORD || 'yourStrong(!)Password',
-    database: process.env.DB_NAME || 'PanDeReyDB',
-    server: process.env.DB_SERVER || 'localhost',
-    pool: {
-        max: 10,
-        min: 0,
-        idleTimeoutMillis: 30000
-    },
-    options: {
-        encrypt: process.env.DB_ENCRYPT === 'true', 
-        trustServerCertificate: true 
-    }
+export const dbConfig = {
+    host: process.env.DB_HOST || '136.243.227.82', // Defaults to hosting IP for production config
+    user: process.env.DB_USER || 'bimndboe',
+    password: process.env.DB_PASSWORD || '01l93pDapK',
+    database: process.env.DB_NAME || 'bimndboe_panderey',
+    port: parseInt(process.env.DB_PORT || '3306'),
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
 };
 
-export const getDbPool = async () => {
-    try {
-        const pool = await sql.connect(sqlConfig);
-        return pool;
-    } catch (err) {
-        console.error('Database connection failed:', err);
-        throw err;
+let pool: mysql.Pool;
+
+export const getDbPool = (): mysql.Pool => {
+    if (!pool) {
+        try {
+            pool = mysql.createPool(dbConfig);
+        } catch (err) {
+            console.error('Database pool creation failed:', err);
+            throw err;
+        }
     }
+    return pool;
 };

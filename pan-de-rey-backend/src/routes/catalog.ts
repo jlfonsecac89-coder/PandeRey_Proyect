@@ -1,15 +1,14 @@
 import { Router } from 'express';
 import { getDbPool } from '../db';
-import sql from 'mssql';
 
 const router = Router();
 
 // Get all categories
 router.get('/categories', async (req, res) => {
     try {
-        const pool = await getDbPool();
-        const result = await pool.request().query('SELECT * FROM Categories WHERE IsActive = 1');
-        res.json(result.recordset);
+        const pool = getDbPool();
+        const [rows] = await pool.query('SELECT * FROM Categories WHERE IsActive = 1');
+        res.json(rows);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to fetch categories' });
@@ -20,17 +19,17 @@ router.get('/categories', async (req, res) => {
 router.get('/products', async (req, res) => {
     const { categoryId } = req.query;
     try {
-        const pool = await getDbPool();
+        const pool = getDbPool();
         let query = 'SELECT * FROM Products WHERE IsActive = 1';
-        const request = pool.request();
+        const params: any[] = [];
         
         if (categoryId) {
-            query += ' AND CategoryId = @categoryId';
-            request.input('categoryId', sql.Int, parseInt(categoryId as string));
+            query += ' AND CategoryId = ?';
+            params.push(parseInt(categoryId as string));
         }
         
-        const result = await request.query(query);
-        res.json(result.recordset);
+        const [rows] = await pool.query(query, params);
+        res.json(rows);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to fetch products' });
@@ -40,32 +39,28 @@ router.get('/products', async (req, res) => {
 // Get product details with variants and stock
 router.get('/products/:id', async (req, res) => {
     try {
-        const pool = await getDbPool();
+        const pool = getDbPool();
         const productId = req.params.id;
         
         // Fetch Product
-        const productResult = await pool.request()
-            .input('id', sql.UniqueIdentifier, productId)
-            .query('SELECT * FROM Products WHERE Id = @id');
+        const [productRows]: any = await pool.query('SELECT * FROM Products WHERE Id = ?', [productId]);
             
-        if (productResult.recordset.length === 0) {
+        if (productRows.length === 0) {
             return res.status(404).json({ error: 'Product not found' });
         }
         
-        const product = productResult.recordset[0];
+        const product = productRows[0];
         
         // Fetch Variants and Inventory
-        const variantsResult = await pool.request()
-            .input('productId', sql.UniqueIdentifier, productId)
-            .query(`
-                SELECT v.*, i.Quantity, i.SafetyBuffer 
-                FROM ProductVariants v
-                LEFT JOIN Inventory i ON v.Id = i.VariantId
-                WHERE v.ProductId = @productId AND v.IsActive = 1
-            `);
+        const [variantsRows]: any = await pool.query(`
+            SELECT v.*, i.Quantity, i.SafetyBuffer 
+            FROM ProductVariants v
+            LEFT JOIN Inventory i ON v.Id = i.VariantId
+            WHERE v.ProductId = ? AND v.IsActive = 1
+        `, [productId]);
             
         // Map available stock: Si Quantity <= SafetyBuffer, está "Agotado" (lógicamente)
-        product.variants = variantsResult.recordset.map(v => ({
+        product.variants = variantsRows.map((v: any) => ({
             ...v,
             isAvailable: v.Quantity > v.SafetyBuffer,
             stockStatus: v.Quantity > v.SafetyBuffer ? 'Disponible' : 'Agotado'
