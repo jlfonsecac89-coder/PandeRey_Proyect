@@ -1,0 +1,123 @@
+{
+  "version": "2.0",
+  "project": "Pan de Rey",
+  "audit_date": "2026-05-26",
+  "improvements": {
+    "brand_ui": {
+      "color_palette": {
+        "status": "Dorado estándar (#D4AF37) se siente genérico y poco premium sobre fondo negro.",
+        "proposal": "Reemplazar el color primario dorado por una paleta de Oro Cepillado / Champaña Metálico y dar mayor jerarquía visual.",
+        "changes": [
+          {
+            "variable": "--color-gold",
+            "current": "#D4AF37",
+            "proposed": "#C5A880",
+            "rationale": "Un tono dorado apagado que evoca exclusividad y productos artesanales horneados."
+          },
+          {
+            "variable": "--color-gold-hover",
+            "current": "#E6C27A",
+            "proposed": "#D9C3A3",
+            "rationale": "Mantener la coherencia del estado hover con la paleta de oro cepillado."
+          }
+        ]
+      },
+      "styling_and_aesthetics": [
+        {
+          "component": "CartSidebar",
+          "improvement": "Reemplazar el fondo sólido por un efecto de Glassmorphism elegante (fondo semitransparente con desenfoque de fondo y borde sutil).",
+          "classes": "bg-[#0B0B0B]/85 backdrop-blur-xl border-l border-white/5"
+        },
+        {
+          "component": "ShopContainer",
+          "improvement": "Agregar un gradiente de fondo sutil al contenedor principal para evitar la rigidez del color negro plano, dándole textura a la presentación.",
+          "classes": "bg-gradient-to-tr from-[#0F0F0F] via-[#0B0B0B] to-[#080808]"
+        }
+      ],
+      "multimedia_optimization": [
+        {
+          "asset": "/logo.png",
+          "issue": "El archivo es un PNG de 20KB renderizado con filtros CSS de inversión.",
+          "solution": "Convertir el logotipo a formato SVG vectorial nativo optimizado. Esto mejora la nitidez y elimina el procesamiento adicional de filtros."
+        },
+        {
+          "asset": "/storefront.jpg",
+          "issue": "Imagen en formato JPEG pesado (13KB) que podría ralentizar la carga inicial en móviles.",
+          "solution": "Convertir a formato WebP optimizado con compresión del 80%."
+        },
+        {
+          "product_images": "Las imágenes de productos de Unsplash están cargando con parámetros de tamaño altos.",
+          "solution": "Ajustar las URLs de Unsplash a 'w=600&auto=format&fit=crop' para optimizar la transferencia de red."
+        }
+      ]
+    },
+    "ux_design": {
+      "cart_flow": [
+        {
+          "issue": "Los badges de las variedades en el carrito (e.g. • Clásico) se ven planos y difíciles de leer.",
+          "solution": "Diseñar badges redondeados finos con fondo charcoal y texto dorado para mayor legibilidad y estilo premium."
+        },
+        {
+          "issue": "El botón 'Pagar Ahora' tiene una sombra de brillo fija y estática.",
+          "solution": "Agregar un efecto dinámico de hover que expanda suavemente la sombra y transiciones fluidas de carga."
+        }
+      ],
+      "catalog_flow": [
+        {
+          "issue": "En móviles, el botón de agregar al carrito rápida (el botón '+' en el grid) solo aparece en hover, haciendo imposible la compra rápida desde el catálogo en dispositivos táctiles.",
+          "solution": "Hacer que el botón de añadir al carrito rápido esté siempre visible en pantallas táctiles o móviles bajo la tarjeta del producto, o habilitar un toque prolongado."
+        },
+        {
+          "issue": "En móviles, el filtro de categorías horizontal no tiene indicación de scroll a la derecha.",
+          "solution": "Agregar un degradado de máscara de desvanecimiento lateral en el contenedor del menú horizontal."
+        },
+        {
+          "issue": "La opción de variedad agotada ('Nuez y Pasas (Agotado)') está deshabilitada sin alternativas.",
+          "solution": "Permitir hacer clic para activar un input de 'Avísame cuando esté disponible' para retención de clientes."
+        }
+      ]
+    },
+    "growth_marketing": {
+      "copywriting": [
+        {
+          "location": "HeroBanner",
+          "current": "El Arte del Buen Sabor",
+          "proposed": "El Arte de la Fermentación Lenta",
+          "rationale": "Comunica de inmediato el valor diferencial del proceso artesanal (Masa Madre)."
+        },
+        {
+          "location": "HeroBanner - Subtítulo",
+          "current": "Descubre nuestra selección exclusiva de panes de masa madre...",
+          "proposed": "Panes de masa madre orgánica y pastelería fina horneados diariamente con fermentación natural de 48 horas.",
+          "rationale": "Mayor claridad técnica que justifica el precio premium y apela al consumidor consciente."
+        },
+        {
+          "location": "CartSidebar - CTA",
+          "current": "Pagar Ahora",
+          "proposed": "Finalizar Pedido",
+          "rationale": "Reduce la fricción psicológica de gasto inmediato y orienta al usuario al envío."
+        }
+      ],
+      "seo_on_page": [
+        {
+          "enhancement": "Datos estructurados Schema.org",
+          "description": "Implementar el esquema JSON-LD 'Product' en los detalles del producto para habilitar Rich Snippets en las búsquedas de Google (precio, disponibilidad, descripción)."
+        },
+        {
+          "enhancement": "Open Graph (OG) Tags",
+          "description": "Añadir etiquetas meta og:title, og:description y og:image dinámicas para mejorar la visualización al compartir en WhatsApp, Instagram y redes sociales."
+        }
+      ],
+      "analytics_tracking": [
+        {
+          "event": "AddToCart",
+          "description": "Disparar evento en GTM / Meta Pixel al hacer clic en 'Añadir al Carrito' con los parámetros product_id, product_name, price y currency."
+        },
+        {
+          "event": "InitiateCheckout",
+          "description": "Disparar evento al hacer clic en 'Finalizar Pedido' para medir la deserción en el formulario."
+        }
+      ]
+    }
+  }
+}
