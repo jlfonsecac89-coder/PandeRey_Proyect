@@ -1,0 +1,8 @@
+RewriteEngine On
+RewriteBase /
+
+# Route clean URLs (e.g. /admin -> /admin.html)
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME}.html -f
+RewriteRule ^(.*)$ $1.html [L]

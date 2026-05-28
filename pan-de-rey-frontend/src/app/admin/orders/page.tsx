@@ -3,6 +3,16 @@
 import { useState, useEffect } from 'react';
 import { Package, Truck, CheckCircle, Clock } from 'lucide-react';
 
+const getApiUrl = (path: string) => {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return `http://localhost:3001${path}`;
+    }
+  }
+  return path;
+};
+
 type OrderStatus = 'Nuevo' | 'Preparación' | 'Listo' | 'Enviado';
 
 type Order = {
@@ -31,7 +41,7 @@ export default function OrdersKanban() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('http://localhost:3001/api/orders');
+      const res = await fetch(getApiUrl('/api/orders'));
       if (!res.ok) throw new Error('API offline');
       const data = await res.json();
       
@@ -88,7 +98,7 @@ export default function OrdersKanban() {
       }
       
       try {
-        const res = await fetch('http://localhost:3001/api/orders/update-status', {
+        const res = await fetch(getApiUrl('/api/orders/update-status'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

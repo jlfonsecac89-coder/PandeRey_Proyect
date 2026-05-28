@@ -4,6 +4,16 @@ import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LabelList } from 'recharts';
 import { DollarSign, Package, ShoppingBag, AlertTriangle, AlertCircle, XCircle, Ban, Store, Truck } from 'lucide-react';
 
+const getApiUrl = (path: string) => {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return `http://localhost:3001${path}`;
+    }
+  }
+  return path;
+};
+
 // Tipos
 type TimeFilter = '1h' | '4h' | '1d' | '7d' | '15d' | '30d';
 type Metric = 'ventas' | 'unidades';
@@ -83,7 +93,7 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:3001/api/orders/analytics');
+      const res = await fetch(getApiUrl('/api/orders/analytics'));
       if (!res.ok) throw new Error('API offline');
       const data = await res.json();
       
@@ -93,7 +103,7 @@ export default function AdminDashboard() {
       
       // Fetch recent orders
       try {
-        const ordRes = await fetch('http://localhost:3001/api/orders');
+        const ordRes = await fetch(getApiUrl('/api/orders'));
         if (ordRes.ok) {
           const ordData = await ordRes.json();
           const formatted = ordData.slice(0, 5).map((o: any) => ({
@@ -121,14 +131,14 @@ export default function AdminDashboard() {
   const handleSeedDatabase = async () => {
     setSeeding(true);
     try {
-      const res = await fetch('http://localhost:3001/api/orders/seed');
+      const res = await fetch(getApiUrl('/api/orders/seed'));
       if (!res.ok) throw new Error('Seed failed');
       const data = await res.json();
       alert(`Éxito: ${data.message}`);
       fetchDashboardData();
     } catch (err) {
       console.error(err);
-      alert('Error: No se pudo poblar la base de datos. Asegúrate de que el backend esté corriendo en http://localhost:3001');
+      alert('Error: No se pudo poblar la base de datos. Asegúrate de que el backend esté corriendo.');
     } finally {
       setSeeding(false);
     }
