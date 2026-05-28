@@ -1,5 +1,8 @@
 RewriteEngine On
 RewriteBase /
 
-# Custom 404 Page
+# 1. Reverse Proxy /api/ requests to the local Node.js server on port 3001
+RewriteRule ^api/(.*)$ http://127.0.0.1:3001/api/$1 [P,L]
+
+# 2. Custom 404 Page Fallback
 ErrorDocument 404 /404.html
