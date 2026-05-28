@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LabelList } from 'recharts';
 import { DollarSign, Package, ShoppingBag, AlertTriangle, AlertCircle, XCircle, Ban, Store, Truck } from 'lucide-react';
 
@@ -9,8 +9,8 @@ type TimeFilter = '1h' | '4h' | '1d' | '7d' | '15d' | '30d';
 type Metric = 'ventas' | 'unidades';
 type ViewType = 'productos' | 'categorias';
 
-// Mock KPIs Fijos
-const kpis = {
+// Mock KPIs Fijos (Fallback)
+const kpisFallback = {
   ventas: 1450000,
   unidades: 342,
   pedidos: 128,
@@ -55,7 +55,7 @@ const getMockMaterialData = (time: TimeFilter) => {
   ];
 };
 
-const recentOrders = [
+const recentOrdersFallback = [
   { id: 'ORD-001', monto: 25500, tipo: 'Retiro en Tienda', estado: 'Pendiente' },
   { id: 'ORD-002', monto: 18900, tipo: 'Envío Propio', estado: 'Preparación' },
   { id: 'ORD-003', monto: 45000, tipo: 'Retiro en Tienda', estado: 'Listo' },
@@ -69,33 +69,143 @@ export default function AdminDashboard() {
   const [mainView, setMainView] = useState<ViewType>('productos');
   const [materialMetric, setMaterialMetric] = useState<Metric>('unidades');
 
-  const mainData = getMockMainData(timeFilter, mainView);
+  // API Integration states
+  const [seeding, setSeeding] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [isLive, setIsLive] = useState(false);
+  const [kpiData, setKpiData] = useState<any>(kpisFallback);
+  const [mainData, setMainData] = useState<any[]>([]);
+  const [recentOrdersList, setRecentOrdersList] = useState<any[]>(recentOrdersFallback);
+  const [rawAnalytics, setRawAnalytics] = useState<any>(null);
+
   const materialData = getMockMaterialData(timeFilter);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('http://localhost:3001/api/orders/analytics');
+      if (!res.ok) throw new Error('API offline');
+      const data = await res.json();
+      
+      setRawAnalytics(data);
+      setKpiData(data.kpis);
+      setIsLive(true);
+      
+      // Fetch recent orders
+      try {
+        const ordRes = await fetch('http://localhost:3001/api/orders');
+        if (ordRes.ok) {
+          const ordData = await ordRes.json();
+          const formatted = ordData.slice(0, 5).map((o: any) => ({
+            id: o.id.substring(0, 8).toUpperCase(),
+            monto: o.total,
+            tipo: o.shippingMethod === 'Delivery' ? 'Envío Propio' : 'Retiro en Tienda',
+            estado: o.status === 'Preparando' ? 'Preparación' : o.status === 'Listo' ? 'Listo' : o.status === 'En Ruta' ? 'En Ruta' : o.status === 'Entregado' ? 'Entregado' : o.status
+          }));
+          setRecentOrdersList(formatted);
+        }
+      } catch (err) {
+        console.error('Failed to fetch recent orders list:', err);
+      }
+      
+    } catch (err) {
+      console.warn('Dashboard API not available, falling back to mock data:', err);
+      setIsLive(false);
+      setKpiData(kpisFallback);
+      setRecentOrdersList(recentOrdersFallback);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSeedDatabase = async () => {
+    setSeeding(true);
+    try {
+      const res = await fetch('http://localhost:3001/api/orders/seed');
+      if (!res.ok) throw new Error('Seed failed');
+      const data = await res.json();
+      alert(`Éxito: ${data.message}`);
+      fetchDashboardData();
+    } catch (err) {
+      console.error(err);
+      alert('Error: No se pudo poblar la base de datos. Asegúrate de que el backend esté corriendo en http://localhost:3001');
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  useEffect(() => {
+    if (isLive && rawAnalytics) {
+      // Filter/scale by timeFilter if desired, otherwise display raw values
+      // Note: timeFilter multiplier is simulated for mock charts, for live database we show raw aggregated totals
+      if (mainView === 'productos') {
+        const mapped = (rawAnalytics.productSales || []).map((p: any) => ({
+          name: p.name,
+          ventas: parseFloat(p.totalAmount || 0),
+          unidades: parseInt(p.totalUnits || 0)
+        }));
+        setMainData(mapped);
+      } else {
+        const mapped = (rawAnalytics.categoryDistribution || []).map((c: any) => ({
+          name: c.name,
+          ventas: parseFloat(c.value || 0),
+          unidades: parseInt(c.units || (c.value / 3000))
+        }));
+        setMainData(mapped);
+      }
+    } else {
+      setMainData(getMockMainData(timeFilter, mainView));
+    }
+  }, [mainView, timeFilter, isLive, rawAnalytics]);
 
   return (
     <div className="space-y-8 pb-12">
       
       {/* Header & Global Filters */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-charcoal-light p-4 rounded-xl border border-charcoal-border sticky top-0 z-10 shadow-lg">
-        <div>
-          <h1 className="text-xl font-serif text-white tracking-wide">Panel de Control</h1>
-          <p className="text-sm text-gray-400">Resumen operativo y comercial</p>
+        <div className="flex justify-between items-center w-full lg:w-auto gap-4">
+          <div>
+            <h1 className="text-xl font-serif text-white tracking-wide flex items-center gap-2">
+              Panel de Control
+              {isLive && (
+                <span className="w-2.5 h-2.5 bg-green-500 rounded-full inline-block animate-pulse" title="Conexión en vivo con base de datos" />
+              )}
+            </h1>
+            <p className="text-sm text-gray-400">Resumen operativo y comercial</p>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {[
-            { id: '1h', label: '1 Hora' }, { id: '4h', label: '4 Horas' }, { id: '1d', label: '1 Día' },
-            { id: '7d', label: '7 Días' }, { id: '15d', label: '15 Días' }, { id: '30d', label: '1 Mes' }
-          ].map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTimeFilter(t.id as TimeFilter)}
-              className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all ${
-                timeFilter === t.id ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'bg-[#161616] text-gray-400 hover:text-white border border-white/5'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleSeedDatabase}
+            disabled={seeding}
+            className={`px-4 py-2 rounded-md font-bold uppercase tracking-wider text-[10px] border border-gold/30 text-gold bg-gold/5 hover:bg-gold hover:text-black transition-all active:scale-95 shadow-md ${
+              seeding ? 'opacity-50 cursor-wait' : ''
+            }`}
+          >
+            {seeding ? 'Poblando...' : 'Poblar Base de Datos (Seed)'}
+          </button>
+          
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { id: '1h', label: '1 Hora' }, { id: '4h', label: '4 Horas' }, { id: '1d', label: '1 Día' },
+              { id: '7d', label: '7 Días' }, { id: '15d', label: '15 Días' }, { id: '30d', label: '1 Mes' }
+            ].map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTimeFilter(t.id as TimeFilter)}
+                className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${
+                  timeFilter === t.id ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'bg-[#161616] text-gray-400 hover:text-white border border-white/5'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -107,35 +217,35 @@ export default function AdminDashboard() {
             <div className="p-2 bg-green-500/10 text-green-500 rounded-lg"><DollarSign className="w-5 h-5" /></div>
             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Ventas</p>
           </div>
-          <p className="text-3xl font-serif text-white font-bold">${kpis.ventas.toLocaleString()}</p>
+          <p className="text-3xl font-serif text-white font-bold">${kpiData.ventas.toLocaleString()}</p>
         </div>
         <div className="bg-[#161616] border border-white/5 p-5 rounded-xl shadow-md">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg"><Package className="w-5 h-5" /></div>
             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Unidades</p>
           </div>
-          <p className="text-3xl font-serif text-white font-bold">{kpis.unidades}</p>
+          <p className="text-3xl font-serif text-white font-bold">{kpiData.unidades}</p>
         </div>
         <div className="bg-[#161616] border border-white/5 p-5 rounded-xl shadow-md">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-purple-500/10 text-purple-500 rounded-lg"><ShoppingBag className="w-5 h-5" /></div>
             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Pedidos</p>
           </div>
-          <p className="text-3xl font-serif text-white font-bold">{kpis.pedidos}</p>
+          <p className="text-3xl font-serif text-white font-bold">{kpiData.pedidos}</p>
         </div>
         <div className="bg-[#161616] border border-white/5 p-5 rounded-xl shadow-md">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-gold/10 text-gold rounded-lg"><Store className="w-5 h-5" /></div>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider leading-tight">Pendiente Retiro</p>
           </div>
-          <p className="text-3xl font-serif text-white font-bold">{kpis.pendientesRetiro}</p>
+          <p className="text-3xl font-serif text-white font-bold">{kpiData.pendientesRetiro}</p>
         </div>
         <div className="bg-[#161616] border border-white/5 p-5 rounded-xl shadow-md">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-gold/10 text-gold rounded-lg"><Truck className="w-5 h-5" /></div>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider leading-tight">Pendiente Envío</p>
           </div>
-          <p className="text-3xl font-serif text-white font-bold">{kpis.pendientesEnvio}</p>
+          <p className="text-3xl font-serif text-white font-bold">{kpiData.pendientesEnvio}</p>
         </div>
 
         {/* Stock Alerts */}
@@ -144,28 +254,28 @@ export default function AdminDashboard() {
             <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg"><AlertCircle className="w-5 h-5" /></div>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider leading-tight">Alerta (6-9)</p>
           </div>
-          <p className="text-3xl font-serif text-blue-500 font-bold">{kpis.alerta}</p>
+          <p className="text-3xl font-serif text-blue-500 font-bold">{kpiData.alerta}</p>
         </div>
         <div className="bg-[#161616] border border-yellow-500/20 p-5 rounded-xl shadow-md">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-yellow-500/10 text-yellow-500 rounded-lg"><AlertTriangle className="w-5 h-5" /></div>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider leading-tight">Riesgo (4-5)</p>
           </div>
-          <p className="text-3xl font-serif text-yellow-500 font-bold">{kpis.riesgo}</p>
+          <p className="text-3xl font-serif text-yellow-500 font-bold">{kpiData.riesgo}</p>
         </div>
         <div className="bg-[#161616] border border-orange-500/20 p-5 rounded-xl shadow-md">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-orange-500/10 text-orange-500 rounded-lg"><XCircle className="w-5 h-5" /></div>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider leading-tight">Crítico (1-3)</p>
           </div>
-          <p className="text-3xl font-serif text-orange-500 font-bold">{kpis.critico}</p>
+          <p className="text-3xl font-serif text-orange-500 font-bold">{kpiData.critico}</p>
         </div>
         <div className="bg-[#161616] border border-red-500/20 p-5 rounded-xl shadow-md xl:col-span-2">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-red-500/10 text-red-500 rounded-lg"><Ban className="w-5 h-5" /></div>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider leading-tight">Sin Stock (0)</p>
           </div>
-          <p className="text-3xl font-serif text-red-500 font-bold">{kpis.sinStock}</p>
+          <p className="text-3xl font-serif text-red-500 font-bold">{kpiData.sinStock}</p>
         </div>
       </div>
 
@@ -263,16 +373,18 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {recentOrders.map((order, idx) => (
+              {recentOrdersList.map((order, idx) => (
                 <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
                   <td className="px-6 py-4 font-bold text-white">{order.id}</td>
                   <td className="px-6 py-4 text-gold font-bold">${order.monto.toLocaleString()}</td>
                   <td className="px-6 py-4">{order.tipo}</td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      order.estado === 'Pendiente' ? 'bg-yellow-500/10 text-yellow-500' :
-                      order.estado === 'Preparación' ? 'bg-blue-500/10 text-blue-500' :
+                      order.estado === 'Pendiente' || order.estado === 'Nuevo' ? 'bg-yellow-500/10 text-yellow-500' :
+                      order.estado === 'Preparación' || order.estado === 'Preparando' ? 'bg-blue-500/10 text-blue-500' :
                       order.estado === 'En Ruta' ? 'bg-purple-500/10 text-purple-500' :
+                      order.estado === 'Listo' ? 'bg-indigo-500/10 text-indigo-400' :
+                      order.estado === 'Cancelado' ? 'bg-red-500/10 text-red-500' :
                       'bg-green-500/10 text-green-500'
                     }`}>
                       {order.estado}

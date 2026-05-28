@@ -64,7 +64,31 @@ export default function ShopContainer() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const { addToCart, setIsCartOpen, items } = useCart();
+  const { addToCart, setIsCartOpen, items, updateQuantity } = useCart();
+
+  const handleDecrementProduct = (e: React.MouseEvent, productId: string) => {
+    e.stopPropagation();
+    const cartItem = items.find(item => item.productId === productId);
+    if (cartItem) {
+      updateQuantity(cartItem.id, cartItem.quantity - 1);
+    }
+  };
+
+  const handleIncrementProduct = (e: React.MouseEvent, product: any) => {
+    e.stopPropagation();
+    const cartItem = items.find(item => item.productId === product.id.toString());
+    if (cartItem) {
+      updateQuantity(cartItem.id, cartItem.quantity + 1);
+    } else {
+      addToCart({
+        productId: product.id.toString(),
+        name: product.name,
+        price: product.price,
+        quantity: 1,
+        imageUrl: product.image
+      });
+    }
+  };
 
   const handleAddToCart = (e: React.MouseEvent, product: any) => {
     e.stopPropagation();
@@ -115,34 +139,65 @@ export default function ShopContainer() {
               </div>
             </div>
 
-            {/* Product Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-16">
-              {filteredProducts.map((product) => (
-                <div 
-                  key={product.id} 
-                  onClick={() => setSelectedProduct(product)}
-                  className="group cursor-pointer flex flex-col"
-                >
-                  <div className="relative aspect-square w-full mb-6 rounded-sm overflow-hidden bg-white/5">
-                    <Image 
-                      src={product.image} 
-                      alt={product.name} 
-                      fill 
-                      className="object-cover group-hover:scale-105 transition-transform duration-700 opacity-90 group-hover:opacity-100" 
-                    />
-                    <button 
-                      onClick={(e) => handleAddToCart(e, product)}
-                      className="absolute bottom-4 right-4 w-10 h-10 bg-gold text-black rounded-sm flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 hover:bg-gold-hover active:scale-95 shadow-xl"
-                    >
-                      <Plus className="w-5 h-5" />
-                    </button>
+              {filteredProducts.map((product) => {
+                const cartQty = items
+                  .filter(item => item.productId === product.id.toString())
+                  .reduce((sum, item) => sum + item.quantity, 0);
+
+                return (
+                  <div 
+                    key={product.id} 
+                    onClick={() => setSelectedProduct(product)}
+                    className="group cursor-pointer flex flex-col relative"
+                  >
+                    <div className="relative aspect-square w-full mb-6 rounded-sm overflow-hidden bg-white/5">
+                      <Image 
+                        src={product.image} 
+                        alt={product.name} 
+                        fill 
+                        className="object-cover group-hover:scale-105 transition-transform duration-700 opacity-90 group-hover:opacity-100" 
+                      />
+                      {cartQty > 0 && (
+                        <div className="absolute top-4 right-4 bg-gold text-black font-black text-[10px] w-6 h-6 rounded-full flex items-center justify-center shadow-lg border border-black/10 z-10 animate-in zoom-in-50 duration-300">
+                          {cartQty}
+                        </div>
+                      )}
+                      {cartQty > 0 ? (
+                        <div 
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute bottom-4 right-4 h-10 bg-gold text-black rounded-sm flex items-center shadow-xl opacity-100 transition-all duration-300 z-20 border border-black/10"
+                        >
+                          <button 
+                            onClick={(e) => handleDecrementProduct(e, product.id.toString())}
+                            className="w-8 h-full flex items-center justify-center hover:bg-black/10 active:scale-95 transition-all text-sm font-bold"
+                          >
+                            -
+                          </button>
+                          <span className="px-1.5 font-bold text-xs min-w-[20px] text-center select-none">{cartQty}</span>
+                          <button 
+                            onClick={(e) => handleIncrementProduct(e, product)}
+                            className="w-8 h-full flex items-center justify-center hover:bg-black/10 active:scale-95 transition-all text-sm font-bold"
+                          >
+                            +
+                          </button>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={(e) => handleAddToCart(e, product)}
+                          className="absolute bottom-4 right-4 w-10 h-10 bg-gold text-black rounded-sm flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 hover:bg-gold-hover active:scale-95 shadow-xl z-20"
+                        >
+                          <Plus className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-lg font-serif text-white group-hover:text-gold transition-colors">{product.name}</h3>
+                      <p className="text-gold font-serif">${product.price.toLocaleString()}</p>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <h3 className="text-lg font-serif text-white group-hover:text-gold transition-colors">{product.name}</h3>
-                    <p className="text-gold font-serif">${product.price.toLocaleString()}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

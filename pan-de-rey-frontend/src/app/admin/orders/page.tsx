@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Package, Truck, CheckCircle, Clock } from 'lucide-react';
 
 type OrderStatus = 'Nuevo' | 'Preparación' | 'Listo' | 'Enviado';
@@ -12,6 +12,9 @@ type Order = {
   total: number;
   status: OrderStatus;
   time: string;
+  email?: string;
+  phone?: string;
+  shippingMethod?: string;
 };
 
 const initialOrders: Order[] = [
@@ -24,9 +27,90 @@ const initialOrders: Order[] = [
 export default function OrdersKanban() {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isLive, setIsLive] = useState(false);
 
-  const moveOrder = (id: string, newStatus: OrderStatus) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+  const fetchOrders = async () => {
+    try {
+      const res = await fetch('http://localhost:3001/api/orders');
+      if (!res.ok) throw new Error('API offline');
+      const data = await res.json();
+      
+      setIsLive(true);
+      
+      // Map statuses from DB to Frontend Kanban categories
+      const mapped = data.map((o: any) => {
+        let kanbanStatus: OrderStatus = 'Nuevo';
+        if (o.status === 'Preparando') kanbanStatus = 'Preparación';
+        else if (o.status === 'Listo' || o.status === 'Listo para Retiro') kanbanStatus = 'Listo';
+        else if (o.status === 'En Ruta' || o.status === 'Entregado') kanbanStatus = 'Enviado';
+        
+        return {
+          id: o.id.substring(0, 8).toUpperCase(), // Display short UUID
+          realId: o.id, // Keep full UUID for API calls
+          customerName: o.customerName,
+          email: o.email,
+          phone: o.phone,
+          items: o.items,
+          total: o.total,
+          status: kanbanStatus,
+          time: o.time,
+          shippingMethod: o.shippingMethod
+        };
+      });
+      
+      // Filter out 'Cancelado' to keep board clean
+      const active = mapped.filter((o: any) => o.status !== 'Cancelado');
+      setOrders(active);
+    } catch (err) {
+      console.warn('Orders API not available, falling back to mock data:', err);
+      setIsLive(false);
+      setOrders(initialOrders);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const moveOrder = async (id: string, newStatus: OrderStatus) => {
+    const order = orders.find(o => o.id === id);
+    if (isLive && order && (order as any).realId) {
+      const realId = (order as any).realId;
+      
+      // Map Kanban status back to DB status
+      let dbStatus = 'Nuevo';
+      if (newStatus === 'Preparación') dbStatus = 'Preparando';
+      else if (newStatus === 'Listo') {
+        dbStatus = order.shippingMethod === 'Delivery' ? 'Listo' : 'Listo para Retiro';
+      }
+      else if (newStatus === 'Enviado') {
+        dbStatus = order.shippingMethod === 'Delivery' ? 'En Ruta' : 'Entregado';
+      }
+      
+      try {
+        const res = await fetch('http://localhost:3001/api/orders/update-status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            orderId: realId,
+            newStatus: dbStatus
+          })
+        });
+        
+        if (res.ok) {
+          fetchOrders();
+        } else {
+          alert('Error al actualizar el estado en el servidor');
+        }
+      } catch (err) {
+        console.error('Failed to update status:', err);
+        alert('Error de conexión al actualizar estado');
+      }
+    } else {
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+    }
   };
 
   const columns: { title: string; status: OrderStatus; icon: any }[] = [
@@ -38,9 +122,24 @@ export default function OrdersKanban() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-white mb-2">Pipeline de Pedidos</h1>
-        <p className="text-gray-400">Gestiona el flujo de trabajo de los pedidos activos.</p>
+      <div className="mb-6 flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-semibold text-white mb-2 flex items-center gap-2">
+            Pipeline de Pedidos
+            {isLive && (
+              <span className="w-2.5 h-2.5 bg-green-500 rounded-full inline-block animate-pulse" title="Conexión en vivo con base de datos" />
+            )}
+          </h1>
+          <p className="text-gray-400 text-sm">Gestiona el flujo de trabajo de los pedidos activos.</p>
+        </div>
+        {isLive && (
+          <button 
+            onClick={fetchOrders} 
+            className="px-3 py-1.5 bg-[#161616] text-gray-400 hover:text-white border border-white/5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors"
+          >
+            Sincronizar
+          </button>
+        )}
       </div>
 
       {/* Kanban Board */}
@@ -76,17 +175,17 @@ export default function OrdersKanban() {
                     </div>
                     
                     <div className="flex justify-between items-center pt-3 border-t border-charcoal-border/50">
-                      <span className="text-gold font-medium">${order.total.toFixed(2)}</span>
+                      <span className="text-gold font-medium">${order.total.toLocaleString()}</span>
                       {/* Action Buttons to move */}
                       <div className="flex gap-2">
                         {col.status === 'Nuevo' && (
-                          <button onClick={(e) => { e.stopPropagation(); moveOrder(order.id, 'Preparación') }} className="text-xs bg-gold/10 text-gold px-2 py-1 rounded-sm hover:bg-gold hover:text-black transition-colors">Preparar</button>
+                          <button onClick={(e) => { e.stopPropagation(); moveOrder(order.id, 'Preparación') }} className="text-[10px] bg-gold/10 text-gold px-2 py-1 rounded-sm hover:bg-gold hover:text-black transition-colors font-bold uppercase">Preparar</button>
                         )}
                         {col.status === 'Preparación' && (
-                          <button onClick={(e) => { e.stopPropagation(); moveOrder(order.id, 'Listo') }} className="text-xs bg-gold/10 text-gold px-2 py-1 rounded-sm hover:bg-gold hover:text-black transition-colors">Terminar</button>
+                          <button onClick={(e) => { e.stopPropagation(); moveOrder(order.id, 'Listo') }} className="text-[10px] bg-gold/10 text-gold px-2 py-1 rounded-sm hover:bg-gold hover:text-black transition-colors font-bold uppercase">Terminar</button>
                         )}
                         {col.status === 'Listo' && (
-                          <button onClick={(e) => { e.stopPropagation(); moveOrder(order.id, 'Enviado') }} className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded-sm hover:bg-green-500 hover:text-black transition-colors">Enviar</button>
+                          <button onClick={(e) => { e.stopPropagation(); moveOrder(order.id, 'Enviado') }} className="text-[10px] bg-green-500/10 text-green-500 px-2 py-1 rounded-sm hover:bg-green-500 hover:text-black transition-colors font-bold uppercase">{order.shippingMethod === 'Delivery' ? 'Despachar' : 'Entregar'}</button>
                         )}
                       </div>
                     </div>
@@ -109,8 +208,12 @@ export default function OrdersKanban() {
             <div className="p-6 space-y-4">
               <div>
                 <p className="text-sm text-gray-400">Cliente</p>
-                <p className="text-white">{selectedOrder.customerName}</p>
-                <p className="text-sm text-gray-400 mt-1">Tel: +54 9 11 1234-5678</p>
+                <p className="text-white font-medium">{selectedOrder.customerName}</p>
+                <p className="text-sm text-gray-400 mt-1">Email: {selectedOrder.email || 'No Registrado'}</p>
+                <p className="text-sm text-gray-400">Tel: {selectedOrder.phone || 'No Registrado'}</p>
+                {selectedOrder.shippingMethod && (
+                  <p className="text-sm text-gray-400">Tipo de Envío: {selectedOrder.shippingMethod === 'Delivery' ? 'Despacho a Domicilio' : 'Retiro en Tienda'}</p>
+                )}
               </div>
               <div className="pt-4 border-t border-charcoal-border">
                 <p className="text-sm text-gray-400 mb-2">Items</p>
@@ -121,8 +224,8 @@ export default function OrdersKanban() {
                 </ul>
               </div>
               <div className="pt-4 border-t border-charcoal-border flex justify-between">
-                <p className="text-sm text-gray-400">Total a cobrar</p>
-                <p className="text-xl text-gold font-serif">${selectedOrder.total.toFixed(2)}</p>
+                <p className="text-sm text-gray-400">Total</p>
+                <p className="text-xl text-gold font-serif">${selectedOrder.total.toLocaleString()}</p>
               </div>
             </div>
           </div>
