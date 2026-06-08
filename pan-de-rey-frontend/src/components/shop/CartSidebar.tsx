@@ -45,6 +45,26 @@ export default function CartSidebar() {
           </div>
         </div>
 
+        {/* Progress Bar Banner */}
+        {items.length > 0 && (
+          <div className="bg-[#121212] border-b border-white/5 p-4 animate-in slide-in-from-top duration-300">
+            <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider mb-2">
+              <span className={total >= 12000 ? "text-gold" : "text-gray-400"}>
+                {total >= 12000 
+                  ? "¡Felicitaciones! Tienes despacho gratis." 
+                  : `Faltan $${formatPrice(12000 - total)} para despacho gratis.`}
+              </span>
+              <span className="text-gold font-serif">{Math.min(Math.round((total / 12000) * 100), 100)}%</span>
+            </div>
+            <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gold transition-all duration-500"
+                style={{ width: `${Math.min((total / 12000) * 100, 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* List */}
         <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-hide">
           {items.length === 0 ? (
