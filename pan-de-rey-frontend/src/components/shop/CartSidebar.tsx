@@ -3,6 +3,7 @@
 import { useCart } from '@/context/CartContext';
 import { X, Plus, Minus, ShoppingBag, ArrowRight, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { formatPrice } from '@/utils/format';
 
 export default function CartSidebar() {
   const { isCartOpen, setIsCartOpen, items, updateQuantity, removeFromCart, total, clearCart } = useCart();
@@ -73,7 +74,7 @@ export default function CartSidebar() {
                     {item.dietaryType && <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-charcoal-light border border-white/5 text-gold rounded-full">{item.dietaryType}</span>}
                   </div>
                   <div className="flex items-center justify-between mt-3">
-                    <span className="text-gold font-bold">${(item.price * item.quantity).toLocaleString()}</span>
+                    <span className="text-gold font-bold">${formatPrice(item.price * item.quantity)}</span>
                     <div className="flex items-center border border-charcoal-border rounded-md bg-black">
                       <button 
                         onClick={() => updateQuantity(item.id, item.quantity - 1)} 
@@ -104,7 +105,7 @@ export default function CartSidebar() {
                 <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-1">Total del Pedido</p>
                 <p className="text-xs text-gray-600 font-light">Incluye impuestos y preparación</p>
               </div>
-              <span className="font-serif text-3xl text-gold">${total.toLocaleString()}</span>
+              <span className="font-serif text-3xl text-gold">${formatPrice(total)}</span>
             </div>
             
             <div className="space-y-4">

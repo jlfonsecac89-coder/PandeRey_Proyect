@@ -18,6 +18,7 @@ import { useCart } from '@/context/CartContext';
 import ProductDetail from './ProductDetail';
 import CheckoutForm from './CheckoutForm';
 import Navbar from '../Navbar';
+import { formatPrice } from '@/utils/format';
 
 const categories = [
   { id: 'all', name: 'Todo', icon: Utensils },
@@ -193,7 +194,7 @@ export default function ShopContainer() {
                     </div>
                     <div className="space-y-2 flex-grow flex flex-col justify-between">
                       <h3 className="text-base font-serif text-white group-hover:text-gold transition-colors line-clamp-2 leading-tight">{product.name}</h3>
-                      <p className="text-gold font-serif text-base font-semibold">${product.price.toLocaleString()}</p>
+                      <p className="text-gold font-serif text-base font-semibold">${formatPrice(product.price)}</p>
                     </div>
                   </div>
                 );

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ChevronRight, Plus, Minus, X } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { formatPrice } from '@/utils/format';
 
 interface ProductDetailProps {
   product?: {
@@ -61,7 +62,7 @@ export default function ProductDetail({ product, onClose }: ProductDetailProps) 
             {product.name}
           </h1>
           <p className="text-3xl font-light text-gold font-serif">
-            ${product.price.toLocaleString()}
+            ${formatPrice(product.price)}
           </p>
         </div>
 

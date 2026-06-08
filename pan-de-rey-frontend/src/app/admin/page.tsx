@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LabelList } from 'recharts';
 import { DollarSign, Package, ShoppingBag, AlertTriangle, AlertCircle, XCircle, Ban, Store, Truck } from 'lucide-react';
 import { seedLocalDb, getLocalAnalytics, getLocalOrders } from '@/utils/dbSim';
+import { formatPrice } from '@/utils/format';
 
 const getApiUrl = (path: string) => {
   if (typeof window !== 'undefined') {
@@ -245,7 +246,7 @@ export default function AdminDashboard() {
             <div className="p-2 bg-green-500/10 text-green-500 rounded-lg"><DollarSign className="w-5 h-5" /></div>
             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Ventas</p>
           </div>
-          <p className="text-3xl font-serif text-white font-bold">${kpiData.ventas.toLocaleString()}</p>
+          <p className="text-3xl font-serif text-white font-bold">${formatPrice(kpiData.ventas)}</p>
         </div>
         <div className="bg-[#161616] border border-white/5 p-5 rounded-xl shadow-md">
           <div className="flex items-center gap-3 mb-2">
@@ -327,10 +328,10 @@ export default function AdminDashboard() {
               <BarChart data={mainData} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
                 <XAxis dataKey="name" stroke="#888" tick={{ fill: '#888', fontSize: 12 }} angle={-25} textAnchor="end" />
-                <YAxis stroke="#888" tick={{ fill: '#888', fontSize: 12 }} tickFormatter={(val) => mainMetric === 'ventas' ? `$${val.toLocaleString()}` : val} />
+                <YAxis stroke="#888" tick={{ fill: '#888', fontSize: 12 }} tickFormatter={(val) => mainMetric === 'ventas' ? `$${formatPrice(val)}` : val} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }}
-                  formatter={(value: any) => [mainMetric === 'ventas' && typeof value === 'number' ? `$${value.toLocaleString()}` : value, mainMetric === 'ventas' ? 'Monto' : 'Cantidad']}
+                  formatter={(value: any) => [mainMetric === 'ventas' && typeof value === 'number' ? `$${formatPrice(value)}` : value, mainMetric === 'ventas' ? 'Monto' : 'Cantidad']}
                 />
                 <Bar dataKey={mainMetric} fill="#D4AF37" radius={[4, 4, 0, 0]}>
                   <LabelList 
@@ -366,7 +367,7 @@ export default function AdminDashboard() {
                 <YAxis dataKey="name" type="category" stroke="#888" tick={{ fill: '#888', fontSize: 11 }} width={100} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }}
-                  formatter={(value: any) => [materialMetric === 'ventas' && typeof value === 'number' ? `$${value.toLocaleString()}` : value, materialMetric === 'ventas' ? 'Monto' : 'Unidades']}
+                  formatter={(value: any) => [materialMetric === 'ventas' && typeof value === 'number' ? `$${formatPrice(value)}` : value, materialMetric === 'ventas' ? 'Monto' : 'Unidades']}
                 />
                 <Bar dataKey={materialMetric} fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24}>
                   <LabelList 
@@ -404,7 +405,7 @@ export default function AdminDashboard() {
               {recentOrdersList.map((order, idx) => (
                 <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
                   <td className="px-6 py-4 font-bold text-white">{order.id}</td>
-                  <td className="px-6 py-4 text-gold font-bold">${order.monto.toLocaleString()}</td>
+                  <td className="px-6 py-4 text-gold font-bold">${formatPrice(order.monto)}</td>
                   <td className="px-6 py-4">{order.tipo}</td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${

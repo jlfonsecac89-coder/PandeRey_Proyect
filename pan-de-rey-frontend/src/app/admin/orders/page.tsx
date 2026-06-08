@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Package, Truck, CheckCircle, Clock, AlertTriangle, AlertCircle, RefreshCw, MessageSquare, ShieldCheck, Check, Search } from 'lucide-react';
+import { formatPrice } from '@/utils/format';
 
 // Tipos
 type OrderStatus = 'Nuevo' | 'Preparación' | 'Listo' | 'Enviado';
@@ -386,7 +387,7 @@ export default function OrdersKanban() {
                           {/* Footer Tarjeta */}
                           <div className="flex justify-between items-center pt-3 border-t border-charcoal-border/50">
                             <span className="text-white font-serif font-bold text-sm">
-                              ${order.total.toLocaleString()}
+                              ${formatPrice(order.total)}
                             </span>
                             
                             {/* Botones de Acción */}
@@ -650,7 +651,7 @@ export default function OrdersKanban() {
                   <option value="">Selecciona el producto agotado...</option>
                   {subOrder.itemsRaw?.map(it => (
                     <option key={it.variantId} value={it.variantId}>
-                      {it.quantity}x {it.productName} ({it.variantName}) - ${it.price.toLocaleString()} c/u
+                      {it.quantity}x {it.productName} ({it.variantName}) - ${formatPrice(it.price)} c/u
                     </option>
                   ))}
                 </select>
@@ -670,7 +671,7 @@ export default function OrdersKanban() {
                     .filter(v => v.id !== variantToRemove) // No duplicar
                     .map(v => (
                       <option key={v.id} value={v.id}>
-                        {v.name} - ${v.price.toLocaleString()}
+                        {v.name} - ${formatPrice(v.price)}
                       </option>
                     ))
                   }
@@ -771,8 +772,8 @@ export default function OrdersKanban() {
                         <tr key={idx} className="border-b border-white/5 last:border-b-0">
                           <td className="py-2 text-gray-300 font-medium">{it.productName} <span className="text-[10px] text-gray-500">({it.variantName})</span></td>
                           <td className="py-2 text-center text-white">{it.quantity}</td>
-                          <td className="py-2 text-right text-gray-400">${it.price.toLocaleString()}</td>
-                          <td className="py-2 text-right text-white font-bold">${it.subtotal.toLocaleString()}</td>
+                          <td className="py-2 text-right text-gray-400">${formatPrice(it.price)}</td>
+                          <td className="py-2 text-right text-white font-bold">${formatPrice(it.subtotal)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -782,7 +783,7 @@ export default function OrdersKanban() {
               
               <div className="pt-4 border-t border-charcoal-border flex justify-between items-center">
                 <p className="text-xs text-gray-400 uppercase tracking-widest font-bold">Total del Pedido</p>
-                <p className="text-2xl text-gold font-serif font-bold">${selectedOrder.total.toLocaleString()}</p>
+                <p className="text-2xl text-gold font-serif font-bold">${formatPrice(selectedOrder.total)}</p>
               </div>
             </div>
           </div>
