@@ -1,0 +1,18 @@
+# =========================================================
+# Redirección de API para Pan de Rey (Apache / cPanel)
+# =========================================================
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Previene problemas en algunos subdirectorios
+    RewriteBase /api/
+
+    # Si el recurso solicitado no es un archivo real
+    RewriteCond %{REQUEST_FILENAME} !-f
+    
+    # Si el recurso solicitado no es una carpeta real
+    RewriteCond %{REQUEST_FILENAME} !-d
+    
+    # Redirigir todo a index.php pasando la ruta en la variable 'route'
+    RewriteRule ^(.*)$ index.php?route=$1 [QSA,L]
+</IfModule>

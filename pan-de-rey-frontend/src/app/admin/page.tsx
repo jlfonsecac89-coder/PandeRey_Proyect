@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LabelList } from 'recharts';
 import { DollarSign, Package, ShoppingBag, AlertTriangle, AlertCircle, XCircle, Ban, Store, Truck } from 'lucide-react';
+import { seedLocalDb, getLocalAnalytics, getLocalOrders } from '@/utils/dbSim';
 
 const getApiUrl = (path: string) => {
   if (typeof window !== 'undefined') {
@@ -119,10 +120,21 @@ export default function AdminDashboard() {
       }
       
     } catch (err) {
-      console.warn('Dashboard API not available, falling back to mock data:', err);
+      console.warn('Dashboard API not available, falling back to local simulation database:', err);
       setIsLive(false);
-      setKpiData(kpisFallback);
-      setRecentOrdersList(recentOrdersFallback);
+      
+      // Load from localStorage via dbSim
+      const localData = getLocalAnalytics();
+      setRawAnalytics(localData);
+      setKpiData(localData.kpis);
+      
+      const localOrders = getLocalOrders().slice(0, 5).map((o: any) => ({
+        id: o.id.replace('order-sim-', 'ORD-').toUpperCase(),
+        monto: o.total,
+        tipo: o.shippingMethod === 'Delivery' ? 'Envío Propio' : 'Retiro en Tienda',
+        estado: o.status === 'Preparando' ? 'Preparación' : o.status === 'Listo' ? 'Listo' : o.status === 'En Ruta' ? 'En Ruta' : o.status === 'Entregado' ? 'Entregado' : o.status
+      }));
+      setRecentOrdersList(localOrders);
     } finally {
       setLoading(false);
     }
@@ -132,13 +144,19 @@ export default function AdminDashboard() {
     setSeeding(true);
     try {
       const res = await fetch(getApiUrl('/api/orders/seed'));
-      if (!res.ok) throw new Error('Seed failed');
-      const data = await res.json();
-      alert(`Éxito: ${data.message}`);
-      fetchDashboardData();
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Éxito (Servidor): ${data.message}`);
+        fetchDashboardData();
+        setSeeding(false);
+        return;
+      }
+      throw new Error('Server seeding failed');
     } catch (err) {
-      console.error(err);
-      alert('Error: No se pudo poblar la base de datos. Asegúrate de que el backend esté corriendo.');
+      console.warn('Server seed failed, seeding local browser database instead...');
+      seedLocalDb(true);
+      alert('¡Éxito! Base de datos local (Simulador) poblada en tu navegador con 28 pedidos históricos.');
+      fetchDashboardData();
     } finally {
       setSeeding(false);
     }
