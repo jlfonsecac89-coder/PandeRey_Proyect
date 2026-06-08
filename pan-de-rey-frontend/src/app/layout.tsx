@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
-import { Montserrat, Playfair_Display } from "next/font/google";
+import { Manrope, EB_Garamond } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import CartSidebar from "@/components/shop/CartSidebar";
 
-const montserrat = Montserrat({
+const manrope = Manrope({
   variable: "--font-sans",
   subsets: ["latin"],
 });
 
-const playfair = Playfair_Display({
+const ebGaramond = EB_Garamond({
   variable: "--font-serif",
   subsets: ["latin"],
 });
@@ -27,7 +27,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${montserrat.variable} ${playfair.variable} h-full antialiased`}
+      className={`${manrope.variable} ${ebGaramond.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground selection:bg-gold selection:text-black">
         <CartProvider>

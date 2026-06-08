@@ -2,12 +2,14 @@
 
 :root {
   --background: #0B0B0B;
-  --foreground: #f3f3f3;
+  --foreground: #F5F5DC; /* Sable Crema para legibilidad cálida */
   
-  --color-gold: #C5A880;
-  --color-gold-hover: #D9C3A3;
-  --color-charcoal-light: #161616;
-  --color-charcoal-border: #2A2A2A;
+  --color-gold: #D4AF37;       /* Dorado Rey Premium */
+  --color-gold-hover: #E6CCA8; /* Dorado Claro */
+  --color-gold-dark: #A3835B;  /* Dorado Oscuro */
+  --color-charcoal-light: #161616; /* Onyx */
+  --color-charcoal-border: rgba(255, 255, 255, 0.08); /* Borde Glassmorphic sutil */
+  --color-glass-fill: rgba(22, 22, 22, 0.7);
 }
 
 @theme inline {
@@ -15,11 +17,13 @@
   --color-foreground: var(--foreground);
   --color-gold: var(--color-gold);
   --color-gold-hover: var(--color-gold-hover);
+  --color-gold-dark: var(--color-gold-dark);
   --color-charcoal-light: var(--color-charcoal-light);
   --color-charcoal-border: var(--color-charcoal-border);
+  --color-glass-fill: var(--color-glass-fill);
   
-  --font-sans: 'Montserrat', sans-serif;
-  --font-serif: 'Playfair Display', serif;
+  --font-sans: var(--font-sans), sans-serif;
+  --font-serif: var(--font-serif), serif;
 }
 
 body {
