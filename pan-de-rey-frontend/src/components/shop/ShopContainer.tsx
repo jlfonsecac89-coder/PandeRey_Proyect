@@ -125,13 +125,13 @@ export default function ShopContainer() {
                     <button
                       key={cat.id}
                       onClick={() => setActiveCategory(cat.id)}
-                      className={`flex items-center gap-3 whitespace-nowrap px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ${
+                      className={`flex items-center gap-3 whitespace-nowrap px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${
                         activeCategory === cat.id 
-                          ? 'bg-gold text-black' 
-                           : 'bg-white/5 text-gray-500 hover:text-white border border-white/5'
+                          ? 'bg-gold text-black shadow-[0_4px_20px_rgba(212,175,55,0.25)]' 
+                          : 'bg-charcoal-light/40 text-foreground/60 hover:text-foreground hover:bg-charcoal-light/80 border border-white/5'
                       }`}
                     >
-                      <Icon className="w-4 h-4" /> {/* Adjusted icon size */}
+                      <Icon className="w-3.5 h-3.5" />
                       {cat.name}
                     </button>
                   );
@@ -139,7 +139,7 @@ export default function ShopContainer() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-16">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredProducts.map((product) => {
                 const cartQty = items
                   .filter(item => item.productId === product.id.toString())
@@ -149,9 +149,9 @@ export default function ShopContainer() {
                   <div 
                     key={product.id} 
                     onClick={() => setSelectedProduct(product)}
-                    className="group cursor-pointer flex flex-col relative"
+                    className="group cursor-pointer flex flex-col relative bg-charcoal-light/40 border border-white/5 rounded-2xl p-4 hover:scale-[1.02] hover:shadow-[0_12px_40px_rgba(212,175,55,0.06)] hover:border-gold/25 transition-all duration-300 backdrop-blur-sm"
                   >
-                    <div className="relative aspect-square w-full mb-6 rounded-sm overflow-hidden bg-white/5">
+                    <div className="relative aspect-square w-full mb-5 rounded-xl overflow-hidden bg-white/5">
                       <Image 
                         src={product.image} 
                         alt={product.name} 
@@ -166,18 +166,18 @@ export default function ShopContainer() {
                       {cartQty > 0 ? (
                         <div 
                           onClick={(e) => e.stopPropagation()}
-                          className="absolute bottom-4 right-4 h-10 bg-gold text-black rounded-sm flex items-center shadow-xl opacity-100 transition-all duration-300 z-20 border border-black/10"
+                          className="absolute bottom-4 right-4 h-9 bg-gold text-black rounded-lg flex items-center shadow-xl opacity-100 transition-all duration-300 z-20 border border-black/10 overflow-hidden"
                         >
                           <button 
                             onClick={(e) => handleDecrementProduct(e, product.id.toString())}
-                            className="w-8 h-full flex items-center justify-center hover:bg-black/10 active:scale-95 transition-all text-sm font-bold"
+                            className="w-7 h-full flex items-center justify-center hover:bg-black/10 active:scale-95 transition-all text-xs font-bold"
                           >
                             -
                           </button>
-                          <span className="px-1.5 font-bold text-xs min-w-[20px] text-center select-none">{cartQty}</span>
+                          <span className="px-1 font-bold text-xs min-w-[18px] text-center select-none">{cartQty}</span>
                           <button 
                             onClick={(e) => handleIncrementProduct(e, product)}
-                            className="w-8 h-full flex items-center justify-center hover:bg-black/10 active:scale-95 transition-all text-sm font-bold"
+                            className="w-7 h-full flex items-center justify-center hover:bg-black/10 active:scale-95 transition-all text-xs font-bold"
                           >
                             +
                           </button>
@@ -185,15 +185,15 @@ export default function ShopContainer() {
                       ) : (
                         <button 
                           onClick={(e) => handleAddToCart(e, product)}
-                          className="absolute bottom-4 right-4 w-10 h-10 bg-gold text-black rounded-sm flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 hover:bg-gold-hover active:scale-95 shadow-xl z-20"
+                          className="absolute bottom-4 right-4 w-9 h-9 bg-gold text-black rounded-lg flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 hover:bg-gold-hover active:scale-95 shadow-xl z-20"
                         >
-                          <Plus className="w-5 h-5" />
+                          <Plus className="w-4.5 h-4.5" />
                         </button>
                       )}
                     </div>
-                    <div className="space-y-1">
-                      <h3 className="text-lg font-serif text-white group-hover:text-gold transition-colors">{product.name}</h3>
-                      <p className="text-gold font-serif">${product.price.toLocaleString()}</p>
+                    <div className="space-y-2 flex-grow flex flex-col justify-between">
+                      <h3 className="text-base font-serif text-white group-hover:text-gold transition-colors line-clamp-2 leading-tight">{product.name}</h3>
+                      <p className="text-gold font-serif text-base font-semibold">${product.price.toLocaleString()}</p>
                     </div>
                   </div>
                 );
@@ -206,10 +206,10 @@ export default function ShopContainer() {
       {/* Checkout Overlay */}
       {isCheckoutOpen && (
         <div className="fixed inset-0 z-[150] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity duration-500">
-          <div className="bg-[#0B0B0B] w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-sm border border-gold/30 shadow-2xl animate-in slide-in-from-bottom-8 duration-500">
-            <div className="sticky top-0 z-10 bg-[#0B0B0B] p-6 border-b border-white/10 flex items-center justify-between">
-              <h2 className="text-white font-serif text-2xl">Finalizar Pedido</h2>
-              <button onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-white">
+          <div className="bg-[#0B0B0B] w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 shadow-2xl animate-in slide-in-from-bottom-8 duration-500">
+            <div className="sticky top-0 z-10 bg-[#0B0B0B]/90 backdrop-blur-md p-6 border-b border-white/5 flex items-center justify-between">
+              <h2 className="text-white font-serif text-2xl tracking-wide">Finalizar Pedido</h2>
+              <button onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-white transition-colors duration-300">
                 <X className="w-6 h-6" />
               </button>
             </div>
