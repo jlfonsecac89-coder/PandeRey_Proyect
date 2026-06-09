@@ -37,25 +37,227 @@ export type SimProduct = {
   price: number;
   category: string;
   stock: number;
+  image?: string;
+  description?: string;
+  subCategory?: string;
+  cobertura?: string;
+  relleno?: string;
+  estilo?: string;
+  tipoSemilla?: string;
 };
 
 // Seed initial products with varying stock levels to trigger KPI warnings
 const initialProducts: SimProduct[] = [
-  { id: 1, name: 'Pan de Masa Madre Clásico', price: 4500, category: 'Panadería', stock: 12 },
-  { id: 2, name: 'Focaccia al Romero', price: 3800, category: 'Panadería', stock: 8 }, // Alerta
-  { id: 3, name: 'Baguette Tradicional', price: 1800, category: 'Panadería', stock: 15 },
-  { id: 4, name: 'Pan de Centeno Alemán', price: 4200, category: 'Panadería', stock: 4 }, // Riesgo
-  { id: 5, name: 'Ciabatta Rústica', price: 2200, category: 'Panadería', stock: 2 }, // Crítico
-  { id: 6, name: 'Croissant de Mantequilla', price: 2200, category: 'Pastelería', stock: 25 },
-  { id: 7, name: 'Pain au Chocolat', price: 2500, category: 'Pastelería', stock: 0 }, // Sin Stock
-  { id: 8, name: 'Tarta de Limón y Merengue', price: 3800, category: 'Pastelería', stock: 6 }, // Alerta
-  { id: 9, name: 'Roll de Canela Glaseado', price: 2800, category: 'Pastelería', stock: 3 }, // Crítico
-  { id: 10, name: 'Brownie Sin Gluten', price: 2500, category: 'Sin Gluten', stock: 14 },
-  { id: 11, name: 'Pan de Molde Keto', price: 5500, category: 'Sin Gluten', stock: 5 }, // Riesgo
-  { id: 12, name: 'Galletas de Almendra', price: 1800, category: 'Sin Gluten', stock: 18 },
-  { id: 13, name: 'Café Latte XL', price: 3500, category: 'Bebestibles', stock: 50 },
-  { id: 14, name: 'Espresso Doble', price: 2200, category: 'Bebestibles', stock: 60 },
-  { id: 15, name: 'Cappuccino Italiano', price: 3200, category: 'Bebestibles', stock: 45 },
+  { 
+    id: 1, 
+    name: 'Pan de Masa Madre Clásico', 
+    price: 4500, 
+    category: 'Panadería', 
+    stock: 12,
+    image: 'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&q=80',
+    description: 'Elaborado con una masa madre de 5 años de antigüedad y harinas orgánicas, con una fermentación lenta de 48 horas.',
+    subCategory: 'Masa Madre',
+    cobertura: 'Ninguna',
+    relleno: 'Ninguno',
+    estilo: 'Tradicional',
+    tipoSemilla: 'Ninguna'
+  },
+  { 
+    id: 2, 
+    name: 'Focaccia al Romero', 
+    price: 3800, 
+    category: 'Panadería', 
+    stock: 8,
+    image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80',
+    description: 'Focaccia esponjosa con aceite de oliva extra virgen, sal de mar y romero fresco de nuestro huerto.',
+    subCategory: 'Especialidades',
+    cobertura: 'Aceite de oliva y romero',
+    relleno: 'Ninguno',
+    estilo: 'Italiano',
+    tipoSemilla: 'Ninguna'
+  },
+  { 
+    id: 3, 
+    name: 'Baguette Tradicional', 
+    price: 1800, 
+    category: 'Panadería', 
+    stock: 15,
+    image: 'https://images.unsplash.com/photo-1598373182133-52452f7691ef?w=800&q=80',
+    description: 'Baguette parisina clásica de corteza crujiente y miga alveolada y suave.',
+    subCategory: 'Rústicos',
+    cobertura: 'Harina espolvoreada',
+    relleno: 'Ninguno',
+    estilo: 'Francés',
+    tipoSemilla: 'Ninguna'
+  },
+  { 
+    id: 4, 
+    name: 'Pan de Centeno Alemán', 
+    price: 4200, 
+    category: 'Panadería', 
+    stock: 4,
+    image: 'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&q=80&crop=edges',
+    description: 'Pan denso de centeno integral con semillas de alcaravea, ideal para acompañar quesos maduros.',
+    subCategory: 'Centeno',
+    cobertura: 'Semillas de alcaravea',
+    relleno: 'Ninguno',
+    estilo: 'Rústico Alemán',
+    tipoSemilla: 'Alcaravea'
+  },
+  { 
+    id: 5, 
+    name: 'Ciabatta Rústica', 
+    price: 2200, 
+    category: 'Panadería', 
+    stock: 2,
+    image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80&crop=faces',
+    description: 'Pan italiano de alta hidratación, corteza fina y miga ligera perfecta para sándwiches.',
+    subCategory: 'Especialidades',
+    cobertura: 'Ninguna',
+    relleno: 'Ninguno',
+    estilo: 'Italiano',
+    tipoSemilla: 'Ninguna'
+  },
+  { 
+    id: 6, 
+    name: 'Croissant de Mantequilla', 
+    price: 2200, 
+    category: 'Pastelería', 
+    stock: 25,
+    image: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?w=800&q=80',
+    description: 'Hojaldre francés clásico elaborado con 100% mantequilla premium, crujiente por fuera y aireado por dentro.',
+    subCategory: 'Hojaldres',
+    cobertura: 'Brillo de almíbar',
+    relleno: 'Mantequilla',
+    estilo: 'Francés',
+    tipoSemilla: 'Ninguna'
+  },
+  { 
+    id: 7, 
+    name: 'Pain au Chocolat', 
+    price: 2500, 
+    category: 'Pastelería', 
+    stock: 0,
+    image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80&sat=1',
+    description: 'Hojaldre relleno con dos barras de chocolate belga semi-amargo de alta calidad.',
+    subCategory: 'Hojaldres',
+    cobertura: 'Ninguna',
+    relleno: 'Chocolate semi-amargo',
+    estilo: 'Francés',
+    tipoSemilla: 'Ninguna'
+  },
+  { 
+    id: 8, 
+    name: 'Tarta de Limón y Merengue', 
+    price: 3800, 
+    category: 'Pastelería', 
+    stock: 6,
+    image: 'https://images.unsplash.com/photo-1550617931-e17a7b70dce2?w=800&q=80',
+    description: 'Base de masa sablee crujiente, crema ácida de limón natural y copetes dorados de merengue italiano.',
+    subCategory: 'Tartas',
+    cobertura: 'Merengue italiano',
+    relleno: 'Crema de limón',
+    estilo: 'Clásico',
+    tipoSemilla: 'Ninguna'
+  },
+  { 
+    id: 9, 
+    name: 'Roll de Canela Glaseado', 
+    price: 2800, 
+    category: 'Pastelería', 
+    stock: 3,
+    image: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?w=800&q=80&sat=2',
+    description: 'Espiral de masa brioche esponjosa rellena con canela de Ceilán y cubierta con glaseado de queso crema.',
+    subCategory: 'Brioche',
+    cobertura: 'Glaseado de queso crema',
+    relleno: 'Canela y azúcar rubia',
+    estilo: 'Americano',
+    tipoSemilla: 'Ninguna'
+  },
+  { 
+    id: 10, 
+    name: 'Brownie Sin Gluten', 
+    price: 2500, 
+    category: 'Sin Gluten', 
+    stock: 14,
+    image: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=800&q=80',
+    description: 'Brownie húmedo e intenso de chocolate negro, elaborado con harina de almendras y nueces picadas.',
+    subCategory: 'Dulces',
+    cobertura: 'Lluvia de cacao',
+    relleno: 'Nueces',
+    estilo: 'Fudge',
+    tipoSemilla: 'Ninguna'
+  },
+  { 
+    id: 11, 
+    name: 'Pan de Molde Keto', 
+    price: 5500, 
+    category: 'Sin Gluten', 
+    stock: 5,
+    image: 'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&q=80&bri=1',
+    description: 'Pan de molde bajo en carbohidratos elaborado con harina de coco, linaza y huevo, ideal para dietas cetogénicas.',
+    subCategory: 'Panes',
+    cobertura: 'Semillas de linaza',
+    relleno: 'Ninguno',
+    estilo: 'Saludable',
+    tipoSemilla: 'Linaza y sésamo'
+  },
+  { 
+    id: 12, 
+    name: 'Galletas de Almendra', 
+    price: 1800, 
+    category: 'Sin Gluten', 
+    stock: 18,
+    image: 'https://images.unsplash.com/photo-1550617931-e17a7b70dce2?w=800&q=80&con=1',
+    description: 'Crujientes galletas sin gluten elaboradas con harina de almendra y aromatizadas con cáscara de naranja.',
+    subCategory: 'Galletas',
+    cobertura: 'Almendras fileteadas',
+    relleno: 'Ninguno',
+    estilo: 'Rústico',
+    tipoSemilla: 'Ninguna'
+  },
+  { 
+    id: 13, 
+    name: 'Café Latte XL', 
+    price: 3500, 
+    category: 'Bebestibles', 
+    stock: 50,
+    image: 'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=800&q=80',
+    description: 'Doble shot de espresso de grano arábica con leche al vapor texturizada.',
+    subCategory: 'Cafetería Caliente',
+    cobertura: 'Canela espolvoreada',
+    relleno: 'Leche texturizada',
+    estilo: 'Italiano',
+    tipoSemilla: 'Ninguna'
+  },
+  { 
+    id: 14, 
+    name: 'Espresso Doble', 
+    price: 2200, 
+    category: 'Bebestibles', 
+    stock: 60,
+    image: 'https://images.unsplash.com/photo-1511920170033-f8396924c348?w=800&q=80',
+    description: 'Extracción concentrada e intensa de café de especialidad arábica 100%.',
+    subCategory: 'Cafetería Caliente',
+    cobertura: 'Crema de café natural',
+    relleno: 'Ninguno',
+    estilo: 'Italiano',
+    tipoSemilla: 'Ninguna'
+  },
+  { 
+    id: 15, 
+    name: 'Cappuccino Italiano', 
+    price: 3200, 
+    category: 'Bebestibles', 
+    stock: 45,
+    image: 'https://images.unsplash.com/photo-1495474472207-464a8d960c8b?w=800&q=80',
+    description: 'Terceras partes iguales de espresso, leche caliente y espuma de leche de textura sedosa.',
+    subCategory: 'Cafetería Caliente',
+    cobertura: 'Cacao fino en polvo',
+    relleno: 'Ninguno',
+    estilo: 'Clásico Italiano',
+    tipoSemilla: 'Ninguna'
+  }
 ];
 
 const customerNames = ['María González', 'Juan Pérez', 'Diego Muñoz', 'Camila Rojas', 'José Fonseca'];
@@ -65,11 +267,18 @@ const phones = ['+56987654321', '+56911112222', '+56933334444', '+56955556666', 
 export const seedLocalDb = (force = false): boolean => {
   if (typeof window === 'undefined') return false;
   
+  const existingProducts = localStorage.getItem('pan_de_rey_sim_products');
+  if (!existingProducts || force) {
+    localStorage.setItem('pan_de_rey_sim_products', JSON.stringify(initialProducts));
+  }
+
   const existingOrders = localStorage.getItem('pan_de_rey_sim_orders');
   if (existingOrders && !force) return false; // Already seeded
 
   // Seed Products
-  localStorage.setItem('pan_de_rey_sim_products', JSON.stringify(initialProducts));
+  if (force) {
+    localStorage.setItem('pan_de_rey_sim_products', JSON.stringify(initialProducts));
+  }
 
   // Seed 28 Orders
   const orders: SimOrder[] = [];
@@ -306,6 +515,60 @@ export const incrementLocalOrderLabel = (orderId: string): SimOrder[] => {
   const orders = getLocalOrders();
   const updated = orders.map(o => o.id === orderId ? { ...o, labelPrintedCount: (o.labelPrintedCount || 0) + 1 } : o);
   localStorage.setItem('pan_de_rey_sim_orders', JSON.stringify(updated));
+  return updated;
+};
+
+// CRUD operations for products
+export const getLocalProducts = (): SimProduct[] => {
+  if (typeof window === 'undefined') return [];
+  seedLocalDb(); // Ensure db is seeded
+  const raw = localStorage.getItem('pan_de_rey_sim_products');
+  return raw ? JSON.parse(raw) : [];
+};
+
+export const saveLocalProducts = (products: SimProduct[]): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('pan_de_rey_sim_products', JSON.stringify(products));
+};
+
+export const addLocalProduct = (product: Omit<SimProduct, 'id'>): SimProduct => {
+  const products = getLocalProducts();
+  const nextId = products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1;
+  const newProduct: SimProduct = {
+    ...product,
+    id: nextId
+  };
+  products.push(newProduct);
+  saveLocalProducts(products);
+  return newProduct;
+};
+
+export const updateLocalProduct = (id: number, updates: Partial<SimProduct>): SimProduct[] => {
+  const products = getLocalProducts();
+  const updated = products.map(p => p.id === id ? { ...p, ...updates } : p);
+  saveLocalProducts(updated);
+  return updated;
+};
+
+export const deleteLocalProduct = (id: number): SimProduct[] => {
+  const products = getLocalProducts();
+  const filtered = products.filter(p => p.id !== id);
+  saveLocalProducts(filtered);
+  return filtered;
+};
+
+export const bulkAddLocalProducts = (newProducts: Omit<SimProduct, 'id'>[]): SimProduct[] => {
+  const products = getLocalProducts();
+  let nextId = products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1;
+  
+  const mapped = newProducts.map(p => {
+    const item = { ...p, id: nextId };
+    nextId++;
+    return item;
+  });
+  
+  const updated = [...products, ...mapped];
+  saveLocalProducts(updated);
   return updated;
 };
 
