@@ -7,11 +7,28 @@ export type SimOrder = {
   email: string;
   phone: string;
   items: string[];
+  itemsRaw?: {
+    variantId: string;
+    productName: string;
+    variantName: string;
+    quantity: number;
+    price: number;
+    subtotal: number;
+  }[];
   total: number;
   status: string;
   time: string;
   createdAt: string;
   shippingMethod: 'Retiro' | 'Delivery';
+  slaStartedAt?: string | null;
+  slaPausedAt?: string | null;
+  slaPausedTime?: number;
+  deliveryPin?: string | null;
+  completenessPercent?: number;
+  orderState?: 'Pendiente' | 'Aceptado';
+  labelPrintedCount?: number;
+  pickupTime?: string;
+  actualDeliveryTime?: string | null;
 };
 
 export type SimProduct = {
@@ -56,7 +73,7 @@ export const seedLocalDb = (force = false): boolean => {
 
   // Seed 28 Orders
   const orders: SimOrder[] = [];
-  const statuses = ['Nuevo', 'Preparando', 'Listo', 'En Ruta', 'Entregado', 'Cancelado'];
+  const statuses = ['Nuevo', 'Preparando', 'Listo', 'En Ruta', 'Entregado', 'Cancelado', 'Incompleto'];
   const methods: ('Retiro' | 'Delivery')[] = ['Retiro', 'Delivery'];
 
   for (let i = 1; i <= 28; i++) {
@@ -69,6 +86,7 @@ export const seedLocalDb = (force = false): boolean => {
     // Pick 1-3 random items
     const itemsCount = 1 + (i % 3);
     const items: string[] = [];
+    const itemsRaw: any[] = [];
     let total = 0;
 
     for (let j = 0; j < itemsCount; j++) {
@@ -77,14 +95,45 @@ export const seedLocalDb = (force = false): boolean => {
       const sub = prod.price * qty;
       total += sub;
       items.push(`${qty}x ${prod.name} (Clásico)`);
+      itemsRaw.push({
+        variantId: `var-prod-${prod.id}`,
+        productName: prod.name,
+        variantName: 'Clásico',
+        quantity: qty,
+        price: prod.price,
+        subtotal: sub
+      });
     }
 
     const shippingMethod = methods[i % methods.length];
     const shippingCost = shippingMethod === 'Delivery' ? 3500 : 0;
     total += shippingCost;
 
-    const status = i === 1 ? 'Nuevo' : i === 2 ? 'Preparando' : i === 3 ? 'Listo' : statuses[i % statuses.length];
+    // Distribuir estados para que no sean todos iguales
+    let status = statuses[i % statuses.length];
+    if (i === 1) status = 'Nuevo';
+    if (i === 2) status = 'Preparando';
+    if (i === 3) status = 'Listo';
+    if (i === 4) status = 'Incompleto';
+
     const timeFormatted = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Tiempos estimados y reales
+    const minutesToAdd = shippingMethod === 'Retiro' ? 40 : 60;
+    const estimatedDate = new Date(date.getTime() + minutesToAdd * 60 * 1000);
+    const pickupTimeFormatted = estimatedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    const actualDelDate = status === 'Entregado' ? new Date(date.getTime() + (minutesToAdd - 5) * 60 * 1000) : null;
+    const actualDeliveryTimeFormatted = actualDelDate ? actualDelDate.toISOString() : null;
+
+    // Completitud
+    const completenessPercent = status === 'Incompleto' ? 66 : 100;
+    
+    // Estado de Aceptación
+    const orderState = status === 'Nuevo' ? 'Pendiente' : 'Aceptado';
+    
+    // Copias de etiquetas impresas
+    const labelPrintedCount = status === 'Nuevo' ? 0 : (i % 3);
 
     orders.push({
       id: orderId,
@@ -92,11 +141,21 @@ export const seedLocalDb = (force = false): boolean => {
       email: emails[custIdx],
       phone: phones[custIdx],
       items,
+      itemsRaw,
       total,
       status,
       time: timeFormatted,
       createdAt: date.toISOString(),
-      shippingMethod
+      shippingMethod,
+      slaStartedAt: date.toISOString(),
+      slaPausedAt: status === 'Incompleto' ? new Date(date.getTime() + 10 * 60 * 1000).toISOString() : null,
+      slaPausedTime: status === 'Incompleto' ? 300 : 0,
+      deliveryPin: shippingMethod === 'Delivery' ? String(1000 + (i * 27) % 9000) : null,
+      completenessPercent,
+      orderState,
+      labelPrintedCount,
+      pickupTime: pickupTimeFormatted,
+      actualDeliveryTime: actualDeliveryTimeFormatted
     });
   }
 
@@ -241,3 +300,12 @@ export const getLocalAnalytics = () => {
     productSales,
   };
 };
+
+export const incrementLocalOrderLabel = (orderId: string): SimOrder[] => {
+  if (typeof window === 'undefined') return [];
+  const orders = getLocalOrders();
+  const updated = orders.map(o => o.id === orderId ? { ...o, labelPrintedCount: (o.labelPrintedCount || 0) + 1 } : o);
+  localStorage.setItem('pan_de_rey_sim_orders', JSON.stringify(updated));
+  return updated;
+};
+

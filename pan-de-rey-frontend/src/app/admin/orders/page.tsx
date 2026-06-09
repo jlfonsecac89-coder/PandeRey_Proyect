@@ -1,8 +1,35 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Package, Truck, CheckCircle, Clock, AlertTriangle, AlertCircle, RefreshCw, MessageSquare, ShieldCheck, Check, Search } from 'lucide-react';
+import { 
+  Package, 
+  Truck, 
+  CheckCircle, 
+  Clock, 
+  AlertTriangle, 
+  AlertCircle, 
+  RefreshCw, 
+  MessageSquare, 
+  ShieldCheck, 
+  Check, 
+  Search, 
+  Printer, 
+  Eye, 
+  Filter, 
+  Calendar,
+  Layers,
+  Inbox,
+  UserCheck,
+  TrendingUp,
+  FileText
+} from 'lucide-react';
 import { formatPrice } from '@/utils/format';
+import { 
+  getLocalOrders, 
+  updateLocalOrderStatus, 
+  incrementLocalOrderLabel, 
+  seedLocalDb 
+} from '@/utils/dbSim';
 
 // Tipos
 type OrderStatus = 'Nuevo' | 'Preparación' | 'Listo' | 'Enviado';
@@ -29,10 +56,17 @@ type Order = {
   time: string;
   createdAt: string;
   shippingMethod: string;
-  slaStartedAt: string | null;
-  slaPausedAt: string | null;
-  slaPausedTime: number;
-  deliveryPin: string | null;
+  slaStartedAt?: string | null;
+  slaPausedAt?: string | null;
+  slaPausedTime?: number;
+  deliveryPin?: string | null;
+  
+  // Nuevos campos
+  pickupTime?: string;
+  completenessPercent?: number;
+  orderState?: 'Pendiente' | 'Aceptado';
+  labelPrintedCount?: number;
+  actualDeliveryTime?: string | null;
 };
 
 // Catálogo de variantes fijas de la panadería para la sustitución de stock
@@ -57,8 +91,8 @@ const getApiUrl = (path: string) => {
   return path;
 };
 
-// Componente del Cronómetro del SLA
-function SlaTimer({ startedAt, pausedAt, pausedTime, status }: { startedAt: string | null, pausedAt: string | null, pausedTime: number, status: string }) {
+// Componente del Cronómetro del SLA para la grilla Kanban
+function SlaTimer({ startedAt, pausedAt, pausedTime, status }: { startedAt?: string | null, pausedAt?: string | null, pausedTime?: number, status: string }) {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   useEffect(() => {
@@ -66,16 +100,15 @@ function SlaTimer({ startedAt, pausedAt, pausedTime, status }: { startedAt: stri
 
     const calculateTime = () => {
       const startTime = new Date(startedAt).getTime();
-      // Si está pausado (ej: Incompleto), congelar el tiempo actual en la fecha de pausa
       const now = pausedAt ? new Date(pausedAt).getTime() : Date.now();
-      const elapsedSeconds = Math.floor((now - startTime) / 1000) - pausedTime;
+      const elapsedSeconds = Math.floor((now - startTime) / 1000) - (pausedTime || 0);
       const totalSla = 40 * 60; // 40 minutos de SLA
       setTimeLeft(totalSla - elapsedSeconds);
     };
 
     calculateTime();
     if (pausedAt || status === 'Entregado' || status === 'Cancelado') {
-      return; // No refrescar si está pausado o ya finalizó
+      return;
     }
 
     const interval = setInterval(calculateTime, 1000);
@@ -104,12 +137,103 @@ function SlaTimer({ startedAt, pausedAt, pausedTime, status }: { startedAt: stri
   );
 }
 
-export default function OrdersKanban() {
+// Componente Celda de SLA Dinámico para la Tabla Principal de Seguimiento
+function SlaTableCell({ order }: { order: Order }) {
+  const [slaData, setSlaData] = useState<{
+    timeString: string;
+    label: string;
+    class: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const calculateSla = () => {
+      const { status, slaStartedAt, slaPausedAt, slaPausedTime, shippingMethod } = order;
+
+      if (status === 'Entregado' || status === 'Cancelado') {
+        setSlaData({
+          timeString: '--:--',
+          label: status === 'Entregado' ? 'Entregado' : 'Cancelado',
+          class: 'text-gray-500 bg-gray-500/10 border border-gray-500/20'
+        });
+        return;
+      }
+
+      if (!slaStartedAt) {
+        setSlaData({
+          timeString: '--:--',
+          label: 'Sin SLA',
+          class: 'text-gray-400 bg-white/5 border border-white/5'
+        });
+        return;
+      }
+
+      const startTime = new Date(slaStartedAt).getTime();
+      const now = slaPausedAt ? new Date(slaPausedAt).getTime() : Date.now();
+      const elapsedSeconds = Math.floor((now - startTime) / 1000) - (slaPausedTime || 0);
+      const totalSla = (shippingMethod === 'Delivery' ? 60 : 40) * 60; // 60m delivery, 40m retiro
+      const timeLeft = totalSla - elapsedSeconds;
+
+      const isExceeded = timeLeft < 0;
+      const absSeconds = Math.abs(timeLeft);
+      const minutes = Math.floor(absSeconds / 60);
+      const seconds = absSeconds % 60;
+      const timeString = `${isExceeded ? '-' : ''}${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+      let label = 'Normal';
+      let colorClass = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+
+      if (slaPausedAt) {
+        label = 'Pausado';
+        colorClass = 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/30 animate-pulse';
+      } else if (isExceeded) {
+        label = 'Vencido';
+        colorClass = 'bg-red-950/20 text-red-500 border border-red-900/30';
+      } else if (timeLeft <= 60) {
+        label = 'Crítico';
+        colorClass = 'bg-red-500/15 text-red-500 border border-red-500/30 animate-pulse';
+      } else if (timeLeft <= 300) {
+        label = 'Urgente';
+        colorClass = 'bg-orange-500/15 text-orange-500 border border-orange-500/30';
+      } else if (timeLeft <= 600) {
+        label = 'Alerta';
+        colorClass = 'bg-yellow-500/15 text-yellow-500 border border-yellow-500/30';
+      }
+
+      setSlaData({
+        timeString,
+        label,
+        class: colorClass
+      });
+    };
+
+    calculateSla();
+    if (order.status === 'Entregado' || order.status === 'Cancelado' || order.slaPausedAt) {
+      return;
+    }
+
+    const interval = setInterval(calculateSla, 1000);
+    return () => clearInterval(interval);
+  }, [order]);
+
+  if (!slaData) return <span className="text-gray-600">--:--</span>;
+
+  return (
+    <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-mono font-bold leading-none ${slaData.class}`}>
+      <Clock className="w-3.5 h-3.5" />
+      <span>{slaData.timeString} ({slaData.label})</span>
+    </div>
+  );
+}
+
+export default function OrdersDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [labelPrintOrder, setLabelPrintOrder] = useState<Order | null>(null);
   const [isLive, setIsLive] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'kanban' | 'exceptions'>('kanban');
+  const [activeTab, setActiveTab] = useState<'tracking' | 'kanban' | 'exceptions'>('tracking');
+  const [pipelineFilter, setPipelineFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Estados de Modales y Formularios
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
@@ -128,11 +252,12 @@ export default function OrdersKanban() {
       const res = await fetch(getApiUrl('/api/orders'));
       if (!res.ok) throw new Error('API offline');
       const data = await res.json();
-      
       setOrders(data);
       setIsLive(true);
     } catch (err) {
-      console.warn('Orders API not available in local mode, simulating offline database.');
+      console.warn('Orders API not available, running local simulator.');
+      const localData = getLocalOrders();
+      setOrders(localData);
       setIsLive(false);
     } finally {
       setLoading(false);
@@ -143,7 +268,7 @@ export default function OrdersKanban() {
     fetchOrders();
   }, []);
 
-  // Mover pedido de estado (Kanban)
+  // Mover pedido de estado
   const moveOrder = async (id: string, newDbStatus: string, pinCode?: string) => {
     const order = orders.find(o => o.id === id);
     if (!order) return;
@@ -182,8 +307,58 @@ export default function OrdersKanban() {
         alert('Error de conexión al actualizar estado');
       }
     } else {
-      alert('Funcionalidad en vivo deshabilitada. Conecta la base de datos MySQL.');
+      // Simulación offline local
+      if (newDbStatus === 'Entregado' && order.shippingMethod === 'Delivery') {
+        if (pinCode !== order.deliveryPin) {
+          setPinError('Código PIN incorrecto');
+          return;
+        }
+        setIsPinModalOpen(false);
+        setEnteredPin('');
+        setPinError('');
+      }
+
+      // Actualizar estado en el simulador local
+      const updated = updateLocalOrderStatus(order.id, newDbStatus);
+      
+      // Ajuste de campos derivados que no maneja updateLocalOrderStatus por defecto
+      const local = getLocalOrders();
+      const adjusted = local.map(o => {
+        if (o.id === order.id) {
+          const nextState = newDbStatus === 'Nuevo' ? 'Pendiente' as const : 'Aceptado' as const;
+          const actualTime = newDbStatus === 'Entregado' ? new Date().toISOString() : o.actualDeliveryTime;
+          return {
+            ...o,
+            orderState: nextState,
+            actualDeliveryTime: actualTime
+          };
+        }
+        return o;
+      });
+      localStorage.setItem('pan_de_rey_sim_orders', JSON.stringify(adjusted));
+      fetchOrders();
     }
+  };
+
+  // Incrementar copias de etiquetas e imprimir
+  const handlePrintLabel = async (order: Order) => {
+    if (isLive) {
+      try {
+        await fetch(getApiUrl('/api/orders/increment-label'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: order.realId || order.id })
+        });
+      } catch (err) {
+        console.error('Failed to increment label count on server:', err);
+      }
+    } else {
+      incrementLocalOrderLabel(order.id);
+    }
+    
+    // Abre previsualización de impresión no fiscal
+    setLabelPrintOrder(order);
+    fetchOrders(); // Refrescar tabla para mostrar incremento del contador
   };
 
   // Procesar Sustitución de Producto Faltante
@@ -194,39 +369,120 @@ export default function OrdersKanban() {
       return;
     }
 
-    try {
-      const res = await fetch(getApiUrl('/api/orders/substitute'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: subOrder.realId || subOrder.id,
-          variantIdToRemove: variantToRemove,
-          variantIdToAdd: variantToAdd
-        })
-      });
-      
-      const data = await res.json();
-      if (res.ok) {
-        alert(data.message);
-        setIsSubModalOpen(false);
-        setSubOrder(null);
-        setVariantToRemove('');
-        setVariantToAdd('');
-        fetchOrders();
-      } else {
-        alert(data.error || 'Error procesando la sustitución.');
+    if (isLive) {
+      try {
+        const res = await fetch(getApiUrl('/api/orders/substitute'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: subOrder.realId || subOrder.id,
+            variantIdToRemove: variantToRemove,
+            variantIdToAdd: variantToAdd
+          })
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+          alert(data.message);
+          setIsSubModalOpen(false);
+          setSubOrder(null);
+          setVariantToRemove('');
+          setVariantToAdd('');
+          fetchOrders();
+        } else {
+          alert(data.error || 'Error procesando la sustitución.');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error de red al enviar la sustitución.');
       }
-    } catch (err) {
-      console.error(err);
-      alert('Error de red al enviar la sustitución.');
+    } else {
+      // Simulación offline sustitución
+      const local = getLocalOrders();
+      const updated = local.map(o => {
+        if (o.id === subOrder.id) {
+          // Reemplazar ítem
+          const itemsRaw = o.itemsRaw || [];
+          const remainingItems = itemsRaw.filter(it => it.variantId !== variantToRemove);
+          const addedVar = productVariantsCatalog.find(v => v.id === variantToAdd);
+          
+          if (addedVar) {
+            remainingItems.push({
+              variantId: variantToAdd,
+              productName: addedVar.name.split(' (')[0],
+              variantName: addedVar.name.includes('(') ? addedVar.name.split('(')[1].replace(')', '') : 'Clásico',
+              quantity: 1,
+              price: addedVar.price,
+              subtotal: addedVar.price
+            });
+          }
+          
+          // Re-calcular total
+          const newSubtotal = remainingItems.reduce((sum, it) => sum + it.subtotal, 0);
+          const shippingCost = o.shippingMethod === 'Delivery' ? 3500 : 0;
+          const nextStatus = o.shippingMethod === 'Delivery' ? 'Listo' : 'Listo'; // Vuelve a la cola listo
+
+          return {
+            ...o,
+            itemsRaw: remainingItems,
+            items: remainingItems.map(it => `${it.quantity}x ${it.productName} (${it.variantName})`),
+            total: newSubtotal + shippingCost,
+            status: nextStatus,
+            completenessPercent: 100, // Ahora completo
+            slaPausedAt: null // Despausar SLA
+          };
+        }
+        return o;
+      });
+
+      localStorage.setItem('pan_de_rey_sim_orders', JSON.stringify(updated));
+      alert('Sustitución simulada con éxito. El pedido pasa a Listo.');
+      setIsSubModalOpen(false);
+      setSubOrder(null);
+      setVariantToRemove('');
+      setVariantToAdd('');
+      fetchOrders();
     }
   };
 
+  // Cálculos de KPIs Superiores
+  const totalOrders = orders.length;
+  const pendientesCount = orders.filter(o => o.orderState === 'Pendiente' || o.status === 'Nuevo').length;
+  const aceptadosCount = orders.filter(o => o.orderState === 'Aceptado' && o.status !== 'Nuevo').length;
+  const incompleteOrders = orders.filter(o => o.status === 'Incompleto' || (o.completenessPercent !== undefined && o.completenessPercent < 100));
+  const completeOrdersCount = orders.filter(o => o.status !== 'Incompleto' && (o.completenessPercent === undefined || o.completenessPercent === 100)).length;
+  
+  const totalDelivery = orders.filter(o => o.shippingMethod === 'Delivery').length;
+  const totalRetiro = orders.filter(o => o.shippingMethod === 'Retiro').length;
+
+  // Filtrado de Pedidos para la grilla
+  const getFilteredOrders = () => {
+    return orders.filter(order => {
+      // Filtro de estado pipeline
+      if (pipelineFilter !== 'all') {
+        const statusLower = order.status.toLowerCase();
+        if (pipelineFilter === 'nuevo' && order.status !== 'Nuevo' && order.status !== 'Aceptado') return false;
+        if (pipelineFilter === 'preparando' && order.status !== 'Preparando' && order.status !== 'En Preparación') return false;
+        if (pipelineFilter === 'listo' && !['listo', 'listo para retiro', 'listo para despacho'].includes(statusLower)) return false;
+        if (pipelineFilter === 'enviado' && !['en ruta', 'en camino', 'entregado'].includes(statusLower)) return false;
+        if (pipelineFilter === 'incompleto' && order.status !== 'Incompleto') return false;
+        if (pipelineFilter === 'cancelado' && order.status !== 'Cancelado') return false;
+      }
+
+      // Filtro de búsqueda
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const idMatches = order.id.toLowerCase().includes(query);
+        const nameMatches = order.customerName.toLowerCase().includes(query);
+        const phoneMatches = order.phone.includes(query);
+        return idMatches || nameMatches || phoneMatches;
+      }
+
+      return true;
+    });
+  };
+
   // Mapeo del Kanban
-  // 1. Nuevos/Aceptados -> 'Nuevo', 'Aceptado'
-  // 2. En Preparación -> 'Preparando', 'En Preparación'
-  // 3. Listos -> 'Listo', 'Listo para Retiro', 'Listo para Despacho'
-  // 4. Enviados / Camino -> 'En Ruta', 'En Camino', 'Entregado'
   const filterOrdersForKanban = (columnStatus: OrderStatus) => {
     return orders.filter(o => {
       const s = o.status;
@@ -246,9 +502,6 @@ export default function OrdersKanban() {
     });
   };
 
-  // Pedidos incompletos para la pestaña de excepciones
-  const incompleteOrders = orders.filter(o => o.status === 'Incompleto');
-
   const columns: { title: string; status: OrderStatus; icon: any }[] = [
     { title: 'Nuevos Pedidos', status: 'Nuevo', icon: Clock },
     { title: 'En Preparación', status: 'Preparación', icon: Package },
@@ -257,20 +510,20 @@ export default function OrdersKanban() {
   ];
 
   return (
-    <div className="h-full flex flex-col space-y-6">
+    <div className="h-full flex flex-col space-y-6 pb-12">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-charcoal-light p-4 rounded-xl border border-charcoal-border shadow-lg">
+      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 bg-charcoal-light p-4 rounded-xl border border-charcoal-border shadow-lg">
         <div>
           <h1 className="text-xl font-serif text-white tracking-wide flex items-center gap-2">
-            Control Operativo de Pedidos
+            Seguimiento de Pedidos y Operaciones
             {isLive ? (
-              <span className="w-2.5 h-2.5 bg-green-500 rounded-full inline-block animate-pulse" title="Conectado a MySQL" />
+              <span className="w-2.5 h-2.5 bg-green-500 rounded-full inline-block animate-pulse" title="Servidor Activo (MySQL)" />
             ) : (
-              <span className="w-2.5 h-2.5 bg-red-500 rounded-full inline-block" title="Offline" />
+              <span className="w-2.5 h-2.5 bg-yellow-500 rounded-full inline-block" title="Modo Local Simulado (Offline)" />
             )}
           </h1>
-          <p className="text-xs text-gray-400">Pipelines de producción y excepciones de stock</p>
+          <p className="text-xs text-gray-400">Panel administrativo centralizado de control de ventas y SLAs</p>
         </div>
         
         <div className="flex gap-2">
@@ -284,24 +537,113 @@ export default function OrdersKanban() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Grid de Tarjetas KPI */}
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+        {/* KPI 1: Pendientes vs Aceptados */}
+        <div className="bg-charcoal-light border border-charcoal-border rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 text-gold/10 group-hover:text-gold/20 transition-colors">
+            <Inbox className="w-10 h-10" />
+          </div>
+          <p className="text-[9px] uppercase tracking-wider text-gray-500 font-bold mb-1">Pedidos por Estado</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-serif font-bold text-white">{pendientesCount}</span>
+            <span className="text-[10px] text-gray-400 font-medium">Pend.</span>
+            <span className="text-gray-600">/</span>
+            <span className="text-xl font-serif font-bold text-gold">{aceptadosCount}</span>
+            <span className="text-[10px] text-gray-400 font-medium">Acept.</span>
+          </div>
+        </div>
+
+        {/* KPI 2: Pedidos Incompletos */}
+        <div className="bg-[#1C1A14] border border-yellow-900/30 rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 text-yellow-500/10 group-hover:text-yellow-500/20 transition-colors">
+            <AlertTriangle className="w-10 h-10" />
+          </div>
+          <p className="text-[9px] uppercase tracking-wider text-yellow-600 font-bold mb-1">Pedidos Incompletos</p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-serif font-bold text-yellow-500">{incompleteOrders.length}</span>
+            <span className="text-[9px] text-yellow-600 font-bold uppercase tracking-widest">Stock Faltante</span>
+          </div>
+        </div>
+
+        {/* KPI 3: Pedidos Completos */}
+        <div className="bg-charcoal-light border border-charcoal-border rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 text-emerald-500/10 group-hover:text-emerald-500/20 transition-colors">
+            <CheckCircle className="w-10 h-10" />
+          </div>
+          <p className="text-[9px] uppercase tracking-wider text-gray-500 font-bold mb-1">Pedidos Completos</p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-serif font-bold text-emerald-400">{completeOrdersCount}</span>
+            <span className="text-[9px] text-gray-500 uppercase tracking-widest font-bold">100% Stock</span>
+          </div>
+        </div>
+
+        {/* KPI 4: Total Delivery */}
+        <div className="bg-[#101524] border border-blue-950/30 rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 text-blue-500/15 group-hover:text-blue-500/25 transition-colors">
+            <Truck className="w-10 h-10" />
+          </div>
+          <p className="text-[9px] uppercase tracking-wider text-blue-400 font-bold mb-1">Total Delivery</p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-serif font-bold text-blue-400">{totalDelivery}</span>
+            <span className="text-[9px] text-blue-500/60 uppercase tracking-widest font-bold">A domicilio</span>
+          </div>
+        </div>
+
+        {/* KPI 5: Total Retiro */}
+        <div className="bg-[#141A14] border border-emerald-950/20 rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 text-emerald-500/10 group-hover:text-emerald-500/25 transition-colors">
+            <CheckCircle className="w-10 h-10" />
+          </div>
+          <p className="text-[9px] uppercase tracking-wider text-emerald-500 font-bold mb-1">Retiro en Tienda</p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-serif font-bold text-emerald-400">{totalRetiro}</span>
+            <span className="text-[9px] text-emerald-500/60 uppercase tracking-widest font-bold">En Mostrador</span>
+          </div>
+        </div>
+
+        {/* KPI 6: Total Pedidos */}
+        <div className="bg-[#1f1b13] border border-gold/10 rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 text-gold/20 group-hover:text-gold/30 transition-colors">
+            <TrendingUp className="w-10 h-10" />
+          </div>
+          <p className="text-[9px] uppercase tracking-wider text-gold font-bold mb-1">Total Pedidos</p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-serif font-bold text-white">{totalOrders}</span>
+            <span className="text-[9px] text-gold uppercase tracking-widest font-bold">Historial</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Pestañas (Vistas) */}
       <div className="flex border-b border-charcoal-border">
+        <button
+          onClick={() => setActiveTab('tracking')}
+          className={`flex items-center gap-2 px-6 py-3 border-b-2 text-xs font-bold uppercase tracking-widest transition-all ${
+            activeTab === 'tracking' 
+              ? 'border-gold text-gold bg-gold/5 font-semibold' 
+              : 'border-transparent text-gray-400 hover:text-white'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          Tabla de Seguimiento
+        </button>
         <button
           onClick={() => setActiveTab('kanban')}
           className={`flex items-center gap-2 px-6 py-3 border-b-2 text-xs font-bold uppercase tracking-widest transition-all ${
             activeTab === 'kanban' 
-              ? 'border-gold text-gold bg-gold/5' 
+              ? 'border-gold text-gold bg-gold/5 font-semibold' 
               : 'border-transparent text-gray-400 hover:text-white'
           }`}
         >
-          <Package className="w-4 h-4" />
+          <Layers className="w-4 h-4" />
           Tablero Kanban
         </button>
         <button
           onClick={() => setActiveTab('exceptions')}
           className={`flex items-center gap-2 px-6 py-3 border-b-2 text-xs font-bold uppercase tracking-widest transition-all relative ${
             activeTab === 'exceptions' 
-              ? 'border-gold text-gold bg-gold/5' 
+              ? 'border-gold text-gold bg-gold/5 font-semibold' 
               : 'border-transparent text-gray-400 hover:text-white'
           }`}
         >
@@ -314,6 +656,197 @@ export default function OrdersKanban() {
           )}
         </button>
       </div>
+
+      {/* Tab: Tabla de Seguimiento */}
+      {activeTab === 'tracking' && (
+        <div className="bg-[#111] border border-charcoal-border rounded-xl p-6 shadow-xl space-y-6">
+          {/* Controles y Filtros */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input 
+                  type="text" 
+                  placeholder="Buscar pedido, cliente, fono..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-[#161616] border border-white/5 rounded-lg pl-10 pr-4 py-2 text-xs text-white placeholder-gray-500 focus:border-gold outline-none transition-colors"
+                />
+              </div>
+              
+              <div className="flex items-center gap-2 bg-[#161616] border border-white/5 rounded-lg px-3 py-2 shrink-0">
+                <Filter className="w-3.5 h-3.5 text-gray-500" />
+                <select 
+                  value={pipelineFilter}
+                  onChange={(e) => setPipelineFilter(e.target.value)}
+                  className="bg-transparent border-0 text-xs text-gray-300 focus:ring-0 outline-none cursor-pointer"
+                >
+                  <option value="all" className="bg-[#161616]">Todos los Estados</option>
+                  <option value="nuevo" className="bg-[#161616]">Nuevo / Aceptado</option>
+                  <option value="preparando" className="bg-[#161616]">En Preparación</option>
+                  <option value="listo" className="bg-[#161616]">Listo para Entrega</option>
+                  <option value="enviado" className="bg-[#161616]">Enviado / Entregado</option>
+                  <option value="incompleto" className="bg-[#161616]">Incompleto</option>
+                  <option value="cancelado" className="bg-[#161616]">Cancelado</option>
+                </select>
+              </div>
+            </div>
+            
+            <p className="text-xs text-gray-500 self-end">
+              Mostrando <strong className="text-white">{getFilteredOrders().length}</strong> de <strong className="text-white">{orders.length}</strong> pedidos
+            </p>
+          </div>
+
+          {/* Tabla */}
+          <div className="overflow-x-auto rounded-lg border border-white/5">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-charcoal-border text-gray-400 uppercase tracking-wider text-[9px] bg-charcoal-light/30">
+                  <th className="p-4 text-center">Nro Pedido</th>
+                  <th className="p-4">Fecha</th>
+                  <th className="p-4">Hora</th>
+                  <th className="p-4">Tipo Entrega</th>
+                  <th className="p-4">Pipeline</th>
+                  <th className="p-4">Completitud</th>
+                  <th className="p-4 text-right">Monto</th>
+                  <th className="p-4 text-center">Prod.</th>
+                  <th className="p-4 text-center">Estado</th>
+                  <th className="p-4 text-center">H. Estimada</th>
+                  <th className="p-4 text-center">Deadline SLA</th>
+                  <th className="p-4 text-center">Etiqueta</th>
+                  <th className="p-4 text-center">Copias</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {getFilteredOrders().length === 0 ? (
+                  <tr>
+                    <td colSpan={13} className="text-center py-12 text-gray-500 italic">No se encontraron pedidos con los filtros seleccionados.</td>
+                  </tr>
+                ) : (
+                  getFilteredOrders().map((order) => {
+                    const totalQty = order.itemsRaw?.reduce((sum, it) => sum + it.quantity, 0) || order.items.length;
+                    const isDelivery = order.shippingMethod === 'Delivery';
+                    const completeness = order.completenessPercent ?? (order.status === 'Incompleto' ? 66 : 100);
+                    const state = order.orderState ?? (order.status === 'Nuevo' ? 'Pendiente' : 'Aceptado');
+
+                    return (
+                      <tr key={order.id} className="hover:bg-white/[0.02] transition-colors">
+                        {/* Nro Pedido (Clickable) */}
+                        <td className="p-4 text-center">
+                          <button 
+                            onClick={() => setSelectedOrder(order)}
+                            className="font-bold text-gold hover:text-white underline decoration-gold/40 transition-colors uppercase"
+                          >
+                            #{order.id.substring(0, 8).toUpperCase()}
+                          </button>
+                        </td>
+                        
+                        {/* Fecha */}
+                        <td className="p-4 text-gray-400 font-medium">
+                          {order.createdAt ? new Date(order.createdAt).toLocaleDateString([], { day: '2-digit', month: '2-digit', year: 'numeric' }) : '--/--/----'}
+                        </td>
+                        
+                        {/* Hora */}
+                        <td className="p-4 text-gray-300 font-mono">
+                          {order.time}
+                        </td>
+                        
+                        {/* Tipo de Entrega */}
+                        <td className="p-4 font-semibold">
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider ${
+                            isDelivery 
+                              ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
+                              : 'bg-gold/10 text-gold border border-gold/20'
+                          }`}>
+                            {isDelivery ? <Truck className="w-3.5 h-3.5" /> : <Package className="w-3.5 h-3.5" />}
+                            {order.shippingMethod}
+                          </span>
+                        </td>
+                        
+                        {/* Pipeline Pedido */}
+                        <td className="p-4 font-semibold">
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold ${
+                            order.status === 'Nuevo' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                            order.status === 'Preparando' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                            ['Listo', 'Listo para Retiro', 'Listo para Despacho'].includes(order.status) ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
+                            order.status === 'Incompleto' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                            order.status === 'Cancelado' ? 'bg-gray-500/10 text-gray-400 border border-gray-500/20' :
+                            'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' // Entregado / En ruta
+                          }`}>
+                            {order.status}
+                          </span>
+                        </td>
+                        
+                        {/* Estado Completitud */}
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden shrink-0">
+                              <div 
+                                className={`h-full rounded-full ${completeness < 100 ? 'bg-orange-500' : 'bg-gold'}`}
+                                style={{ width: `${completeness}%` }}
+                              />
+                            </div>
+                            <span className={`font-mono text-[10px] font-bold ${completeness < 100 ? 'text-orange-400' : 'text-gray-400'}`}>
+                              {completeness}%
+                            </span>
+                          </div>
+                        </td>
+                        
+                        {/* Monto */}
+                        <td className="p-4 text-right font-bold text-white font-mono">
+                          ${formatPrice(order.total)}
+                        </td>
+                        
+                        {/* Cantidad de productos */}
+                        <td className="p-4 text-center text-gray-300 font-mono font-bold">
+                          {totalQty}
+                        </td>
+                        
+                        {/* Estado pedido */}
+                        <td className="p-4 text-center font-semibold">
+                          <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded font-bold ${
+                            state === 'Pendiente' 
+                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
+                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          }`}>
+                            {state}
+                          </span>
+                        </td>
+                        
+                        {/* Hora estimada de retiro o envio */}
+                        <td className="p-4 text-center text-gray-300 font-mono">
+                          {order.pickupTime || '--:--'}
+                        </td>
+                        
+                        {/* Deadline (SLA timer) */}
+                        <td className="p-4 text-center">
+                          <SlaTableCell order={order} />
+                        </td>
+                        
+                        {/* Imprimir etiqueta */}
+                        <td className="p-4 text-center">
+                          <button 
+                            onClick={() => handlePrintLabel(order)}
+                            className="p-1.5 rounded bg-white/5 hover:bg-gold/10 border border-white/5 hover:border-gold/30 text-gray-400 hover:text-gold transition-all duration-300"
+                            title="Imprimir etiqueta de preparación (no fiscal)"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                        
+                        {/* Copias impresas */}
+                        <td className="p-4 text-center font-mono text-gray-400 font-bold">
+                          {order.labelPrintedCount || 0}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Tab: Kanban */}
       {activeTab === 'kanban' && (
@@ -408,7 +941,7 @@ export default function OrdersKanban() {
                                 <>
                                   <button 
                                     onClick={() => {
-                                      const next = isDelivery ? 'Listo para Despacho' : 'Listo para Retiro';
+                                      const next = isDelivery ? 'Listo' : 'Listo';
                                       moveOrder(order.id, next);
                                     }} 
                                     className="text-[9px] bg-gold/10 text-gold border border-gold/30 px-2.5 py-1 rounded hover:bg-gold hover:text-black transition-colors font-bold uppercase tracking-wider"
@@ -520,11 +1053,17 @@ export default function OrdersKanban() {
                       </td>
                       <td className="p-4 max-w-xs">
                         <ul className="list-disc list-inside space-y-0.5 text-gray-400">
-                          {order.itemsRaw?.map((it, idx) => (
-                            <li key={idx}>
-                              {it.quantity}x {it.productName} ({it.variantName})
-                            </li>
-                          ))}
+                          {order.itemsRaw && order.itemsRaw.length > 0 ? (
+                            order.itemsRaw.map((it, idx) => (
+                              <li key={idx}>
+                                {it.quantity}x {it.productName} ({it.variantName})
+                              </li>
+                            ))
+                          ) : (
+                            order.items.map((it, idx) => (
+                              <li key={idx}>{it}</li>
+                            ))
+                          )}
                         </ul>
                       </td>
                       <td className="p-4">
@@ -681,7 +1220,7 @@ export default function OrdersKanban() {
               <div className="bg-gold/5 border border-gold/15 p-3 rounded flex items-start gap-3 mt-4">
                 <AlertCircle className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
                 <p className="text-[11px] text-gray-400 leading-relaxed">
-                  <strong className="text-gold">Soporte Operativo:</strong> Al confirmar la sustitución, el SLA en pausa se calculará y registrará en la orden. El estado del pedido se actualizará automáticamente a <strong>{subOrder.shippingMethod === 'Delivery' ? 'Listo para Despacho' : 'Listo para Retiro'}</strong> y el pedido regresará al tablero Kanban principal.
+                  <strong className="text-gold">Soporte Operativo:</strong> Al confirmar la sustitución, el SLA en pausa se calculará y registrará en la orden. El estado del pedido se actualizará automáticamente a <strong>Listo</strong> y el pedido regresará al tablero principal.
                 </p>
               </div>
               
@@ -710,8 +1249,106 @@ export default function OrdersKanban() {
         </div>
       )}
 
-      {/* Modal Detalle General */}
-      {selectedOrder && !isPinModalOpen && !isSubModalOpen && (
+      {/* MODAL: Impresión de Etiqueta No Fiscal */}
+      {labelPrintOrder && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white text-black w-full max-w-sm rounded-lg shadow-2xl flex flex-col p-6 animate-in fade-in zoom-in-95 duration-200">
+            {/* Cabecera del modal de etiqueta */}
+            <div className="flex justify-between items-center pb-3 border-b border-dashed border-gray-300 mb-4">
+              <span className="font-mono text-xs font-bold uppercase text-gray-600">Simulación Ticketera Térmica</span>
+              <button 
+                onClick={() => setLabelPrintOrder(null)}
+                className="text-gray-400 hover:text-black font-bold text-sm"
+              >
+                &times; Close
+              </button>
+            </div>
+            
+            {/* Cuerpo del ticket (Estilizado como papel térmico) */}
+            <div className="border border-gray-200 p-4 bg-[#fcfcfc] rounded font-mono text-xs text-black shadow-inner space-y-3 leading-relaxed">
+              <div className="text-center border-b border-dashed border-gray-300 pb-2">
+                <h4 className="font-bold text-sm tracking-wide">*** PAN DE REY ***</h4>
+                <p className="text-[10px] text-gray-600 uppercase">Boulangerie & Cafétéria Premium</p>
+                <p className="text-[9px] text-gray-500 mt-1">Control Interno de Cocina</p>
+              </div>
+              
+              <div className="space-y-0.5 text-[10px] border-b border-dashed border-gray-300 pb-2">
+                <p><span className="font-bold">NRO PEDIDO:</span> #{labelPrintOrder.id.substring(0, 8).toUpperCase()}</p>
+                <p><span className="font-bold">FECHA:</span> {new Date(labelPrintOrder.createdAt).toLocaleDateString()} {labelPrintOrder.time}</p>
+                <p><span className="font-bold">CLIENTE:</span> {labelPrintOrder.customerName}</p>
+                <p><span className="font-bold">ENTREGA:</span> {labelPrintOrder.shippingMethod === 'Delivery' ? 'ENVÍO A DOMICILIO' : 'RETIRO EN MOSTRADOR'}</p>
+              </div>
+              
+              {/* Items */}
+              <div className="py-2 border-b border-dashed border-gray-300">
+                <p className="font-bold mb-2 text-center text-[10px] tracking-widest">PRODUCTOS A PREPARAR</p>
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="font-bold border-b border-gray-200 text-[9px] text-gray-700">
+                      <th className="pb-1">CANT.</th>
+                      <th className="pb-1">PRODUCTO / VARIANTE</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {labelPrintOrder.itemsRaw && labelPrintOrder.itemsRaw.length > 0 ? (
+                      labelPrintOrder.itemsRaw.map((it, idx) => (
+                        <tr key={idx} className="border-b border-gray-100 last:border-b-0 text-[11px]">
+                          <td className="py-1.5 font-bold align-top pr-2">{it.quantity}x</td>
+                          <td className="py-1.5">{it.productName} ({it.variantName})</td>
+                        </tr>
+                      ))
+                    ) : (
+                      labelPrintOrder.items.map((it, idx) => {
+                        const parts = it.split('x ');
+                        const qty = parts[0];
+                        const name = parts[1] || it;
+                        return (
+                          <tr key={idx} className="border-b border-gray-100 last:border-b-0 text-[11px]">
+                            <td className="py-1.5 font-bold align-top pr-2">{qty}x</td>
+                            <td className="py-1.5">{name}</td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Código de barras simulado */}
+              <div className="text-center pt-2">
+                <p className="font-bold tracking-[0.25em] text-[10px] leading-none mb-1">|||| | | ||| || ||| | ||</p>
+                <p className="text-[8px] text-gray-500">#{labelPrintOrder.id.substring(0, 10).toUpperCase()}*</p>
+                <p className="text-[8px] text-red-600 font-bold uppercase mt-2 border border-red-200 px-1 py-0.5 rounded inline-block bg-red-50">
+                  TICKET NO FISCAL - SOLO LOGÍSTICA
+                </p>
+              </div>
+            </div>
+
+            {/* Controles de impresión */}
+            <div className="flex gap-3 pt-4 mt-2">
+              <button 
+                onClick={() => setLabelPrintOrder(null)}
+                className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded text-xs font-bold uppercase tracking-widest transition-colors font-sans"
+              >
+                Cerrar
+              </button>
+              <button 
+                onClick={() => {
+                  window.print();
+                  setLabelPrintOrder(null);
+                }}
+                className="flex-1 bg-black text-white hover:bg-gray-800 py-2.5 rounded text-xs font-bold uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2 font-sans"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Imprimir Real
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Detalle General de Pedido */}
+      {selectedOrder && !isPinModalOpen && !isSubModalOpen && !labelPrintOrder && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-charcoal-light w-full max-w-lg rounded-lg border border-charcoal-border shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-charcoal-border flex justify-between items-center bg-charcoal-light/25 rounded-t-lg">
@@ -768,14 +1405,33 @@ export default function OrdersKanban() {
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedOrder.itemsRaw?.map((it, idx) => (
-                        <tr key={idx} className="border-b border-white/5 last:border-b-0">
-                          <td className="py-2 text-gray-300 font-medium">{it.productName} <span className="text-[10px] text-gray-500">({it.variantName})</span></td>
-                          <td className="py-2 text-center text-white">{it.quantity}</td>
-                          <td className="py-2 text-right text-gray-400">${formatPrice(it.price)}</td>
-                          <td className="py-2 text-right text-white font-bold">${formatPrice(it.subtotal)}</td>
-                        </tr>
-                      ))}
+                      {selectedOrder.itemsRaw && selectedOrder.itemsRaw.length > 0 ? (
+                        selectedOrder.itemsRaw.map((it, idx) => (
+                          <tr key={idx} className="border-b border-white/5 last:border-b-0">
+                            <td className="py-2 text-gray-300 font-medium">{it.productName} <span className="text-[10px] text-gray-500">({it.variantName})</span></td>
+                            <td className="py-2 text-center text-white">{it.quantity}</td>
+                            <td className="py-2 text-right text-gray-400">${formatPrice(it.price)}</td>
+                            <td className="py-2 text-right text-white font-bold">${formatPrice(it.subtotal)}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        selectedOrder.items.map((it, idx) => {
+                          const parts = it.split('x ');
+                          const qty = parts[0];
+                          const name = parts[1] || it;
+                          // Fallback prices for mock items
+                          const price = 2500;
+                          const quantity = parseInt(qty) || 1;
+                          return (
+                            <tr key={idx} className="border-b border-white/5 last:border-b-0">
+                              <td className="py-2 text-gray-300 font-medium">{name}</td>
+                              <td className="py-2 text-center text-white">{quantity}</td>
+                              <td className="py-2 text-right text-gray-400">${formatPrice(price)}</td>
+                              <td className="py-2 text-right text-white font-bold">${formatPrice(price * quantity)}</td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>

@@ -166,18 +166,35 @@ try {
     
     // 1. GET /api/orders - Listar todos los pedidos para el admin kanban y sustitución
     if ($route === 'orders' && $_SERVER['REQUEST_METHOD'] === 'GET') {
-        // A. Consultar órdenes y detalles de usuarios (incluye nuevos campos SLA y PIN)
-        $orderQuery = "
-            SELECT o.Id, o.UserId, o.AddressId, o.CouponId, o.TotalAmount, o.Status, 
-                   o.ShippingMethod, o.PickupTime, o.ShippingCost, o.Notes, o.CreatedAt,
-                   o.SlaStartedAt, o.SlaPausedAt, o.SlaPausedTime, o.DeliveryPin,
-                   u.FirstName, u.LastName, u.Phone, u.Email
-            FROM Orders o
-            LEFT JOIN Users u ON o.UserId = u.Id
-            ORDER BY o.CreatedAt DESC
-        ";
-        $ordersStmt = $db->query($orderQuery);
-        $orderRows = $ordersStmt->fetchAll();
+        // A. Consultar órdenes y detalles de usuarios (incluye nuevos campos SLA, PIN y de seguimiento con fallback seguro)
+        $orderRows = [];
+        try {
+            $orderQuery = "
+                SELECT o.Id, o.UserId, o.AddressId, o.CouponId, o.TotalAmount, o.Status, 
+                       o.ShippingMethod, o.PickupTime, o.ShippingCost, o.Notes, o.CreatedAt,
+                       o.SlaStartedAt, o.SlaPausedAt, o.SlaPausedTime, o.DeliveryPin,
+                       o.CompletenessPercent, o.OrderState, o.LabelPrintedCount, o.ActualDeliveryTime,
+                       u.FirstName, u.LastName, u.Phone, u.Email
+                FROM Orders o
+                LEFT JOIN Users u ON o.UserId = u.Id
+                ORDER BY o.CreatedAt DESC
+            ";
+            $ordersStmt = $db->query($orderQuery);
+            $orderRows = $ordersStmt->fetchAll();
+        } catch (PDOException $e) {
+            // Fallback si no se han creado las columnas de seguimiento
+            $orderQuery = "
+                SELECT o.Id, o.UserId, o.AddressId, o.CouponId, o.TotalAmount, o.Status, 
+                       o.ShippingMethod, o.PickupTime, o.ShippingCost, o.Notes, o.CreatedAt,
+                       o.SlaStartedAt, o.SlaPausedAt, o.SlaPausedTime, o.DeliveryPin,
+                       u.FirstName, u.LastName, u.Phone, u.Email
+                FROM Orders o
+                LEFT JOIN Users u ON o.UserId = u.Id
+                ORDER BY o.CreatedAt DESC
+            ";
+            $ordersStmt = $db->query($orderQuery);
+            $orderRows = $ordersStmt->fetchAll();
+        }
         
         // B. Consultar ítems de orden con nombres de productos y variantes
         $itemsQuery = "
@@ -240,12 +257,58 @@ try {
                 'slaStartedAt' => $order['SlaStartedAt'],
                 'slaPausedAt' => $order['SlaPausedAt'],
                 'slaPausedTime' => (int)$order['SlaPausedTime'],
-                'deliveryPin' => $order['DeliveryPin']
+                'deliveryPin' => $order['DeliveryPin'],
+                // Nuevos campos
+                'pickupTime' => $order['PickupTime'] ?? '',
+                'completenessPercent' => isset($order['CompletenessPercent']) ? (int)$order['CompletenessPercent'] : ($order['Status'] === 'Incompleto' ? 66 : 100),
+                'orderState' => isset($order['OrderState']) ? $order['OrderState'] : ($order['Status'] === 'Nuevo' ? 'Pendiente' : 'Aceptado'),
+                'labelPrintedCount' => isset($order['LabelPrintedCount']) ? (int)$order['LabelPrintedCount'] : 0,
+                'actualDeliveryTime' => $order['ActualDeliveryTime'] ?? null
             ];
         }
         
         echo json_encode($orders);
         exit;
+    }
+    
+    // 1.5. POST /api/orders/increment-label - Incrementar el contador de etiquetas impresas
+    elseif ($route === 'orders/increment-label' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $inputJSON = file_get_contents('php://input');
+        $input = json_decode($inputJSON, true);
+        $orderId = isset($input['orderId']) ? trim($input['orderId']) : '';
+        
+        if (empty($orderId)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Order ID is required']);
+            exit;
+        }
+        
+        try {
+            // Verificar si la columna existe antes de actualizar
+            try {
+                $db->query("SELECT LabelPrintedCount FROM Orders LIMIT 1");
+            } catch (PDOException $ex) {
+                // Agregar la columna si no existe
+                $db->exec("ALTER TABLE Orders ADD COLUMN LabelPrintedCount INT NOT NULL DEFAULT 0");
+            }
+
+            $stmt = $db->prepare("UPDATE Orders SET LabelPrintedCount = LabelPrintedCount + 1 WHERE Id = :id");
+            $stmt->execute([':id' => $orderId]);
+            
+            $selectStmt = $db->prepare("SELECT LabelPrintedCount FROM Orders WHERE Id = :id");
+            $selectStmt->execute([':id' => $orderId]);
+            $res = $selectStmt->fetch();
+            
+            echo json_encode([
+                'success' => true, 
+                'labelPrintedCount' => isset($res['LabelPrintedCount']) ? (int)$res['LabelPrintedCount'] : 1
+            ]);
+            exit;
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Error al incrementar etiquetas', 'details' => $e->getMessage()]);
+            exit;
+        }
     }
     
     // 2. POST /api/orders/update-status - Cambiar estado de un pedido (con control de SLA, PIN y webhook n8n)
@@ -571,7 +634,7 @@ try {
                 'riesgo' => (int)($invRow['riesgo'] ?? 0),
                 'critico' => (int)($invRow['critico'] ?? 0),
                 'sinStock' => (int)($invRow['sinStock'] ?? 0),
-                'pendientesRetiro' => (int)($pendingRow['pendientesRetiro'] ?? 0),
+'pendientesRetiro' => (int)($pendingRow['pendientesRetiro'] ?? 0),
                 'pendientesEnvio' => (int)($pendingRow['pendientesEnvio'] ?? 0)
             ],
             'categoryDistribution' => $categoryDistribution,
@@ -583,6 +646,20 @@ try {
     
     // 5. GET /api/orders/seed - Inicializar y poblar base de datos con pedidos de prueba
     elseif ($route === 'orders/seed' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+        // Asegurar de forma dinámica que las columnas de seguimiento existan en la tabla Orders
+        try {
+            $db->query("SELECT CompletenessPercent, OrderState, LabelPrintedCount, ActualDeliveryTime FROM Orders LIMIT 1");
+        } catch (PDOException $e) {
+            try {
+                $db->exec("ALTER TABLE Orders ADD COLUMN CompletenessPercent INT NOT NULL DEFAULT 100");
+                $db->exec("ALTER TABLE Orders ADD COLUMN OrderState VARCHAR(50) NOT NULL DEFAULT 'Pendiente'");
+                $db->exec("ALTER TABLE Orders ADD COLUMN LabelPrintedCount INT NOT NULL DEFAULT 0");
+                $db->exec("ALTER TABLE Orders ADD COLUMN ActualDeliveryTime TIMESTAMP NULL DEFAULT NULL");
+            } catch (PDOException $ex) {
+                // Ignorar si ya se agregaron en otra petición paralela
+            }
+        }
+
         // Comenzamos una transacción atómica
         $db->beginTransaction();
         
@@ -619,57 +696,65 @@ try {
                 ['prod-1', 1, 'Pan de Masa Madre Clásico', 'pan-de-masa-madre-clasico', 4500, 'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&q=80'],
                 ['prod-2', 1, 'Focaccia al Romero', 'focaccia-al-romero', 3800, 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80'],
                 ['prod-3', 1, 'Baguette Tradicional', 'baguette-tradicional', 1800, 'https://images.unsplash.com/photo-1598373182133-52452f7691ef?w=800&q=80'],
+                ['prod-4', 1, 'Pan de Centeno Alemán', 'pan-de-centeno-aleman', 4200, 'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&q=80&crop=edges'],
+                ['prod-5', 1, 'Ciabatta Rústica', 'ciabatta-rustica', 2200, 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80&crop=faces'],
                 ['prod-6', 2, 'Croissant de Mantequilla', 'croissant-de-mantequilla', 2200, 'https://images.unsplash.com/photo-1551024601-bec78aea704b?w=800&q=80'],
                 ['prod-7', 2, 'Pain au Chocolat', 'pain-au-chocolat', 2500, 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80&sat=1'],
+                ['prod-8', 2, 'Tarta de Limón y Merengue', 'tarta-de-limon-y-merengue', 3800, 'https://images.unsplash.com/photo-1550617931-e17a7b70dce2?w=800&q=80'],
+                ['prod-9', 2, 'Roll de Canela Glaseado', 'roll-de-canela-glaseado', 2800, 'https://images.unsplash.com/photo-1551024601-bec78aea704b?w=800&q=80&sat=2'],
                 ['prod-10', 3, 'Brownie Sin Gluten', 'brownie-sin-gluten', 2500, 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=800&q=80'],
-                ['prod-13', 4, 'Café Latte XL', 'cafe-latte-xl', 3500, 'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=800&q=80']
+                ['prod-11', 3, 'Pan de Molde Keto', 'pan-de-molde-keto', 5500, 'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&q=80&bri=1'],
+                ['prod-12', 3, 'Galletas de Almendra', 'galletas-de-almendra', 1800, 'https://images.unsplash.com/photo-1550617931-e17a7b70dce2?w=800&q=80&con=1'],
+                ['prod-13', 4, 'Café Latte XL', 'cafe-latte-xl', 3500, 'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=800&q=80'],
+                ['prod-14', 4, 'Espresso Doble', 'espresso-doble', 2200, 'https://images.unsplash.com/photo-1511920170033-f8396924c348?w=800&q=80'],
+                ['prod-15', 4, 'Cappuccino Italiano', 'cappuccino-italiano', 3200, 'https://images.unsplash.com/photo-1495474472207-464a8d960c8b?w=800&q=80']
             ];
             
             $prodInsert = $db->prepare('INSERT INTO Products (Id, CategoryId, Name, Slug, BasePrice, ImageUrl, IsActive) VALUES (?, ?, ?, ?, ?, ?, 1)');
-            $varInsert = $db->prepare('INSERT INTO ProductVariants (Id, ProductId, VariantName, PriceAdjustment, SKU, IsActive) VALUES (?, ?, ?, ?, ?, 1)');
+            $varInsert = $db->prepare('INSERT INTO ProductVariants (Id, ProductId, VariantName, PriceAdjustment, SKU, IsActive) VALUES (?, ?, "Clásico", 0.00, ?, 1)');
             $invInsert = $db->prepare('INSERT INTO Inventory (VariantId, Quantity, SafetyBuffer) VALUES (?, ?, 2)');
             
-            foreach ($products as $prod) {
-                $prodInsert->execute($prod);
+            foreach ($products as $p) {
+                $prodInsert->execute($p);
                 
-                $variantId = "var-{$prod[0]}";
-                $sku = "SKU-" . strtoupper($prod[3]);
+                // Variantes
+                $variantId = "var-" . $p[0];
+                $sku = "SKU-" . strtoupper($p[3]);
+                $varInsert->execute([$variantId, $p[0], $sku]);
                 
-                // Variante base (Clásica)
-                $varInsert->execute([$variantId, $prod[0], 'Clásico', 0.00, $sku]);
+                // Inventario (Stock variado para KPIs)
+                $qty = 10;
+                if ($p[0] === 'prod-7') $qty = 0; // Pain au Chocolat - Sin stock
+                if ($p[0] === 'prod-5') $qty = 2; // Ciabatta - Crítico
+                if ($p[0] === 'prod-9') $qty = 3; // Cinnamon - Crítico
+                if ($p[0] === 'prod-4') $qty = 4; // Rye - Riesgo
+                if ($p[0] === 'prod-11') $qty = 5; // Keto - Riesgo
+                if ($p[0] === 'prod-2') $qty = 8; // Focaccia - Alerta
+                if ($p[0] === 'prod-8') $qty = 6; // Lemon - Alerta
                 
-                // Inventario base
-                $invInsert->execute([$variantId, 100]);
+                $invInsert->execute([$variantId, $qty]);
             }
-            
-            // Variantes Extra
-            $varInsert->execute(['var-prod-1-semillas', 'prod-1', 'Con Semillas', 2000.00, 'SKU-MASA-MADRE-SEMILLAS']);
-            $invInsert->execute(['var-prod-1-semillas', 50]);
-            
-            $varInsert->execute(['var-prod-1-nuez', 'prod-1', 'Nuez y Pasas (Agotado)', 3500.00, 'SKU-MASA-MADRE-NUEZ']);
-            $invInsert->execute(['var-prod-1-nuez', 1]); // Casi agotado (Alerta crítica)
             
             // C. Poblar Usuarios (CRM)
             $users = [
-                ['user-1', 'maria.gonzalez@gmail.com', 'Maria', 'Gonzalez', '+56987654321'],
-                ['user-2', 'juan.perez@yahoo.com', 'Juan', 'Perez', '+56911112222'],
-                ['user-3', 'diego.munoz@outlook.com', 'Diego', 'Munoz', '+56933334444'],
-                ['user-4', 'camila.rojas@gmail.com', 'Camila', 'Rojas', '+56955556666'],
-                ['user-5', 'jose.fonseca@gmail.com', 'Jose', 'Fonseca', '+56977778888']
+                ['user-uuid-1', 'maria.gonzalez@gmail.com', 'María', 'González', '+56987654321'],
+                ['user-uuid-2', 'juan.perez@yahoo.com', 'Juan', 'Pérez', '+56911112222'],
+                ['user-uuid-3', 'diego.munoz@outlook.com', 'Diego', 'Muñoz', '+56933334444'],
+                ['user-uuid-4', 'camila.rojas@gmail.com', 'Camila', 'Rojas', '+56955556666'],
+                ['user-uuid-5', 'jose.fonseca@gmail.com', 'José', 'Fonseca', '+56977778888']
             ];
             
-            $userInsert = $db->prepare('INSERT INTO Users (Id, Email, PasswordHash, FirstName, LastName, Phone) VALUES (?, ?, ?, ?, ?, ?)');
-            $roleInsert = $db->prepare('INSERT INTO UserRoles (UserId, RoleId) VALUES (?, 2)');
-            $pash = hash('sha256', 'password123');
+            $userInsert = $db->prepare('INSERT INTO Users (Id, Email, FirstName, LastName, Phone) VALUES (?, ?, ?, ?, ?)');
+            $roleInsert = $db->prepare('INSERT INTO UserRoles (UserId, RoleId) VALUES (?, 2)'); // Cliente
             
             foreach ($users as $u) {
-                $userInsert->execute([$u[0], $u[1], $pash, $u[2], $u[3], $u[4]]);
+                $userInsert->execute($u);
                 $roleInsert->execute([$u[0]]);
             }
             
             // D. Poblar Pedidos y Pagos
             $orderCount = 28;
-            $statuses = ['Nuevo', 'Preparando', 'Listo', 'En Ruta', 'Entregado', 'Cancelado'];
+            $statuses = ['Nuevo', 'Preparando', 'Listo', 'En Ruta', 'Entregado', 'Cancelado', 'Incompleto'];
             $methods = ['Retiro', 'Delivery'];
             $paymentMethods = ['Webpay', 'Transferencia', 'Efectivo'];
             $variantsPool = [
@@ -684,8 +769,8 @@ try {
             ];
             
             $ordInsert = $db->prepare("
-                INSERT INTO Orders (Id, UserId, TotalAmount, Status, ShippingMethod, ShippingCost, CreatedAt, SlaStartedAt, SlaPausedAt, SlaPausedTime, DeliveryPin) 
-                VALUES (?, ?, ?, ?, ?, ?, DATE_SUB(NOW(), INTERVAL ? DAY), ?, ?, ?, ?)
+                INSERT INTO Orders (Id, UserId, TotalAmount, Status, ShippingMethod, ShippingCost, CreatedAt, SlaStartedAt, SlaPausedAt, SlaPausedTime, DeliveryPin, CompletenessPercent, OrderState, LabelPrintedCount, ActualDeliveryTime) 
+                VALUES (?, ?, ?, ?, ?, ?, DATE_SUB(NOW(), INTERVAL ? DAY), ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             
             $oiInsert = $db->prepare("
@@ -711,6 +796,8 @@ try {
                     $status = 'Preparando';
                 } elseif ($i === 3) {
                     $status = 'Listo';
+                } elseif ($i === 4) {
+                    $status = 'Incompleto';
                 } else {
                     $status = $statuses[$i % count($statuses)];
                 }
@@ -740,7 +827,6 @@ try {
                 $totalAmount = $orderSubtotal + $shippingCost;
                 
                 // Datos para SLA y PIN en el seed
-                // Iniciado hace 30 minutos (1800 seg) si no está entregado/cancelado/nuevo
                 $slaStarted = null;
                 $slaPaused = null;
                 $slaPausedTimeAccum = 0;
@@ -751,7 +837,7 @@ try {
                     
                     if ($status === 'Incompleto') {
                         $slaPaused = date("Y-m-d H:i:s", strtotime("-10 minutes"));
-                        $slaPausedTimeAccum = 120; // 2 min pausado previo
+                        $slaPausedTimeAccum = 120;
                     }
                     
                     if ($method === 'Delivery') {
@@ -759,8 +845,35 @@ try {
                     }
                 }
                 
+                // Nuevos campos de seguimiento
+                $completenessPercent = ($status === 'Incompleto') ? 66 : 100;
+                $orderState = ($status === 'Nuevo') ? 'Pendiente' : 'Aceptado';
+                $labelPrintedCount = ($status === 'Nuevo') ? 0 : ($i % 3);
+                
+                $actualDeliveryTime = null;
+                if ($status === 'Entregado') {
+                    $minutesToAdd = ($method === 'Retiro') ? 35 : 55;
+                    $actualDeliveryTime = date("Y-m-d H:i:s", strtotime("-30 minutes + {$minutesToAdd} minutes"));
+                }
+                
                 // A. Insertar orden
-                $ordInsert->execute([$orderId, $userId, $totalAmount, $status, $method, $shippingCost, $daysAgo, $slaStarted, $slaPaused, $slaPausedTimeAccum, $deliveryPin]);
+                $ordInsert->execute([
+                    $orderId, 
+                    $userId, 
+                    $totalAmount, 
+                    $status, 
+                    $method, 
+                    $shippingCost, 
+                    $daysAgo, 
+                    $slaStarted, 
+                    $slaPaused, 
+                    $slaPausedTimeAccum, 
+                    $deliveryPin,
+                    $completenessPercent,
+                    $orderState,
+                    $labelPrintedCount,
+                    $actualDeliveryTime
+                ]);
                 
                 // B. Insertar ítems
                 foreach ($itemsToInsert as $item) {

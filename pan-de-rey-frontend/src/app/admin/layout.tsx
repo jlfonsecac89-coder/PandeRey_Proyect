@@ -9,12 +9,32 @@ import Image from 'next/image';
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  const navItems = [
-    { name: 'Dashboard WMS', href: '/admin', icon: LayoutDashboard },
-    { name: 'Pedidos (Kanban)', href: '/admin/orders', icon: Kanban },
-    { name: 'Catálogo', href: '/admin/products', icon: PackageSearch },
-    { name: 'Apariencia Web', href: '/admin/appearance', icon: Palette },
-    { name: 'Configuración', href: '/admin/settings', icon: Settings },
+  const sections = [
+    {
+      title: 'Seguimiento o Stock',
+      items: [
+        { name: 'Seguimiento Pedidos', href: '/admin/orders', icon: Kanban },
+        { name: 'Inventario & Stock', href: '/admin/products', icon: PackageSearch },
+      ]
+    },
+    {
+      title: 'Marketing y Promo',
+      items: [
+        { name: 'Campañas & Apariencia', href: '/admin/appearance', icon: Palette },
+      ]
+    },
+    {
+      title: 'Análisis y Alertas',
+      items: [
+        { name: 'Dashboard WMS', href: '/admin', icon: LayoutDashboard },
+      ]
+    },
+    {
+      title: 'Configuraciones y Diseño',
+      items: [
+        { name: 'Ajustes del Sistema', href: '/admin/settings', icon: Settings },
+      ]
+    }
   ];
 
   return (
@@ -26,25 +46,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <span className="font-serif text-sm tracking-widest text-gold uppercase">Admin CMS</span>
         </div>
         
-        <nav className="flex-1 py-6 px-3 space-y-1">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href;
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-3 rounded-sm text-sm font-medium transition-colors ${
-                  isActive 
-                    ? 'bg-gold/10 text-gold border-r-2 border-gold' 
-                    : 'text-gray-400 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                {item.name}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 py-6 px-3 space-y-6 overflow-y-auto">
+          {sections.map((section) => (
+            <div key={section.title} className="space-y-1">
+              <h3 className="text-[9px] font-bold uppercase tracking-[0.15em] text-gray-500 px-3 mb-2">{section.title}</h3>
+              {section.items.map((item) => {
+                const isActive = pathname === item.href;
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-sm text-sm font-medium transition-all ${
+                      isActive 
+                        ? 'bg-gold/10 text-gold border-r-2 border-gold font-semibold' 
+                        : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {item.name}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="p-4 border-t border-charcoal-border">
