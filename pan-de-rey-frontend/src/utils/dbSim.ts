@@ -44,6 +44,11 @@ export type SimProduct = {
   relleno?: string;
   estilo?: string;
   tipoSemilla?: string;
+  createdAt?: string;
+  lastRestockedAt?: string | null;
+  lastRestockedBy?: string | null;
+  lastRestockQty?: number | null;
+  previousStock?: number | null;
 };
 
 // Seed initial products with varying stock levels to trigger KPI warnings
@@ -269,7 +274,15 @@ export const seedLocalDb = (force = false): boolean => {
   
   const existingProducts = localStorage.getItem('pan_de_rey_sim_products');
   if (!existingProducts || force) {
-    localStorage.setItem('pan_de_rey_sim_products', JSON.stringify(initialProducts));
+    const seeded = initialProducts.map(p => ({
+      ...p,
+      createdAt: p.createdAt || new Date().toISOString(),
+      previousStock: p.previousStock !== undefined ? p.previousStock : Math.max(0, p.stock - 2),
+      lastRestockQty: p.lastRestockQty !== undefined ? p.lastRestockQty : 5,
+      lastRestockedAt: p.lastRestockedAt !== undefined ? p.lastRestockedAt : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      lastRestockedBy: p.lastRestockedBy !== undefined ? p.lastRestockedBy : 'Panadero Jefe'
+    }));
+    localStorage.setItem('pan_de_rey_sim_products', JSON.stringify(seeded));
   }
 
   const existingOrders = localStorage.getItem('pan_de_rey_sim_orders');
@@ -277,7 +290,15 @@ export const seedLocalDb = (force = false): boolean => {
 
   // Seed Products
   if (force) {
-    localStorage.setItem('pan_de_rey_sim_products', JSON.stringify(initialProducts));
+    const seeded = initialProducts.map(p => ({
+      ...p,
+      createdAt: p.createdAt || new Date().toISOString(),
+      previousStock: p.previousStock !== undefined ? p.previousStock : Math.max(0, p.stock - 2),
+      lastRestockQty: p.lastRestockQty !== undefined ? p.lastRestockQty : 5,
+      lastRestockedAt: p.lastRestockedAt !== undefined ? p.lastRestockedAt : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      lastRestockedBy: p.lastRestockedBy !== undefined ? p.lastRestockedBy : 'Panadero Jefe'
+    }));
+    localStorage.setItem('pan_de_rey_sim_products', JSON.stringify(seeded));
   }
 
   // Seed 28 Orders
@@ -536,7 +557,8 @@ export const addLocalProduct = (product: Omit<SimProduct, 'id'>): SimProduct => 
   const nextId = products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1;
   const newProduct: SimProduct = {
     ...product,
-    id: nextId
+    id: nextId,
+    createdAt: new Date().toISOString()
   };
   products.push(newProduct);
   saveLocalProducts(products);
@@ -560,14 +582,38 @@ export const deleteLocalProduct = (id: number): SimProduct[] => {
 export const bulkAddLocalProducts = (newProducts: Omit<SimProduct, 'id'>[]): SimProduct[] => {
   const products = getLocalProducts();
   let nextId = products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1;
+  const now = new Date().toISOString();
   
   const mapped = newProducts.map(p => {
-    const item = { ...p, id: nextId };
+    const item = { 
+      ...p, 
+      id: nextId,
+      createdAt: now
+    };
     nextId++;
     return item;
   });
   
   const updated = [...products, ...mapped];
+  saveLocalProducts(updated);
+  return updated;
+};
+
+export const restockProduct = (productId: number, qty: number, user: string): SimProduct[] => {
+  const products = getLocalProducts();
+  const updated = products.map(p => {
+    if (p.id === productId) {
+      return {
+        ...p,
+        previousStock: p.stock,
+        stock: p.stock + qty,
+        lastRestockedAt: new Date().toISOString(),
+        lastRestockedBy: user,
+        lastRestockQty: qty
+      };
+    }
+    return p;
+  });
   saveLocalProducts(updated);
   return updated;
 };

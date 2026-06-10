@@ -15,7 +15,9 @@ import {
   Check, 
   Image as ImageIcon,
   HelpCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Package,
+  Zap
 } from 'lucide-react';
 import Image from 'next/image';
 import { 
@@ -88,10 +90,17 @@ export default function CatalogManager() {
 
   if (!mounted) return null;
 
-  // Stock KPI Calculations
+  // Catalog KPI Calculations
+  const totalProductsCount = products.length;
   const outOfStockCount = products.filter(p => p.stock === 0).length;
-  const criticalStockCount = products.filter(p => p.stock > 0 && p.stock < 3).length;
-  const alertStockCount = products.filter(p => p.stock >= 3 && p.stock < 6).length;
+  
+  // Calculate new products today (created today or restocked today)
+  const localTodayStr = new Date().toLocaleDateString('en-CA'); // 'YYYY-MM-DD'
+  const newProductsTodayCount = products.filter(p => {
+    const createdDate = p.createdAt ? p.createdAt.split('T')[0] : '';
+    const restockedDate = p.lastRestockedAt ? p.lastRestockedAt.split('T')[0] : '';
+    return createdDate === localTodayStr || restockedDate === localTodayStr;
+  }).length;
 
   // Category and subcategory lists for dropdown filters
   const categories = Array.from(new Set(products.map(p => p.category)));
@@ -424,6 +433,18 @@ export default function CatalogManager() {
 
       {/* KPI Cards section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* KPI: Total Productos */}
+        <div className="bg-charcoal-light/25 border border-charcoal-border rounded p-6 flex items-center justify-between shadow-lg hover:border-gold/10 transition-all duration-300">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Total Productos</p>
+            <h3 className="text-3xl font-serif text-white font-semibold">{totalProductsCount}</h3>
+            <p className="text-xs text-gray-500 mt-2">Productos en el catálogo activo</p>
+          </div>
+          <div className="w-12 h-12 rounded bg-gold/5 border border-gold/20 flex items-center justify-center text-gold shadow-inner">
+            <Package className="w-6 h-6" />
+          </div>
+        </div>
+
         {/* KPI: Sin Stock */}
         <div className="bg-[#1c1212]/30 border border-red-500/10 rounded p-6 flex items-center justify-between shadow-lg hover:border-red-500/20 transition-all duration-300">
           <div>
@@ -436,27 +457,15 @@ export default function CatalogManager() {
           </div>
         </div>
 
-        {/* KPI: Críticos */}
-        <div className="bg-[#1c1612]/30 border border-orange-500/10 rounded p-6 flex items-center justify-between shadow-lg hover:border-orange-500/20 transition-all duration-300">
+        {/* KPI: Nuevos del Día */}
+        <div className="bg-[#121c16]/30 border border-emerald-500/10 rounded p-6 flex items-center justify-between shadow-lg hover:border-emerald-500/20 transition-all duration-300">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-orange-400 mb-1">Stock Crítico</p>
-            <h3 className="text-3xl font-serif text-white font-semibold">{criticalStockCount}</h3>
-            <p className="text-xs text-gray-500 mt-2">Productos con menos de 3 unidades</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 mb-1">Nuevos del Día</p>
+            <h3 className="text-3xl font-serif text-white font-semibold">{newProductsTodayCount}</h3>
+            <p className="text-xs text-gray-500 mt-2">Creados o reabastecidos hoy</p>
           </div>
-          <div className="w-12 h-12 rounded bg-orange-950/20 border border-orange-500/20 flex items-center justify-center text-orange-500 shadow-inner">
-            <AlertTriangle className="w-6 h-6" />
-          </div>
-        </div>
-
-        {/* KPI: Alerta */}
-        <div className="bg-[#1c1b12]/30 border border-yellow-500/10 rounded p-6 flex items-center justify-between shadow-lg hover:border-yellow-500/20 transition-all duration-300">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-yellow-400 mb-1">Stock en Alerta</p>
-            <h3 className="text-3xl font-serif text-white font-semibold">{alertStockCount}</h3>
-            <p className="text-xs text-gray-500 mt-2">Productos con menos de 6 unidades</p>
-          </div>
-          <div className="w-12 h-12 rounded bg-yellow-950/20 border border-yellow-500/20 flex items-center justify-center text-yellow-400 shadow-inner">
-            <AlertCircle className="w-6 h-6" />
+          <div className="w-12 h-12 rounded bg-emerald-950/20 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-inner">
+            <Zap className="w-6 h-6" />
           </div>
         </div>
       </div>
