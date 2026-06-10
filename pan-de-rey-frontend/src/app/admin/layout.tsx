@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, PackageSearch, Kanban, Settings, LogOut, Palette, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, PackageSearch, Kanban, Settings, LogOut, Palette, ClipboardList, Ticket } from 'lucide-react';
 
 import Image from 'next/image';
 
@@ -22,6 +22,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       title: 'Marketing y Promo',
       items: [
         { name: 'Campañas & Apariencia', href: '/admin/appearance', icon: Palette },
+        { name: 'Cupones de Descuento', href: '/admin/coupons', icon: Ticket },
       ]
     },
     {
@@ -42,15 +43,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="flex h-screen bg-[#0a0a0a]">
       {/* Sidebar */}
       <aside className="w-64 bg-charcoal-light border-r border-charcoal-border flex flex-col">
-        <div className="h-20 flex items-center px-4 border-b border-charcoal-border gap-3">
-          <Image src="/logo.png" alt="Pan de Rey Logo" width={40} height={40} className="invert mix-blend-screen" />
-          <span className="font-serif text-sm tracking-widest text-gold uppercase">Admin CMS</span>
+        <div className="h-20 flex items-center px-5 border-b border-charcoal-border gap-3 bg-[#070707]">
+          <div className="relative w-9 h-9 overflow-hidden rounded-full bg-gold/10 flex items-center justify-center border border-gold/20">
+            <Image src="/logo.png" alt="Pan de Rey Logo" width={24} height={24} className="invert mix-blend-screen opacity-90" />
+          </div>
+          <div>
+            <span className="font-serif text-[11px] tracking-[0.15em] text-gold uppercase block font-black">Pan de Rey</span>
+            <span className="text-[8px] tracking-[0.2em] text-gray-500 uppercase block font-bold mt-0.5">Control Central</span>
+          </div>
         </div>
         
-        <nav className="flex-1 py-6 px-3 space-y-6 overflow-y-auto">
+        <nav className="flex-1 py-6 px-3.5 space-y-6 overflow-y-auto">
           {sections.map((section) => (
-            <div key={section.title} className="space-y-1">
-              <h3 className="text-[9px] font-bold uppercase tracking-[0.15em] text-gray-500 px-3 mb-2">{section.title}</h3>
+            <div key={section.title} className="space-y-1.5">
+              <h3 className="text-[8px] font-bold uppercase tracking-[0.2em] text-gold/40 px-3.5 mb-2.5">{section.title}</h3>
               {section.items.map((item) => {
                 const isActive = pathname === item.href;
                 const Icon = item.icon;
@@ -58,13 +64,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-sm text-sm font-medium transition-all ${
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded text-[11px] font-bold uppercase tracking-wider transition-all duration-300 ${
                       isActive 
-                        ? 'bg-gold/10 text-gold border-r-2 border-gold font-semibold' 
-                        : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                        ? 'bg-gold/10 text-gold border-r-2 border-gold font-bold shadow-[inset_-1px_0_10px_rgba(212,175,55,0.05)]' 
+                        : 'text-gray-400 hover:bg-white/[0.03] hover:text-white hover:translate-x-1'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className="w-4 h-4 shrink-0" />
                     {item.name}
                   </Link>
                 );

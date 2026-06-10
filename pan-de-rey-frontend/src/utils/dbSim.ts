@@ -618,3 +618,87 @@ export const restockProduct = (productId: number, qty: number, user: string): Si
   return updated;
 };
 
+export type SimCoupon = {
+  code: string;
+  type: 'percent' | 'fixed';
+  value: number;
+  minPurchase: number;
+  expiryDate: string;
+  status: 'active' | 'inactive';
+};
+
+const defaultCoupons: SimCoupon[] = [
+  {
+    code: 'REY10',
+    type: 'percent',
+    value: 10,
+    minPurchase: 0,
+    expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    status: 'active'
+  },
+  {
+    code: 'MASAMADRE500',
+    type: 'fixed',
+    value: 500,
+    minPurchase: 5000,
+    expiryDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    status: 'active'
+  },
+  {
+    code: 'BIENVENIDA20',
+    type: 'percent',
+    value: 20,
+    minPurchase: 10000,
+    expiryDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    status: 'active'
+  },
+  {
+    code: 'PROMOEXPIRADA',
+    type: 'percent',
+    value: 15,
+    minPurchase: 8000,
+    expiryDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    status: 'inactive'
+  }
+];
+
+export const getLocalCoupons = (): SimCoupon[] => {
+  if (typeof window === 'undefined') return [];
+  const raw = localStorage.getItem('pan_de_rey_sim_coupons');
+  if (!raw) {
+    localStorage.setItem('pan_de_rey_sim_coupons', JSON.stringify(defaultCoupons));
+    return defaultCoupons;
+  }
+  return JSON.parse(raw);
+};
+
+export const saveLocalCoupons = (coupons: SimCoupon[]): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('pan_de_rey_sim_coupons', JSON.stringify(coupons));
+};
+
+export const addLocalCoupon = (coupon: SimCoupon): SimCoupon[] => {
+  const coupons = getLocalCoupons();
+  if (coupons.some(c => c.code.toUpperCase() === coupon.code.toUpperCase())) {
+    throw new Error('El código de cupón ya existe.');
+  }
+  const updated = [...coupons, { ...coupon, code: coupon.code.toUpperCase() }];
+  saveLocalCoupons(updated);
+  return updated;
+};
+
+export const deleteLocalCoupon = (code: string): SimCoupon[] => {
+  const coupons = getLocalCoupons();
+  const filtered = coupons.filter(c => c.code.toUpperCase() !== code.toUpperCase());
+  saveLocalCoupons(filtered);
+  return filtered;
+};
+
+export const updateLocalCouponStatus = (code: string, status: 'active' | 'inactive'): SimCoupon[] => {
+  const coupons = getLocalCoupons();
+  const updated = coupons.map(c => c.code.toUpperCase() === code.toUpperCase() ? { ...c, status } : c);
+  saveLocalCoupons(updated);
+  return updated;
+};
+
+

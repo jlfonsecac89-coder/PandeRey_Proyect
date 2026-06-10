@@ -21,7 +21,9 @@ import {
   Inbox,
   UserCheck,
   TrendingUp,
-  FileText
+  FileText,
+  User,
+  ArrowRight
 } from 'lucide-react';
 import { formatPrice } from '@/utils/format';
 import { 
@@ -124,7 +126,7 @@ function SlaTimer({ startedAt, pausedAt, pausedTime, status }: { startedAt?: str
   const timeString = `${isExceeded ? '-' : ''}${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
   return (
-    <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+    <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-mono font-bold leading-none w-fit ${
       isExceeded 
         ? 'bg-red-500/10 text-red-500 border border-red-500/30' 
         : pausedAt 
@@ -215,11 +217,11 @@ function SlaTableCell({ order }: { order: Order }) {
     return () => clearInterval(interval);
   }, [order]);
 
-  if (!slaData) return <span className="text-gray-600">--:--</span>;
+  if (!slaData) return <span className="text-gray-600 text-[10px]">--:--</span>;
 
   return (
-    <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-mono font-bold leading-none ${slaData.class}`}>
-      <Clock className="w-3.5 h-3.5" />
+    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-mono font-bold leading-none ${slaData.class}`}>
+      <Clock className="w-3 h-3" />
       <span>{slaData.timeString} ({slaData.label})</span>
     </div>
   );
@@ -234,6 +236,9 @@ export default function OrdersDashboard() {
   const [activeTab, setActiveTab] = useState<'tracking' | 'kanban' | 'exceptions'>('tracking');
   const [pipelineFilter, setPipelineFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  
+  // KPI Click active filters: 'all', 'pendiente', 'aceptado', 'incompleto', 'completo', 'delivery', 'retiro'
+  const [kpiFilter, setKpiFilter] = useState<string>('all');
 
   // Estados de Modales y Formularios
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
@@ -458,7 +463,24 @@ export default function OrdersDashboard() {
   // Filtrado de Pedidos para la grilla
   const getFilteredOrders = () => {
     return orders.filter(order => {
-      // Filtro de estado pipeline
+      // 1. KPI active filter toggle
+      if (kpiFilter === 'pendiente') {
+        if (order.orderState !== 'Pendiente' && order.status !== 'Nuevo') return false;
+      } else if (kpiFilter === 'aceptado') {
+        if (order.orderState !== 'Aceptado' || order.status === 'Nuevo') return false;
+      } else if (kpiFilter === 'incompleto') {
+        const completeness = order.completenessPercent ?? (order.status === 'Incompleto' ? 66 : 100);
+        if (completeness >= 100) return false;
+      } else if (kpiFilter === 'completo') {
+        const completeness = order.completenessPercent ?? (order.status === 'Incompleto' ? 66 : 100);
+        if (completeness < 100) return false;
+      } else if (kpiFilter === 'delivery') {
+        if (order.shippingMethod !== 'Delivery') return false;
+      } else if (kpiFilter === 'retiro') {
+        if (order.shippingMethod !== 'Retiro') return false;
+      }
+
+      // 2. Pipeline status filter
       if (pipelineFilter !== 'all') {
         const statusLower = order.status.toLowerCase();
         if (pipelineFilter === 'nuevo' && order.status !== 'Nuevo' && order.status !== 'Aceptado') return false;
@@ -469,7 +491,7 @@ export default function OrdersDashboard() {
         if (pipelineFilter === 'cancelado' && order.status !== 'Cancelado') return false;
       }
 
-      // Filtro de búsqueda
+      // 3. Search query filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const idMatches = order.id.toLowerCase().includes(query);
@@ -520,7 +542,7 @@ export default function OrdersDashboard() {
             {isLive ? (
               <span className="w-2.5 h-2.5 bg-green-500 rounded-full inline-block animate-pulse" title="Servidor Activo (MySQL)" />
             ) : (
-              <span className="w-2.5 h-2.5 bg-yellow-500 rounded-full inline-block" title="Modo Local Simulado (Offline)" />
+              <span className="w-2.5 h-2.5 bg-gold rounded-full inline-block" title="Modo Local Simulado (Offline)" />
             )}
           </h1>
           <p className="text-xs text-gray-400">Panel administrativo centralizado de control de ventas y SLAs</p>
@@ -529,7 +551,7 @@ export default function OrdersDashboard() {
         <div className="flex gap-2">
           <button 
             onClick={fetchOrders} 
-            className="flex items-center gap-2 px-3 py-1.5 bg-[#161616] text-gray-400 hover:text-white border border-white/5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors active:scale-95"
+            className="flex items-center gap-2 px-3 py-1.5 bg-[#161616] text-gray-400 hover:text-white border border-white/5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors active:scale-95 cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Sincronizar
@@ -537,25 +559,42 @@ export default function OrdersDashboard() {
         </div>
       </div>
 
-      {/* Grid de Tarjetas KPI */}
+      {/* Grid de Tarjetas KPI - Now acting as Filters */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-        {/* KPI 1: Pendientes vs Aceptados */}
-        <div className="bg-charcoal-light border border-charcoal-border rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group">
+        
+        {/* KPI 1: Pedidos por Estado (Toggles Pendiente/Aceptado/All) */}
+        <div 
+          onClick={() => setKpiFilter(prev => prev === 'pendiente' ? 'aceptado' : prev === 'aceptado' ? 'all' : 'pendiente')}
+          className={`cursor-pointer bg-charcoal-light border rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group transition-all duration-300 ${
+            kpiFilter === 'pendiente' || kpiFilter === 'aceptado'
+              ? 'border-gold shadow-[0_0_15px_rgba(212,175,55,0.15)] scale-[1.02]' 
+              : 'border-charcoal-border hover:border-gold/30'
+          }`}
+        >
           <div className="absolute top-0 right-0 p-3 text-gold/10 group-hover:text-gold/20 transition-colors">
             <Inbox className="w-10 h-10" />
           </div>
-          <p className="text-[9px] uppercase tracking-wider text-gray-500 font-bold mb-1">Pedidos por Estado</p>
+          <p className="text-[9px] uppercase tracking-wider text-gray-500 font-bold mb-1">
+            {kpiFilter === 'pendiente' ? 'Filtrando: Pend.' : kpiFilter === 'aceptado' ? 'Filtrando: Acept.' : 'Pedidos por Estado'}
+          </p>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-serif font-bold text-white">{pendientesCount}</span>
+            <span className={`text-2xl font-serif font-bold ${kpiFilter === 'pendiente' ? 'text-gold' : 'text-white'}`}>{pendientesCount}</span>
             <span className="text-[10px] text-gray-400 font-medium">Pend.</span>
             <span className="text-gray-600">/</span>
-            <span className="text-xl font-serif font-bold text-gold">{aceptadosCount}</span>
+            <span className={`text-xl font-serif font-bold ${kpiFilter === 'aceptado' ? 'text-gold' : 'text-white/80'}`}>{aceptadosCount}</span>
             <span className="text-[10px] text-gray-400 font-medium">Acept.</span>
           </div>
         </div>
 
         {/* KPI 2: Pedidos Incompletos */}
-        <div className="bg-[#1C1A14] border border-yellow-900/30 rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group">
+        <div 
+          onClick={() => setKpiFilter(prev => prev === 'incompleto' ? 'all' : 'incompleto')}
+          className={`cursor-pointer border rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group transition-all duration-300 ${
+            kpiFilter === 'incompleto'
+              ? 'bg-[#291f0d] border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)] scale-[1.02]' 
+              : 'bg-[#1C1A14] border-yellow-900/30 hover:border-yellow-500/30'
+          }`}
+        >
           <div className="absolute top-0 right-0 p-3 text-yellow-500/10 group-hover:text-yellow-500/20 transition-colors">
             <AlertTriangle className="w-10 h-10" />
           </div>
@@ -567,7 +606,14 @@ export default function OrdersDashboard() {
         </div>
 
         {/* KPI 3: Pedidos Completos */}
-        <div className="bg-charcoal-light border border-charcoal-border rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group">
+        <div 
+          onClick={() => setKpiFilter(prev => prev === 'completo' ? 'all' : 'completo')}
+          className={`cursor-pointer bg-charcoal-light border rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group transition-all duration-300 ${
+            kpiFilter === 'completo'
+              ? 'border-emerald-500 bg-[#0d2217] shadow-[0_0_15px_rgba(16,185,129,0.2)] scale-[1.02]' 
+              : 'border-charcoal-border hover:border-emerald-500/30'
+          }`}
+        >
           <div className="absolute top-0 right-0 p-3 text-emerald-500/10 group-hover:text-emerald-500/20 transition-colors">
             <CheckCircle className="w-10 h-10" />
           </div>
@@ -579,7 +625,14 @@ export default function OrdersDashboard() {
         </div>
 
         {/* KPI 4: Total Delivery */}
-        <div className="bg-[#101524] border border-blue-950/30 rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group">
+        <div 
+          onClick={() => setKpiFilter(prev => prev === 'delivery' ? 'all' : 'delivery')}
+          className={`cursor-pointer border rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group transition-all duration-300 ${
+            kpiFilter === 'delivery'
+              ? 'bg-[#0f1d3a] border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-[1.02]' 
+              : 'bg-[#101524] border-blue-950/30 hover:border-blue-500/30'
+          }`}
+        >
           <div className="absolute top-0 right-0 p-3 text-blue-500/15 group-hover:text-blue-500/25 transition-colors">
             <Truck className="w-10 h-10" />
           </div>
@@ -591,7 +644,14 @@ export default function OrdersDashboard() {
         </div>
 
         {/* KPI 5: Total Retiro */}
-        <div className="bg-[#141A14] border border-emerald-950/20 rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group">
+        <div 
+          onClick={() => setKpiFilter(prev => prev === 'retiro' ? 'all' : 'retiro')}
+          className={`cursor-pointer border rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group transition-all duration-300 ${
+            kpiFilter === 'retiro'
+              ? 'bg-[#0d2214] border-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.2)] scale-[1.02]' 
+              : 'bg-[#141A14] border-emerald-950/20 hover:border-emerald-500/30'
+          }`}
+        >
           <div className="absolute top-0 right-0 p-3 text-emerald-500/10 group-hover:text-emerald-500/25 transition-colors">
             <CheckCircle className="w-10 h-10" />
           </div>
@@ -603,7 +663,14 @@ export default function OrdersDashboard() {
         </div>
 
         {/* KPI 6: Total Pedidos */}
-        <div className="bg-[#1f1b13] border border-gold/10 rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group">
+        <div 
+          onClick={() => setKpiFilter('all')}
+          className={`cursor-pointer bg-[#1f1b13] border rounded-xl p-4 flex flex-col justify-between shadow-md relative overflow-hidden group transition-all duration-300 ${
+            kpiFilter === 'all'
+              ? 'border-gold shadow-[0_0_15px_rgba(212,175,55,0.25)] scale-[1.02]' 
+              : 'border-gold/10 hover:border-gold/30'
+          }`}
+        >
           <div className="absolute top-0 right-0 p-3 text-gold/20 group-hover:text-gold/30 transition-colors">
             <TrendingUp className="w-10 h-10" />
           </div>
@@ -619,7 +686,7 @@ export default function OrdersDashboard() {
       <div className="flex border-b border-charcoal-border">
         <button
           onClick={() => setActiveTab('tracking')}
-          className={`flex items-center gap-2 px-6 py-3 border-b-2 text-xs font-bold uppercase tracking-widest transition-all ${
+          className={`flex items-center gap-2 px-6 py-3 border-b-2 text-xs font-bold uppercase tracking-widest transition-all cursor-pointer ${
             activeTab === 'tracking' 
               ? 'border-gold text-gold bg-gold/5 font-semibold' 
               : 'border-transparent text-gray-400 hover:text-white'
@@ -630,7 +697,7 @@ export default function OrdersDashboard() {
         </button>
         <button
           onClick={() => setActiveTab('kanban')}
-          className={`flex items-center gap-2 px-6 py-3 border-b-2 text-xs font-bold uppercase tracking-widest transition-all ${
+          className={`flex items-center gap-2 px-6 py-3 border-b-2 text-xs font-bold uppercase tracking-widest transition-all cursor-pointer ${
             activeTab === 'kanban' 
               ? 'border-gold text-gold bg-gold/5 font-semibold' 
               : 'border-transparent text-gray-400 hover:text-white'
@@ -641,7 +708,7 @@ export default function OrdersDashboard() {
         </button>
         <button
           onClick={() => setActiveTab('exceptions')}
-          className={`flex items-center gap-2 px-6 py-3 border-b-2 text-xs font-bold uppercase tracking-widest transition-all relative ${
+          className={`flex items-center gap-2 px-6 py-3 border-b-2 text-xs font-bold uppercase tracking-widest transition-all relative cursor-pointer ${
             activeTab === 'exceptions' 
               ? 'border-gold text-gold bg-gold/5 font-semibold' 
               : 'border-transparent text-gray-400 hover:text-white'
@@ -657,7 +724,7 @@ export default function OrdersDashboard() {
         </button>
       </div>
 
-      {/* Tab: Tabla de Seguimiento */}
+      {/* Tab: Tabla de Seguimiento (Compacted 6-column Layout) */}
       {activeTab === 'tracking' && (
         <div className="bg-[#111] border border-charcoal-border rounded-xl p-6 shadow-xl space-y-6">
           {/* Controles y Filtros */}
@@ -697,30 +764,23 @@ export default function OrdersDashboard() {
             </p>
           </div>
 
-          {/* Tabla */}
+          {/* Tabla de 6 Columnas */}
           <div className="overflow-x-auto rounded-lg border border-white/5">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-charcoal-border text-gray-400 uppercase tracking-wider text-[9px] bg-charcoal-light/30">
-                  <th className="p-4 text-center">Nro Pedido</th>
-                  <th className="p-4">Fecha</th>
-                  <th className="p-4">Hora</th>
-                  <th className="p-4">Tipo Entrega</th>
-                  <th className="p-4">Pipeline</th>
-                  <th className="p-4">Completitud</th>
-                  <th className="p-4 text-right">Monto</th>
-                  <th className="p-4 text-center">Prod.</th>
-                  <th className="p-4 text-center">Estado</th>
-                  <th className="p-4 text-center">H. Estimada</th>
-                  <th className="p-4 text-center">Deadline SLA</th>
-                  <th className="p-4 text-center">Etiqueta</th>
-                  <th className="p-4 text-center">Copias</th>
+                  <th className="p-4 text-center">Pedido</th>
+                  <th className="p-4">Cliente</th>
+                  <th className="p-4">Entrega</th>
+                  <th className="p-4">Detalle & Estado</th>
+                  <th className="p-4">Pipeline & SLA</th>
+                  <th className="p-4 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {getFilteredOrders().length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="text-center py-12 text-gray-500 italic">No se encontraron pedidos con los filtros seleccionados.</td>
+                    <td colSpan={6} className="text-center py-12 text-gray-500 italic">No se encontraron pedidos con los filtros seleccionados.</td>
                   </tr>
                 ) : (
                   getFilteredOrders().map((order) => {
@@ -731,113 +791,102 @@ export default function OrdersDashboard() {
 
                     return (
                       <tr key={order.id} className="hover:bg-white/[0.02] transition-colors">
-                        {/* Nro Pedido (Clickable) */}
-                        <td className="p-4 text-center">
-                          <button 
-                            onClick={() => setSelectedOrder(order)}
-                            className="font-bold text-gold hover:text-white underline decoration-gold/40 transition-colors uppercase"
-                          >
-                            #{order.id.substring(0, 8).toUpperCase()}
-                          </button>
-                        </td>
                         
-                        {/* Fecha */}
-                        <td className="p-4 text-gray-400 font-medium">
-                          {order.createdAt ? new Date(order.createdAt).toLocaleDateString([], { day: '2-digit', month: '2-digit', year: 'numeric' }) : '--/--/----'}
-                        </td>
-                        
-                        {/* Hora */}
-                        <td className="p-4 text-gray-300 font-mono">
-                          {order.time}
-                        </td>
-                        
-                        {/* Tipo de Entrega */}
-                        <td className="p-4 font-semibold">
-                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider ${
-                            isDelivery 
-                              ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
-                              : 'bg-gold/10 text-gold border border-gold/20'
-                          }`}>
-                            {isDelivery ? <Truck className="w-3.5 h-3.5" /> : <Package className="w-3.5 h-3.5" />}
-                            {order.shippingMethod}
-                          </span>
-                        </td>
-                        
-                        {/* Pipeline Pedido */}
-                        <td className="p-4 font-semibold">
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold ${
-                            order.status === 'Nuevo' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                            order.status === 'Preparando' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                            ['Listo', 'Listo para Retiro', 'Listo para Despacho'].includes(order.status) ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
-                            order.status === 'Incompleto' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                            order.status === 'Cancelado' ? 'bg-gray-500/10 text-gray-400 border border-gray-500/20' :
-                            'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' // Entregado / En ruta
-                          }`}>
-                            {order.status}
-                          </span>
-                        </td>
-                        
-                        {/* Estado Completitud */}
+                        {/* 1. Pedido (ID + Fecha/Hora) */}
                         <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden shrink-0">
-                              <div 
-                                className={`h-full rounded-full ${completeness < 100 ? 'bg-orange-500' : 'bg-gold'}`}
-                                style={{ width: `${completeness}%` }}
-                              />
-                            </div>
-                            <span className={`font-mono text-[10px] font-bold ${completeness < 100 ? 'text-orange-400' : 'text-gray-400'}`}>
-                              {completeness}%
+                          <div className="flex flex-col items-center">
+                            <button 
+                              onClick={() => setSelectedOrder(order)}
+                              className="font-bold text-gold hover:text-white underline decoration-gold/40 transition-colors uppercase text-[13px] tracking-wide"
+                            >
+                              #{order.id.substring(0, 8).toUpperCase()}
+                            </button>
+                            <span className="text-[9px] text-gray-500 mt-1 font-mono font-bold tracking-wider">
+                              {order.createdAt ? new Date(order.createdAt).toLocaleDateString([], { day: '2-digit', month: '2-digit' }) : '--/--'} {order.time}
                             </span>
                           </div>
                         </td>
-                        
-                        {/* Monto */}
-                        <td className="p-4 text-right font-bold text-white font-mono">
-                          ${formatPrice(order.total)}
+
+                        {/* 2. Cliente (Nombre + Contacto) */}
+                        <td className="p-4">
+                          <div className="flex flex-col justify-center">
+                            <span className="font-semibold text-white text-sm">{order.customerName}</span>
+                            <span className="text-[10px] text-gray-500 mt-0.5 font-mono">{order.phone}</span>
+                          </div>
                         </td>
-                        
-                        {/* Cantidad de productos */}
-                        <td className="p-4 text-center text-gray-300 font-mono font-bold">
-                          {totalQty}
+
+                        {/* 3. Entrega (Método + Hora Estimada) */}
+                        <td className="p-4">
+                          <div className="flex flex-col justify-center">
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] uppercase font-bold tracking-wider w-fit ${
+                              isDelivery 
+                                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
+                                : 'bg-gold/10 text-gold border border-gold/20'
+                            }`}>
+                              {isDelivery ? <Truck className="w-3.5 h-3.5" /> : <Package className="w-3.5 h-3.5" />}
+                              {order.shippingMethod}
+                            </span>
+                            <span className="text-[10px] text-gray-500 mt-1 font-mono">
+                              Estimado: <strong className="text-white">{order.pickupTime || '--:--'}</strong>
+                            </span>
+                          </div>
                         </td>
-                        
-                        {/* Estado pedido */}
-                        <td className="p-4 text-center font-semibold">
-                          <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded font-bold ${
-                            state === 'Pendiente' 
-                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
-                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          }`}>
-                            {state}
-                          </span>
+
+                        {/* 4. Detalle & Estado (Items + Monto + Barra de completitud) */}
+                        <td className="p-4">
+                          <div className="flex flex-col gap-1.5 max-w-[150px]">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-gray-300 font-bold">{totalQty} {totalQty === 1 ? 'producto' : 'productos'}</span>
+                              <span className="text-white font-mono font-bold">${formatPrice(order.total)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden shrink-0">
+                                <div 
+                                  className={`h-full rounded-full ${completeness < 100 ? 'bg-orange-500' : 'bg-gold'}`}
+                                  style={{ width: `${completeness}%` }}
+                                />
+                              </div>
+                              <span className={`font-mono text-[9px] font-bold ${completeness < 100 ? 'text-orange-400' : 'text-gray-500'}`}>
+                                {completeness}%
+                              </span>
+                            </div>
+                          </div>
                         </td>
-                        
-                        {/* Hora estimada de retiro o envio */}
-                        <td className="p-4 text-center text-gray-300 font-mono">
-                          {order.pickupTime || '--:--'}
+
+                        {/* 5. Pipeline & SLA (Estado Badge + Cronómetro SLA) */}
+                        <td className="p-4">
+                          <div className="flex flex-col gap-1.5 items-start">
+                            <span className={`text-[9px] px-2 py-0.5 rounded uppercase tracking-wider font-bold ${
+                              order.status === 'Nuevo' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                              order.status === 'Preparando' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                              ['Listo', 'Listo para Retiro', 'Listo para Despacho'].includes(order.status) ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
+                              order.status === 'Incompleto' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                              order.status === 'Cancelado' ? 'bg-gray-500/10 text-gray-400 border border-gray-500/20' :
+                              'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            }`}>
+                              {order.status}
+                            </span>
+                            <SlaTableCell order={order} />
+                          </div>
                         </td>
-                        
-                        {/* Deadline (SLA timer) */}
-                        <td className="p-4 text-center">
-                          <SlaTableCell order={order} />
+
+                        {/* 6. Acciones (Impresión + Copias) */}
+                        <td className="p-4">
+                          <div className="flex items-center justify-center gap-3">
+                            <button 
+                              onClick={() => handlePrintLabel(order)}
+                              className="p-2 rounded bg-charcoal-light hover:bg-gold/10 border border-white/5 hover:border-gold/30 text-gray-400 hover:text-gold transition-all duration-300 cursor-pointer"
+                              title="Imprimir ticket preparación (no fiscal)"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="flex flex-col items-start leading-none text-[10px]">
+                              <span className="text-gray-300 font-bold font-mono">{order.labelPrintedCount || 0}x</span>
+                              <span className="text-[8px] text-gray-500 uppercase tracking-widest mt-0.5">impreso</span>
+                            </div>
+                          </div>
                         </td>
-                        
-                        {/* Imprimir etiqueta */}
-                        <td className="p-4 text-center">
-                          <button 
-                            onClick={() => handlePrintLabel(order)}
-                            className="p-1.5 rounded bg-white/5 hover:bg-gold/10 border border-white/5 hover:border-gold/30 text-gray-400 hover:text-gold transition-all duration-300"
-                            title="Imprimir etiqueta de preparación (no fiscal)"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                        
-                        {/* Copias impresas */}
-                        <td className="p-4 text-center font-mono text-gray-400 font-bold">
-                          {order.labelPrintedCount || 0}
-                        </td>
+
                       </tr>
                     );
                   })
@@ -848,43 +897,48 @@ export default function OrdersDashboard() {
         </div>
       )}
 
-      {/* Tab: Kanban */}
+      {/* Tab: Kanban (Facade WMS Redesign) */}
       {activeTab === 'kanban' && (
-        <div className="flex-1 flex gap-6 overflow-x-auto pb-6">
+        <div className="flex-1 flex gap-5 overflow-x-auto pb-6 scrollbar-thin scrollbar-thumb-white/10">
           {columns.map(col => {
             const colOrders = filterOrdersForKanban(col.status);
             const Icon = col.icon;
             
             return (
-              <div key={col.status} className="w-80 flex-shrink-0 flex flex-col bg-[#111] rounded-lg border border-charcoal-border">
+              <div key={col.status} className="w-80 flex-shrink-0 flex flex-col bg-[#0d0d0d] rounded-xl border border-charcoal-border/80 shadow-2xl">
                 {/* Cabecera Columna */}
-                <div className="p-4 border-b border-charcoal-border flex items-center justify-between bg-charcoal-light/30 rounded-t-lg">
-                  <div className="flex items-center gap-2 text-gray-200 font-semibold text-xs uppercase tracking-wider">
+                <div className="p-4 border-b border-charcoal-border flex items-center justify-between bg-charcoal-light/20 rounded-t-xl">
+                  <div className="flex items-center gap-2 text-white font-bold text-xs uppercase tracking-wider">
                     <Icon className="w-4 h-4 text-gold" />
                     {col.title}
                   </div>
-                  <span className="bg-[#1c1c1c] text-gold border border-gold/20 text-[10px] font-bold py-1 px-2.5 rounded-full">
+                  <span className="bg-gold/10 text-gold border border-gold/20 text-[9px] font-black py-0.5 px-2.5 rounded-full uppercase tracking-wider">
                     {colOrders.length}
                   </span>
                 </div>
                 
                 {/* Contenido Columna */}
-                <div className="p-4 flex-1 overflow-y-auto space-y-4 max-h-[60vh]">
+                <div className="p-3 flex-1 overflow-y-auto space-y-3.5 max-h-[62vh] min-h-[350px]">
                   {colOrders.length === 0 ? (
-                    <div className="text-center py-8 text-xs text-gray-600 italic">No hay pedidos</div>
+                    <div className="h-full flex flex-col items-center justify-center py-16 text-center text-gray-600">
+                      <Inbox className="w-8 h-8 stroke-1 text-gray-700 mb-2" />
+                      <p className="text-[11px] uppercase tracking-wider font-semibold">Vacío</p>
+                    </div>
                   ) : (
                     colOrders.map(order => {
                       const isDelivery = order.shippingMethod === 'Delivery';
                       const isRetiro = order.shippingMethod === 'Retiro';
+                      const completeness = order.completenessPercent ?? (order.status === 'Incompleto' ? 66 : 100);
+                      const totalQty = order.itemsRaw?.reduce((sum, it) => sum + it.quantity, 0) || order.items.length;
                       
                       return (
                         <div 
                           key={order.id} 
                           onClick={() => setSelectedOrder(order)}
-                          className="bg-charcoal-light p-4 rounded-lg border border-charcoal-border cursor-pointer hover:border-gold/50 transition-all hover:shadow-lg hover:shadow-black/40 group relative overflow-hidden"
+                          className="bg-charcoal-light/40 hover:bg-charcoal-light/80 p-4 rounded-xl border border-charcoal-border/50 cursor-pointer hover:border-gold/30 transition-all duration-300 shadow-md hover:shadow-black/50 group relative overflow-hidden flex flex-col justify-between"
                         >
-                          {/* SLA Timer para Retiro */}
-                          {isRetiro && (order.status !== 'Entregado' && order.status !== 'Cancelado') && (
+                          {/* SLA Timer en la esquina superior derecha */}
+                          {(order.status !== 'Entregado' && order.status !== 'Cancelado') && (
                             <div className="absolute top-4 right-4" onClick={(e) => e.stopPropagation()}>
                               <SlaTimer 
                                 startedAt={order.slaStartedAt} 
@@ -895,44 +949,60 @@ export default function OrdersDashboard() {
                             </div>
                           )}
 
-                          {/* ID y Tipo de Envío */}
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="font-bold text-sm text-white group-hover:text-gold transition-colors">
-                              #{order.id.substring(0, 8).toUpperCase()}
-                            </span>
-                            <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded font-bold ${
-                              isDelivery 
-                                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
-                                : 'bg-gold/10 text-gold border border-gold/20'
-                            }`}>
-                              {isDelivery ? 'Delivery' : 'Retiro'}
-                            </span>
-                          </div>
-                          
-                          {/* Info Cliente */}
-                          <p className="text-xs text-gray-300 font-medium mb-1">{order.customerName}</p>
-                          
-                          {/* Items */}
-                          <div className="text-[11px] text-gray-500 mb-4 line-clamp-2 leading-relaxed">
-                            {order.items.join(', ')}
+                          <div>
+                            {/* ID y Tipo de Envío */}
+                            <div className="flex justify-between items-center mb-3">
+                              <span className="font-mono font-black text-xs text-white group-hover:text-gold transition-colors tracking-widest uppercase">
+                                #{order.id.substring(0, 8).toUpperCase()}
+                              </span>
+                            </div>
+                            
+                            {/* Info Cliente */}
+                            <div className="space-y-0.5 mb-2.5">
+                              <p className="text-xs text-white font-bold">{order.customerName}</p>
+                              <p className="text-[10px] text-gray-500 font-mono">{order.phone}</p>
+                            </div>
+                            
+                            {/* Detalle Items en Lista Compacta */}
+                            <div className="bg-[#0c0c0c]/40 border border-white/5 rounded p-2.5 mb-3.5">
+                              <div className="text-[9px] uppercase tracking-widest text-gray-600 font-bold mb-1.5 flex justify-between">
+                                <span>Lista a Preparar</span>
+                                <span>{totalQty} un.</span>
+                              </div>
+                              <div className="text-[10px] text-gray-400 font-light leading-relaxed space-y-0.5 truncate">
+                                {order.items.join(', ')}
+                              </div>
+                            </div>
                           </div>
                           
                           {/* Footer Tarjeta */}
-                          <div className="flex justify-between items-center pt-3 border-t border-charcoal-border/50">
-                            <span className="text-white font-serif font-bold text-sm">
-                              ${formatPrice(order.total)}
-                            </span>
+                          <div className="flex flex-col gap-3 pt-3 border-t border-charcoal-border/50">
                             
+                            {/* Monto y Método */}
+                            <div className="flex justify-between items-center">
+                              <span className="text-white font-mono font-bold text-sm">
+                                ${formatPrice(order.total)}
+                              </span>
+                              
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[8px] uppercase font-bold tracking-wider ${
+                                isDelivery 
+                                  ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
+                                  : 'bg-gold/10 text-gold border border-gold/20'
+                              }`}>
+                                {isDelivery ? 'Delivery' : 'Retiro'}
+                              </span>
+                            </div>
+
                             {/* Botones de Acción */}
-                            <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex gap-2 w-full" onClick={(e) => e.stopPropagation()}>
                               
                               {/* Botones columna: Nuevo */}
                               {col.status === 'Nuevo' && (
                                 <button 
                                   onClick={() => moveOrder(order.id, 'Preparando')} 
-                                  className="text-[9px] bg-gold/10 text-gold border border-gold/30 px-2.5 py-1 rounded hover:bg-gold hover:text-black transition-colors font-bold uppercase tracking-wider"
+                                  className="w-full text-[9px] bg-gold text-black px-2.5 py-1.5 rounded font-black uppercase tracking-wider hover:bg-gold-hover transition-colors cursor-pointer"
                                 >
-                                  Aceptar
+                                  Aceptar Pedido
                                 </button>
                               )}
                               
@@ -940,18 +1010,15 @@ export default function OrdersDashboard() {
                               {col.status === 'Preparación' && (
                                 <>
                                   <button 
-                                    onClick={() => {
-                                      const next = isDelivery ? 'Listo' : 'Listo';
-                                      moveOrder(order.id, next);
-                                    }} 
-                                    className="text-[9px] bg-gold/10 text-gold border border-gold/30 px-2.5 py-1 rounded hover:bg-gold hover:text-black transition-colors font-bold uppercase tracking-wider"
+                                    onClick={() => moveOrder(order.id, 'Listo')} 
+                                    className="flex-1 text-[9px] bg-gold text-black px-2.5 py-1.5 rounded font-black uppercase tracking-wider hover:bg-gold-hover transition-colors cursor-pointer"
                                   >
                                     Terminar
                                   </button>
                                   <button 
                                     onClick={() => moveOrder(order.id, 'Incompleto')} 
-                                    className="text-[9px] bg-red-500/10 text-red-500 border border-red-500/30 px-2 py-1 rounded hover:bg-red-500 hover:text-white transition-colors font-bold uppercase"
-                                    title="Falta stock en cocina"
+                                    className="text-[9px] bg-red-950/20 text-red-500 border border-red-500/20 px-2 py-1 rounded hover:bg-red-500 hover:text-black transition-colors font-bold uppercase cursor-pointer"
+                                    title="Reportar falta de stock en cocina"
                                   >
                                     Falta Stock
                                   </button>
@@ -968,9 +1035,9 @@ export default function OrdersDashboard() {
                                       moveOrder(order.id, 'Entregado');
                                     }
                                   }} 
-                                  className="text-[9px] bg-green-500/10 text-green-400 border border-green-500/30 px-2.5 py-1 rounded hover:bg-green-500 hover:text-black transition-colors font-bold uppercase tracking-wider"
+                                  className="w-full text-[9px] bg-emerald-500 text-black px-2.5 py-1.5 rounded font-black uppercase tracking-wider hover:bg-emerald-400 transition-colors cursor-pointer"
                                 >
-                                  {isDelivery ? 'Despachar' : 'Entregar'}
+                                  {isDelivery ? 'Despachar a Ruta' : 'Entregar en Caja'}
                                 </button>
                               )}
 
@@ -981,16 +1048,16 @@ export default function OrdersDashboard() {
                                     setPinOrderId(order.id);
                                     setIsPinModalOpen(true);
                                   }} 
-                                  className="text-[9px] bg-blue-500/10 text-blue-400 border border-blue-500/30 px-2.5 py-1 rounded hover:bg-blue-500 hover:text-white transition-colors font-bold uppercase tracking-wider flex items-center gap-1"
+                                  className="w-full text-[9px] bg-blue-500 hover:bg-blue-400 text-white py-1.5 rounded font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer"
                                 >
-                                  <ShieldCheck className="w-3 h-3" />
+                                  <ShieldCheck className="w-3.5 h-3.5" />
                                   Confirmar PIN
                                 </button>
                               )}
                               
                               {/* Estado Entregado fijo */}
                               {order.status === 'Entregado' && (
-                                <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider flex items-center gap-1">
+                                <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 w-full bg-emerald-500/5 py-1.5 rounded border border-emerald-500/10">
                                   <Check className="w-3.5 h-3.5" />
                                   Entregado
                                 </span>
@@ -1081,7 +1148,7 @@ export default function OrdersDashboard() {
                               setSubOrder(order);
                               setIsSubModalOpen(true);
                             }}
-                            className="bg-gold hover:bg-gold-hover text-black px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors active:scale-95 shadow-md shadow-gold/10"
+                            className="bg-gold hover:bg-gold-hover text-black px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors active:scale-95 shadow-md shadow-gold/10 cursor-pointer"
                           >
                             Sustituir
                           </button>
@@ -1147,14 +1214,14 @@ export default function OrdersDashboard() {
                     setEnteredPin('');
                     setPinError('');
                   }}
-                  className="flex-1 border border-white/10 hover:bg-white/5 text-gray-300 py-2.5 rounded text-xs font-bold uppercase transition-colors"
+                  className="flex-1 border border-white/10 hover:bg-white/5 text-gray-300 py-2.5 rounded text-xs font-bold uppercase transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button 
                   onClick={() => moveOrder(pinOrderId, 'Entregado', enteredPin)}
                   disabled={enteredPin.length < 4}
-                  className="flex-1 bg-gold text-black py-2.5 rounded text-xs font-bold uppercase hover:bg-gold-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-gold text-black py-2.5 rounded text-xs font-bold uppercase hover:bg-gold-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   Entregar
                 </button>
@@ -1233,13 +1300,13 @@ export default function OrdersDashboard() {
                     setVariantToRemove('');
                     setVariantToAdd('');
                   }}
-                  className="flex-1 border border-white/10 hover:bg-white/5 text-gray-300 py-2.5 rounded text-xs font-bold uppercase transition-colors"
+                  className="flex-1 border border-white/10 hover:bg-white/5 text-gray-300 py-2.5 rounded text-xs font-bold uppercase transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 bg-gold text-black py-2.5 rounded text-xs font-bold uppercase hover:bg-gold-hover transition-colors shadow-lg shadow-gold/10"
+                  className="flex-1 bg-gold text-black py-2.5 rounded text-xs font-bold uppercase hover:bg-gold-hover transition-colors shadow-lg shadow-gold/10 cursor-pointer"
                 >
                   Procesar Reemplazo
                 </button>
@@ -1258,7 +1325,7 @@ export default function OrdersDashboard() {
               <span className="font-mono text-xs font-bold uppercase text-gray-600">Simulación Ticketera Térmica</span>
               <button 
                 onClick={() => setLabelPrintOrder(null)}
-                className="text-gray-400 hover:text-black font-bold text-sm"
+                className="text-gray-400 hover:text-black font-bold text-sm cursor-pointer"
               >
                 &times; Close
               </button>
@@ -1328,7 +1395,7 @@ export default function OrdersDashboard() {
             <div className="flex gap-3 pt-4 mt-2">
               <button 
                 onClick={() => setLabelPrintOrder(null)}
-                className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded text-xs font-bold uppercase tracking-widest transition-colors font-sans"
+                className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded text-xs font-bold uppercase tracking-widest transition-colors font-sans cursor-pointer"
               >
                 Cerrar
               </button>
@@ -1337,7 +1404,7 @@ export default function OrdersDashboard() {
                   window.print();
                   setLabelPrintOrder(null);
                 }}
-                className="flex-1 bg-black text-white hover:bg-gray-800 py-2.5 rounded text-xs font-bold uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2 font-sans"
+                className="flex-1 bg-black text-white hover:bg-gray-800 py-2.5 rounded text-xs font-bold uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2 font-sans cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" />
                 Imprimir Real
@@ -1353,7 +1420,7 @@ export default function OrdersDashboard() {
           <div className="bg-charcoal-light w-full max-w-lg rounded-lg border border-charcoal-border shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-charcoal-border flex justify-between items-center bg-charcoal-light/25 rounded-t-lg">
               <h2 className="text-lg text-white font-serif tracking-wide">Pedido #{selectedOrder.id.substring(0, 8).toUpperCase()}</h2>
-              <button onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-white font-bold text-sm">Cerrar</button>
+              <button onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-white font-bold text-sm cursor-pointer">Cerrar</button>
             </div>
             
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
@@ -1421,7 +1488,7 @@ export default function OrdersDashboard() {
                           const name = parts[1] || it;
                           // Fallback prices for mock items
                           const price = 2500;
-                          const quantity = parseInt(qty) || 1;
+                          const quantity = parseInt(qty, 10) || 1;
                           return (
                             <tr key={idx} className="border-b border-white/5 last:border-b-0">
                               <td className="py-2 text-gray-300 font-medium">{name}</td>

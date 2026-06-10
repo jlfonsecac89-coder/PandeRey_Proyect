@@ -55,6 +55,14 @@ export default function StockControl() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  const handleStatusFilterClick = (statusKey: string) => {
+    if (statusFilter === statusKey) {
+      setStatusFilter('all');
+    } else {
+      setStatusFilter(statusKey);
+    }
+  };
+
   if (!mounted) return null;
 
   // 1. Output Analysis (Salidas del Día)
@@ -201,32 +209,32 @@ export default function StockControl() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         
         {/* Analytics Card: Outputs (Salidas del Día) */}
-        <div className="bg-charcoal-light/20 border border-charcoal-border rounded-lg p-6 xl:col-span-1 shadow-lg flex flex-col justify-between hover:border-gold/10 transition-all duration-300">
+        <div className="bg-charcoal-light/25 border border-charcoal-border rounded p-5 xl:col-span-1 shadow-lg flex flex-col justify-between hover:border-gold/20 transition-all duration-300">
           <div>
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-3">
               <span className="text-[10px] font-bold uppercase tracking-widest text-gold">Análisis de Salidas</span>
-              <span className="text-[10px] bg-gold/10 text-gold px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+              <span className="text-[9px] bg-gold/10 text-gold px-2 py-0.5 rounded font-bold uppercase tracking-wider">
                 {isUsingFallback ? 'Último Registro' : 'Hoy'}
               </span>
             </div>
-            <p className="text-xs text-gray-500 mb-6">Consumo y demanda de productos terminados {displayDateStr}.</p>
+            <p className="text-[11px] text-gray-500 mb-4">Consumo y demanda de productos terminados {displayDateStr}.</p>
             
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Producto Estrella</p>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <h4 className="font-serif text-white text-lg truncate max-w-[200px]" title={topProduct}>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Producto Estrella</p>
+                <div className="flex items-baseline gap-2 mt-0.5">
+                  <h4 className="font-serif text-white text-md truncate max-w-[190px]" title={topProduct}>
                     {topProduct}
                   </h4>
-                  <span className="text-gold font-bold text-sm">({topProductQty} un.)</span>
+                  <span className="text-gold font-bold text-xs">({topProductQty} un.)</span>
                 </div>
               </div>
 
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Stock Diario Consumido</p>
-                <div className="flex items-center gap-3 mt-1.5">
-                  <span className="text-3xl font-serif text-white font-bold">{percentConsumed}%</span>
-                  <div className="flex-1 h-2 bg-[#141414] rounded-full overflow-hidden">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Stock Diario Consumido</p>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-2xl font-serif text-white font-bold">{percentConsumed}%</span>
+                  <div className="flex-1 h-1.5 bg-[#141414] rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-gold rounded-full transition-all duration-500" 
                       style={{ width: `${percentConsumed}%` }} 
@@ -237,79 +245,119 @@ export default function StockControl() {
             </div>
           </div>
           
-          <div className="border-t border-charcoal-border/50 pt-4 mt-6 flex justify-between items-center text-[11px] text-gray-500">
+          <div className="border-t border-charcoal-border/50 pt-3 mt-4 flex justify-between items-center text-[10px] text-gray-500">
             <span>Demanda del turno: {totalUnitsSold} unidades vendidas</span>
-            <TrendingUp className="w-4 h-4 text-gold" />
+            <TrendingUp className="w-3.5 h-3.5 text-gold" />
           </div>
         </div>
 
-        {/* Alert Cards Grid (col-span-2) */}
-        <div className="xl:col-span-2 flex flex-col justify-between gap-6">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 h-full">
+        {/* Alert Cards Grid (col-span-2) - Bento Grid horizontal de menor altura */}
+        <div className="xl:col-span-2 flex flex-col justify-between">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-3 h-full">
             
             {/* Stable */}
-            <div className="bg-[#121c16]/30 border border-emerald-500/10 rounded-lg p-5 flex flex-col justify-between shadow hover:border-emerald-500/25 transition-all">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-400">Estable</span>
-              <div className="my-3">
-                <h3 className="text-3xl font-serif text-white font-semibold">{estableCount}</h3>
-                <p className="text-[10px] text-gray-500 mt-1">({'>'}= 8 un.)</p>
+            <div 
+              onClick={() => handleStatusFilterClick('stable')}
+              className={`cursor-pointer rounded p-4 flex items-center justify-between transition-all duration-300 hover:scale-[1.01] md:col-span-2 ${
+                statusFilter === 'stable'
+                  ? 'bg-emerald-950/20 border-emerald-500/70 shadow-[0_0_15px_rgba(16,185,129,0.15)] ring-1 ring-emerald-500/30'
+                  : 'bg-charcoal-light/10 border border-charcoal-border hover:border-emerald-500/40'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">Estable</span>
+                  <span className="text-[10px] text-gray-600">({'>'}= 8 un.)</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-emerald-500 font-semibold bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10 w-fit">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Estable
-              </div>
+              <span className="text-2xl font-serif font-bold text-emerald-400">{estableCount}</span>
             </div>
 
             {/* Alert */}
-            <div className="bg-[#1c1b12]/30 border border-yellow-500/10 rounded-lg p-5 flex flex-col justify-between shadow hover:border-yellow-500/25 transition-all">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-yellow-400">Alerta</span>
-              <div className="my-3">
-                <h3 className="text-3xl font-serif text-white font-semibold">{alertaCount}</h3>
-                <p className="text-[10px] text-gray-500 mt-1">(5 a 7 un.)</p>
+            <div 
+              onClick={() => handleStatusFilterClick('alert')}
+              className={`cursor-pointer rounded p-4 flex items-center justify-between transition-all duration-300 hover:scale-[1.01] md:col-span-2 ${
+                statusFilter === 'alert'
+                  ? 'bg-yellow-950/20 border-yellow-500/70 shadow-[0_0_15px_rgba(234,179,8,0.15)] ring-1 ring-yellow-500/30'
+                  : 'bg-charcoal-light/10 border border-charcoal-border hover:border-yellow-500/40'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-yellow-500/10 text-yellow-400 rounded">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">Alerta</span>
+                  <span className="text-[10px] text-gray-600">(5 a 7 un.)</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-yellow-500 font-semibold bg-yellow-500/5 px-2 py-0.5 rounded border border-yellow-500/10 w-fit">
-                <AlertCircle className="w-3.5 h-3.5" />
-                Moderado
-              </div>
+              <span className="text-2xl font-serif font-bold text-yellow-400">{alertaCount}</span>
             </div>
 
             {/* Risk */}
-            <div className="bg-[#1c1812]/30 border border-amber-500/10 rounded-lg p-5 flex flex-col justify-between shadow hover:border-amber-500/25 transition-all">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-amber-400">Riesgo</span>
-              <div className="my-3">
-                <h3 className="text-3xl font-serif text-white font-semibold">{riesgoCount}</h3>
-                <p className="text-[10px] text-gray-500 mt-1">(3 a 4 un.)</p>
+            <div 
+              onClick={() => handleStatusFilterClick('warning')}
+              className={`cursor-pointer rounded p-4 flex items-center justify-between transition-all duration-300 hover:scale-[1.01] md:col-span-2 ${
+                statusFilter === 'warning'
+                  ? 'bg-amber-950/20 border-amber-500/70 shadow-[0_0_15px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/30'
+                  : 'bg-charcoal-light/10 border border-charcoal-border hover:border-amber-500/40'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-500/10 text-amber-400 rounded">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">Riesgo</span>
+                  <span className="text-[10px] text-gray-600">(3 a 4 un.)</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-amber-500 font-semibold bg-amber-500/5 px-2 py-0.5 rounded border border-amber-500/10 w-fit">
-                <AlertCircle className="w-3.5 h-3.5" />
-                Riesgo
-              </div>
+              <span className="text-2xl font-serif font-bold text-amber-400">{riesgoCount}</span>
             </div>
 
             {/* Critical */}
-            <div className="bg-[#1c1412]/30 border border-orange-500/10 rounded-lg p-5 flex flex-col justify-between shadow hover:border-orange-500/25 transition-all">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-orange-400">Crítico</span>
-              <div className="my-3">
-                <h3 className="text-3xl font-serif text-white font-semibold">{criticoCount}</h3>
-                <p className="text-[10px] text-gray-500 mt-1">(1 a 2 un.)</p>
+            <div 
+              onClick={() => handleStatusFilterClick('critical')}
+              className={`cursor-pointer rounded p-4 flex items-center justify-between transition-all duration-300 hover:scale-[1.01] md:col-span-3 ${
+                statusFilter === 'critical'
+                  ? 'bg-orange-950/20 border-orange-500/70 shadow-[0_0_15px_rgba(249,115,22,0.15)] ring-1 ring-orange-500/30'
+                  : 'bg-charcoal-light/10 border border-charcoal-border hover:border-orange-500/40'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-500/10 text-orange-400 rounded">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">Crítico</span>
+                  <span className="text-[10px] text-gray-600">(1 a 2 un.)</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-orange-500 font-semibold bg-orange-500/5 px-2 py-0.5 rounded border border-orange-500/10 w-fit">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                Crítico
-              </div>
+              <span className="text-2xl font-serif font-bold text-orange-400">{criticoCount}</span>
             </div>
 
             {/* Out of Stock */}
-            <div className="bg-[#1c1212]/30 border border-red-500/10 rounded-lg p-5 flex flex-col justify-between shadow hover:border-red-500/25 transition-all">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-red-400">Quiebre</span>
-              <div className="my-3">
-                <h3 className="text-3xl font-serif text-white font-semibold">{sinStockCount}</h3>
-                <p className="text-[10px] text-gray-500 mt-1">(0 un.)</p>
+            <div 
+              onClick={() => handleStatusFilterClick('out_of_stock')}
+              className={`cursor-pointer rounded p-4 flex items-center justify-between transition-all duration-300 hover:scale-[1.01] md:col-span-3 ${
+                statusFilter === 'out_of_stock'
+                  ? 'bg-red-950/20 border-red-500/70 shadow-[0_0_15px_rgba(239,68,68,0.15)] ring-1 ring-red-500/30'
+                  : 'bg-charcoal-light/10 border border-charcoal-border hover:border-red-500/40'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-red-500/10 text-red-400 rounded">
+                  <XCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">Quiebre</span>
+                  <span className="text-[10px] text-gray-600">(0 un.)</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-red-500 font-semibold bg-red-500/5 px-2 py-0.5 rounded border border-red-500/10 w-fit">
-                <XCircle className="w-3.5 h-3.5" />
-                Quiebre
-              </div>
+              <span className="text-2xl font-serif font-bold text-red-400">{sinStockCount}</span>
             </div>
 
           </div>
