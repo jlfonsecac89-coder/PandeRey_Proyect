@@ -64,10 +64,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded text-[11px] font-bold uppercase tracking-wider transition-all duration-300 ${
+                    className={`flex items-center gap-3 py-2.5 rounded text-[11px] font-bold uppercase tracking-wider transition-all duration-300 ${
                       isActive 
-                        ? 'bg-gold/10 text-gold border-r-2 border-gold font-bold shadow-[inset_-1px_0_10px_rgba(212,175,55,0.05)]' 
-                        : 'text-gray-400 hover:bg-white/[0.03] hover:text-white hover:translate-x-1'
+                        ? 'bg-[#15120a] text-gold border-l-4 border-gold font-black shadow-[0_0_15px_rgba(212,175,55,0.15)] translate-x-1 pl-3 pr-3.5' 
+                        : 'text-gray-400 hover:bg-white/[0.03] hover:text-white hover:translate-x-1 pl-3.5 pr-3.5'
                     }`}
                   >
                     <Icon className="w-4 h-4 shrink-0" />
