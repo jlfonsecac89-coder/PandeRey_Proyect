@@ -29,6 +29,8 @@ export type SimOrder = {
   labelPrintedCount?: number;
   pickupTime?: string;
   actualDeliveryTime?: string | null;
+  couponCode?: string | null;
+  discountAmount?: number;
 };
 
 export type SimProduct = {
@@ -306,6 +308,9 @@ export const seedLocalDb = (force = false): boolean => {
   const statuses = ['Nuevo', 'Preparando', 'Listo', 'En Ruta', 'Entregado', 'Cancelado', 'Incompleto'];
   const methods: ('Retiro' | 'Delivery')[] = ['Retiro', 'Delivery'];
 
+  const currentCoupons = getLocalCoupons();
+  const seededCoupons = currentCoupons.map(c => ({ ...c, usedCount: 0 }));
+
   for (let i = 1; i <= 28; i++) {
     const orderId = `order-sim-${i.toString().padStart(4, '0')}`;
     const custIdx = i % customerNames.length;
@@ -317,13 +322,13 @@ export const seedLocalDb = (force = false): boolean => {
     const itemsCount = 1 + (i % 3);
     const items: string[] = [];
     const itemsRaw: any[] = [];
-    let total = 0;
+    let subtotal = 0;
 
     for (let j = 0; j < itemsCount; j++) {
       const prod = initialProducts[(i + j) % initialProducts.length];
       const qty = 1 + (j % 2);
       const sub = prod.price * qty;
-      total += sub;
+      subtotal += sub;
       items.push(`${qty}x ${prod.name} (Clásico)`);
       itemsRaw.push({
         variantId: `var-prod-${prod.id}`,
@@ -337,6 +342,59 @@ export const seedLocalDb = (force = false): boolean => {
 
     const shippingMethod = methods[i % methods.length];
     const shippingCost = shippingMethod === 'Delivery' ? 3500 : 0;
+    
+    let total = subtotal;
+    let couponCode: string | null = null;
+    let discountAmount = 0;
+
+    // Apply coupon if shouldHaveCoupon is true (approx 35% of orders)
+    const shouldHaveCoupon = (i % 3 === 0);
+    if (shouldHaveCoupon) {
+      const couponIdx = Math.floor(i / 3) % seededCoupons.length;
+      const coupon = seededCoupons[couponIdx];
+      
+      let eligibleSubtotal = 0;
+      itemsRaw.forEach(item => {
+        const prod = initialProducts.find(p => item.productName.startsWith(p.name)) || initialProducts[0];
+        
+        let isAllowed = true;
+        if (coupon.limitProductIds && coupon.limitProductIds.length > 0) {
+          isAllowed = coupon.limitProductIds.includes(prod.id);
+        }
+        if (isAllowed && coupon.limitCategories && coupon.limitCategories.length > 0) {
+          isAllowed = coupon.limitCategories.includes(prod.category);
+        }
+        if (isAllowed && coupon.limitSubCategories && coupon.limitSubCategories.length > 0) {
+          isAllowed = prod.subCategory ? coupon.limitSubCategories.includes(prod.subCategory) : false;
+        }
+        
+        if (isAllowed) {
+          eligibleSubtotal += item.subtotal;
+        }
+      });
+      
+      if (subtotal >= coupon.minPurchase && (eligibleSubtotal > 0 || (!coupon.limitProductIds?.length && !coupon.limitCategories?.length && !coupon.limitSubCategories?.length))) {
+        const finalEligibleSub = (coupon.limitProductIds?.length || coupon.limitCategories?.length || coupon.limitSubCategories?.length)
+          ? eligibleSubtotal
+          : subtotal;
+        
+        if (finalEligibleSub > 0) {
+          couponCode = coupon.code;
+          if (coupon.type === 'percent') {
+            discountAmount = Math.round(finalEligibleSub * (coupon.value / 100));
+            if (coupon.maxDiscountAmount !== undefined && coupon.maxDiscountAmount !== null) {
+              discountAmount = Math.min(discountAmount, coupon.maxDiscountAmount);
+            }
+          } else {
+            discountAmount = Math.min(coupon.value, finalEligibleSub);
+          }
+          
+          total = Math.max(0, total - discountAmount);
+          coupon.usedCount += 1;
+        }
+      }
+    }
+
     total += shippingCost;
 
     // Distribuir estados para que no sean todos iguales
@@ -385,7 +443,9 @@ export const seedLocalDb = (force = false): boolean => {
       orderState,
       labelPrintedCount,
       pickupTime: pickupTimeFormatted,
-      actualDeliveryTime: actualDeliveryTimeFormatted
+      actualDeliveryTime: actualDeliveryTimeFormatted,
+      couponCode,
+      discountAmount
     });
   }
 
@@ -393,6 +453,7 @@ export const seedLocalDb = (force = false): boolean => {
   orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   
   localStorage.setItem('pan_de_rey_sim_orders', JSON.stringify(orders));
+  localStorage.setItem('pan_de_rey_sim_coupons', JSON.stringify(seededCoupons));
   return true;
 };
 
@@ -625,6 +686,16 @@ export type SimCoupon = {
   minPurchase: number;
   expiryDate: string;
   status: 'active' | 'inactive';
+  createdAt: string;
+  
+  // New Fields
+  onlyOncePerEmail?: boolean;
+  maxUses?: number | null;
+  usedCount: number;
+  maxDiscountAmount?: number | null;
+  limitProductIds?: number[];
+  limitCategories?: string[];
+  limitSubCategories?: string[];
 };
 
 const defaultCoupons: SimCoupon[] = [
@@ -634,7 +705,15 @@ const defaultCoupons: SimCoupon[] = [
     value: 10,
     minPurchase: 0,
     expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    status: 'active'
+    status: 'active',
+    createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    usedCount: 0,
+    onlyOncePerEmail: false,
+    maxUses: 100,
+    maxDiscountAmount: 5000,
+    limitProductIds: [],
+    limitCategories: [],
+    limitSubCategories: []
   },
   {
     code: 'MASAMADRE500',
@@ -642,7 +721,15 @@ const defaultCoupons: SimCoupon[] = [
     value: 500,
     minPurchase: 5000,
     expiryDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    status: 'active'
+    status: 'active',
+    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    usedCount: 0,
+    onlyOncePerEmail: true,
+    maxUses: 50,
+    maxDiscountAmount: null,
+    limitProductIds: [],
+    limitCategories: ['Panadería'],
+    limitSubCategories: []
   },
   {
     code: 'BIENVENIDA20',
@@ -650,7 +737,15 @@ const defaultCoupons: SimCoupon[] = [
     value: 20,
     minPurchase: 10000,
     expiryDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    status: 'active'
+    status: 'active',
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    usedCount: 0,
+    onlyOncePerEmail: true,
+    maxUses: 200,
+    maxDiscountAmount: 3000,
+    limitProductIds: [],
+    limitCategories: [],
+    limitSubCategories: []
   },
   {
     code: 'PROMOEXPIRADA',
@@ -658,7 +753,15 @@ const defaultCoupons: SimCoupon[] = [
     value: 15,
     minPurchase: 8000,
     expiryDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    status: 'inactive'
+    status: 'inactive',
+    createdAt: new Date(Date.now() - 17 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    usedCount: 0,
+    onlyOncePerEmail: false,
+    maxUses: 30,
+    maxDiscountAmount: 2000,
+    limitProductIds: [],
+    limitCategories: [],
+    limitSubCategories: []
   }
 ];
 
@@ -682,7 +785,7 @@ export const addLocalCoupon = (coupon: SimCoupon): SimCoupon[] => {
   if (coupons.some(c => c.code.toUpperCase() === coupon.code.toUpperCase())) {
     throw new Error('El código de cupón ya existe.');
   }
-  const updated = [...coupons, { ...coupon, code: coupon.code.toUpperCase() }];
+  const updated = [...coupons, { ...coupon, code: coupon.code.toUpperCase(), createdAt: coupon.createdAt || new Date().toISOString().split('T')[0] }];
   saveLocalCoupons(updated);
   return updated;
 };
@@ -697,6 +800,16 @@ export const deleteLocalCoupon = (code: string): SimCoupon[] => {
 export const updateLocalCouponStatus = (code: string, status: 'active' | 'inactive'): SimCoupon[] => {
   const coupons = getLocalCoupons();
   const updated = coupons.map(c => c.code.toUpperCase() === code.toUpperCase() ? { ...c, status } : c);
+  saveLocalCoupons(updated);
+  return updated;
+};
+
+export const updateLocalCoupon = (oldCode: string, updatedCoupon: SimCoupon): SimCoupon[] => {
+  const coupons = getLocalCoupons();
+  if (oldCode.toUpperCase() !== updatedCoupon.code.toUpperCase() && coupons.some(c => c.code.toUpperCase() === updatedCoupon.code.toUpperCase())) {
+    throw new Error('El nuevo código de cupón ya existe.');
+  }
+  const updated = coupons.map(c => c.code.toUpperCase() === oldCode.toUpperCase() ? { ...updatedCoupon, code: updatedCoupon.code.toUpperCase() } : c);
   saveLocalCoupons(updated);
   return updated;
 };

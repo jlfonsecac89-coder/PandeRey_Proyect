@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, PackageSearch, Kanban, Settings, LogOut, Palette, ClipboardList, Ticket } from 'lucide-react';
+import { LayoutDashboard, PackageSearch, Kanban, Settings, LogOut, Palette, ClipboardList, Ticket, TrendingUp } from 'lucide-react';
 
 import Image from 'next/image';
 
@@ -29,6 +29,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       title: 'Análisis y Alertas',
       items: [
         { name: 'Dashboard WMS', href: '/admin', icon: LayoutDashboard },
+        { name: 'Performance Promos', href: '/admin/performance', icon: TrendingUp },
       ]
     },
     {
