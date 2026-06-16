@@ -1,6 +1,10 @@
-import Image from 'next/image';
+'use client';
 
-const images = [
+import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import { getLocalAppearance } from '@/utils/dbSim';
+
+const fallbackImages = [
   'https://images.unsplash.com/photo-1509440159596-0249088772ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
   'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
   'https://images.unsplash.com/photo-1598373182133-52452f7691ef?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
@@ -9,20 +13,37 @@ const images = [
   'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
 ];
 
-export default function InstagramGallery() {
+export default function InstagramGallery({ previewData }: { previewData?: any } = {}) {
+  const [mounted, setMounted] = useState(false);
+  const [appearance, setAppearance] = useState<any>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    if (!previewData) {
+      setAppearance(getLocalAppearance());
+    }
+  }, [previewData]);
+
+  if (!mounted) return null;
+
+  const activeAppearance = previewData || appearance;
+  const tagline = activeAppearance?.instagramTagline || 'Síguenos en nuestras redes sociales';
+  const account = activeAppearance?.instagramAccount || '@panderey.cl';
+  const images = activeAppearance?.instagramPhotos?.length ? activeAppearance.instagramPhotos : fallbackImages;
+
   return (
     <section className="py-24 bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <span className="text-gold uppercase tracking-[0.3em] text-sm font-semibold mb-4 block">
-            Síguenos en nuestras redes sociales
+            {tagline}
           </span>
-          <h2 className="font-serif text-4xl text-white mb-4">@panderey.cl</h2>
+          <h2 className="font-serif text-4xl text-white mb-4">{account}</h2>
           <div className="w-24 h-1 bg-gold mx-auto"></div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-          {images.map((img, index) => (
+          {images.slice(0, 6).map((img: string, index: number) => (
             <div key={index} className="relative aspect-square overflow-hidden group">
               <Image 
                 src={img} 

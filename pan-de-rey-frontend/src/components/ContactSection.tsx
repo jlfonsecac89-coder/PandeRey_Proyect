@@ -1,10 +1,35 @@
-export default function ContactSection() {
+'use client';
+
+import { useState, useEffect } from 'react';
+import { getLocalAppearance } from '@/utils/dbSim';
+
+export default function ContactSection({ previewData }: { previewData?: any } = {}) {
+  const [mounted, setMounted] = useState(false);
+  const [appearance, setAppearance] = useState<any>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    if (!previewData) {
+      setAppearance(getLocalAppearance());
+    }
+  }, [previewData]);
+
+  if (!mounted) return null;
+
+  const activeAppearance = previewData || appearance;
+  const title = activeAppearance?.contactTitle || 'Visítanos o Escríbenos';
+  const address = activeAppearance?.contactAddress || 'Av. Principal 1234, Providencia, Santiago, Chile';
+  const scheduleWeekdays = activeAppearance?.contactScheduleWeekdays || 'Lun - Vie: 08:00 - 20:00';
+  const scheduleWeekends = activeAppearance?.contactScheduleWeekends || 'Sáb - Dom: 09:00 - 19:00';
+  const email = activeAppearance?.contactEmail || 'hola@panderey.cl';
+  const phone = activeAppearance?.contactPhone || '+56 9 1234 5678';
+
   return (
     <section id="contact" className="py-24 bg-charcoal-light">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
           <div className="space-y-8">
-            <h2 className="font-serif text-4xl text-white">Visítanos o Escríbenos</h2>
+            <h2 className="font-serif text-4xl text-white">{title}</h2>
             <div className="w-20 h-1 bg-gold"></div>
             
             <div className="space-y-6">
@@ -17,7 +42,7 @@ export default function ContactSection() {
                 </div>
                 <div>
                   <h3 className="text-white font-medium mb-1">Ubicación</h3>
-                  <p className="text-gray-400">Av. Principal 1234, Providencia<br/>Santiago, Chile</p>
+                  <p className="text-gray-400 whitespace-pre-line">{address}</p>
                 </div>
               </div>
               
@@ -29,7 +54,11 @@ export default function ContactSection() {
                 </div>
                 <div>
                   <h3 className="text-white font-medium mb-1">Horario</h3>
-                  <p className="text-gray-400">Lun - Vie: 08:00 - 20:00<br/>Sáb - Dom: 09:00 - 19:00</p>
+                  <p className="text-gray-400">
+                    {scheduleWeekdays}
+                    {scheduleWeekends && <br/>}
+                    {scheduleWeekends}
+                  </p>
                 </div>
               </div>
               
@@ -41,7 +70,11 @@ export default function ContactSection() {
                 </div>
                 <div>
                   <h3 className="text-white font-medium mb-1">Contacto</h3>
-                  <p className="text-gray-400">hola@panderey.cl<br/>+56 9 1234 5678</p>
+                  <p className="text-gray-400">
+                    {email}
+                    {phone && <br/>}
+                    {phone}
+                  </p>
                 </div>
               </div>
             </div>

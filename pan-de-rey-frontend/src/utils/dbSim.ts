@@ -814,4 +814,153 @@ export const updateLocalCoupon = (oldCode: string, updatedCoupon: SimCoupon): Si
   return updated;
 };
 
+// --- Appearance CMS Types and Defaults ---
+export type SimAppearanceSlide = {
+  image: string;
+  tagline: string;
+  title1: string;
+  title2: string;
+  description: string;
+  ctaText: string;
+  ctaLink: string;
+};
+
+export type SimAppearance = {
+  heroType: 'fixed' | 'slider';
+  heroPreTitle: string;
+  heroTitle1: string;
+  heroTitle2: string;
+  heroDescription: string;
+  heroCtaText: string;
+  heroCtaLink: string;
+  heroSecText: string;
+  heroSecLink: string;
+  heroImage: string;
+  
+  slides: SimAppearanceSlide[];
+
+  // Storytelling
+  historyPreTitle: string;
+  historyTitle1: string;
+  historyTitle2: string;
+  historyText1: string;
+  historyText2: string;
+  historyText3: string;
+  historyImage: string;
+  historyBadge1Value: string;
+  historyBadge1Label: string;
+  historyBadge2Value: string;
+  historyBadge2Label: string;
+
+  // Instagram
+  instagramTagline: string;
+  instagramAccount: string;
+  instagramPhotos: string[];
+
+  // Contact & Socials
+  contactTitle: string;
+  contactAddress: string;
+  contactScheduleWeekdays: string;
+  contactScheduleWeekends: string;
+  contactEmail: string;
+  contactPhone: string;
+  facebookUrl: string;
+  instagramUrl: string;
+  twitterUrl: string;
+};
+
+export const defaultAppearance: SimAppearance = {
+  heroType: 'slider',
+  heroPreTitle: 'ARTESANAL & PREMIUM',
+  heroTitle1: 'El Arte de la',
+  heroTitle2: 'Fermentación Lenta',
+  heroDescription: 'Panes rústicos y piezas de autor horneados diariamente con fermentación natural de 48 horas y harinas orgánicas.',
+  heroCtaText: 'Ver Panadería',
+  heroCtaLink: '/shop?category=bakery',
+  heroSecText: 'Nuestra Historia',
+  heroSecLink: '/#storytelling',
+  heroImage: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80',
+  
+  slides: [
+    {
+      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80',
+      tagline: 'Masa Madre & Tradición',
+      title1: 'El Arte de la',
+      title2: 'Fermentación Lenta',
+      description: 'Panes rústicos y piezas de autor horneados diariamente con fermentación natural de 48 horas y harinas orgánicas.',
+      ctaText: 'Ver Panadería',
+      ctaLink: '/shop?category=bakery'
+    },
+    {
+      image: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80',
+      tagline: 'Haute Pâtisserie',
+      title1: 'Alta Pastelería',
+      title2: 'Fina y Delicada',
+      description: 'Viennoiserie clásica, croissants de pura mantequilla de Normandía y postres de autor creados por nuestros maestros pasteleros.',
+      ctaText: 'Explorar Dulces',
+      ctaLink: '/shop?category=pastry'
+    },
+    {
+      image: 'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80',
+      tagline: 'Cafetería de Especialidad',
+      title1: 'Granos de Origen',
+      title2: 'Tostado Perfecto',
+      description: 'Cafés seleccionados de fincas sostenibles de Colombia y Etiopía, extraídos con maestría para acompañar tu día.',
+      ctaText: 'Ver Cafetería',
+      ctaLink: '/shop?category=drinks'
+    }
+  ],
+
+  // Storytelling
+  historyPreTitle: 'Nuestra Historia',
+  historyTitle1: 'Tradición familiar,',
+  historyTitle2: 'pasión por el detalle',
+  historyText1: 'En Pan de Rey, creemos que el pan es más que alimento; es un vínculo con nuestras raíces. Cada mañana, nuestro horno cobra vida para transformar ingredientes nobles en piezas únicas de arte comestible.',
+  historyText2: 'Nuestra masa madre, cultivada con paciencia y cuidado, otorga a cada pan una textura y sabor inigualables, respetando los tiempos naturales de fermentación para una digestión más ligera y nutritiva.',
+  historyText3: 'Desde el crujiente de nuestras baguettes hasta la delicadeza de nuestra pastelería francesa, cada producto cuenta una historia de dedicación y excelencia.',
+  historyImage: '/storefront.jpg',
+  historyBadge1Value: '100%',
+  historyBadge1Label: 'Artesanal',
+  historyBadge2Value: '+48h',
+  historyBadge2Label: 'Fermentación',
+
+  // Instagram
+  instagramTagline: 'Síguenos en nuestras redes sociales',
+  instagramAccount: '@panderey.cl',
+  instagramPhotos: [
+    'https://images.unsplash.com/photo-1509440159596-0249088772ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
+    'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
+    'https://images.unsplash.com/photo-1598373182133-52452f7691ef?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
+    'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
+    'https://images.unsplash.com/photo-1608198093002-ad4e005484ec?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
+    'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
+  ],
+
+  // Contact
+  contactTitle: 'Visítanos o Escríbenos',
+  contactAddress: 'Av. Principal 1234, Providencia, Santiago, Chile',
+  contactScheduleWeekdays: 'Lun - Vie: 08:00 - 20:00',
+  contactScheduleWeekends: 'Sáb - Dom: 09:00 - 19:00',
+  contactEmail: 'hola@panderey.cl',
+  contactPhone: '+56 9 1234 5678',
+  facebookUrl: 'https://facebook.com/panderey.cl',
+  instagramUrl: 'https://instagram.com/panderey.cl',
+  twitterUrl: 'https://twitter.com/panderey_cl',
+};
+
+export const getLocalAppearance = (): SimAppearance => {
+  if (typeof window === 'undefined') return defaultAppearance;
+  const raw = localStorage.getItem('pan_de_rey_sim_appearance');
+  if (!raw) {
+    localStorage.setItem('pan_de_rey_sim_appearance', JSON.stringify(defaultAppearance));
+    return defaultAppearance;
+  }
+  return JSON.parse(raw);
+};
+
+export const saveLocalAppearance = (appearance: SimAppearance): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('pan_de_rey_sim_appearance', JSON.stringify(appearance));
+};
+
 
