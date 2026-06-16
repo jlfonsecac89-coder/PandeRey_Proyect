@@ -31,7 +31,8 @@ import {
   getLocalOrders, 
   updateLocalOrderStatus, 
   incrementLocalOrderLabel, 
-  seedLocalDb 
+  seedLocalDb,
+  getLocalSettings
 } from '@/utils/dbSim';
 
 // Tipos
@@ -310,6 +311,7 @@ export default function OrdersDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [labelPrintOrder, setLabelPrintOrder] = useState<Order | null>(null);
+  const [settings, setSettings] = useState<any>(null);
   const [isLive, setIsLive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'tracking' | 'kanban' | 'exceptions'>('tracking');
@@ -360,6 +362,7 @@ export default function OrdersDashboard() {
 
   useEffect(() => {
     fetchOrders();
+    setSettings(getLocalSettings());
   }, []);
 
   useEffect(() => {
@@ -1643,10 +1646,12 @@ export default function OrdersDashboard() {
             
             {/* Cuerpo del ticket (Estilizado como papel térmico) */}
             <div className="border border-gray-200 p-4 bg-[#fcfcfc] rounded font-mono text-xs text-black shadow-inner space-y-3 leading-relaxed">
-              <div className="text-center border-b border-dashed border-gray-300 pb-2">
-                <h4 className="font-bold text-sm tracking-wide">*** PAN DE REY ***</h4>
-                <p className="text-[10px] text-gray-600 uppercase">Boulangerie & Cafétéria Premium</p>
-                <p className="text-[9px] text-gray-500 mt-1">Control Interno de Cocina</p>
+              <div className="text-center border-b border-dashed border-gray-300 pb-2 space-y-0.5">
+                <h4 className="font-bold text-sm tracking-wide">*** {settings?.ticketCompanyName?.toUpperCase() || "PAN DE REY"} ***</h4>
+                {settings?.ticketRut && <p className="text-[10px] text-gray-600">RUT: {settings.ticketRut}</p>}
+                {settings?.ticketAddress && <p className="text-[9px] text-gray-500">{settings.ticketAddress}</p>}
+                {settings?.ticketPhone && <p className="text-[9px] text-gray-500">Fono: {settings.ticketPhone}</p>}
+                <p className="text-[9px] text-gray-400 mt-1">Control Interno de Cocina</p>
               </div>
               
               <div className="space-y-0.5 text-[10px] border-b border-dashed border-gray-300 pb-2">
@@ -1693,6 +1698,9 @@ export default function OrdersDashboard() {
               
               {/* Código de barras simulado */}
               <div className="text-center pt-2">
+                {settings?.ticketNotes && (
+                  <p className="text-[9px] text-gray-600 italic mb-3 whitespace-pre-wrap">"{settings.ticketNotes}"</p>
+                )}
                 <p className="font-bold tracking-[0.25em] text-[10px] leading-none mb-1">|||| | | ||| || ||| | ||</p>
                 <p className="text-[8px] text-gray-500">#{labelPrintOrder.id.substring(0, 10).toUpperCase()}*</p>
                 <p className="text-[8px] text-red-600 font-bold uppercase mt-2 border border-red-200 px-1 py-0.5 rounded inline-block bg-red-50">

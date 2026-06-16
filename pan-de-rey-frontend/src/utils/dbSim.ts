@@ -963,4 +963,157 @@ export const saveLocalAppearance = (appearance: SimAppearance): void => {
   localStorage.setItem('pan_de_rey_sim_appearance', JSON.stringify(appearance));
 };
 
+// --- Settings CMS Types, Defaults, and Helpers ---
+export type SimRedemptionReward = {
+  id: string;
+  title: string;
+  pointsCost: number;
+  rewardType: 'fixed' | 'percent' | 'free_shipping';
+  rewardValue: number;
+};
+
+export type SimAuditLog = {
+  timestamp: string;
+  ip: string;
+  event: string;
+  user: string;
+  status: 'Exitoso' | 'Advertencia' | 'Bloqueado';
+};
+
+export type SimSettings = {
+  // Ticket
+  ticketCompanyName: string;
+  ticketRut: string;
+  ticketAddress: string;
+  ticketPhone: string;
+  ticketNotes: string;
+
+  // Payments
+  mercadoPagoActive: boolean;
+  mercadoPagoPublicKey: string;
+  mercadoPagoAccessToken: string;
+  mercadoPagoSandbox: boolean;
+  bankTransferActive: boolean;
+  bankTransferBank: string;
+  bankTransferAccountType: string;
+  bankTransferAccountNumber: string;
+  bankTransferRut: string;
+  bankTransferEmail: string;
+  whatsappCheckoutActive: boolean;
+  whatsappPhone: string;
+  whatsappMessageTemplate: string;
+
+  // Security
+  sessionTimeoutMinutes: number;
+  maxLoginAttempts: number;
+  ipWhitelist: string;
+  sslForced: boolean;
+  securityAuditLogs: SimAuditLog[];
+
+  // Loyalty
+  loyaltyActive: boolean;
+  pesosPerPoint: number;
+  pointValueCashback: number;
+  redemptionRewards: SimRedemptionReward[];
+
+  // Campaigns & Events
+  eventActive: boolean;
+  eventName: string;
+  eventStartDate: string;
+  eventEndDate: string;
+  eventProductIds: number[];
+  eventMinPrepDays: number;
+  eventMaxOrdersPerDay: number;
+  eventCustomerMessage: string;
+
+  // Socials, Analytics & SEO
+  facebookPixelId: string;
+  googleAnalyticsId: string;
+  googleTagManagerId: string;
+  googleAdsToken: string;
+  seoDefaultTitle: string;
+  seoDefaultDescription: string;
+  seoDefaultKeywords: string;
+};
+
+export const defaultSettings: SimSettings = {
+  ticketCompanyName: "Pan de Rey SpA",
+  ticketRut: "76.123.456-K",
+  ticketAddress: "Av. Principal 1234, Providencia, Santiago",
+  ticketPhone: "+56 9 1234 5678",
+  ticketNotes: "¡Gracias por preferir Pan de Rey! Conservar en lugar fresco y seco. Consumir preferentemente dentro de las 48 hrs.",
+
+  mercadoPagoActive: true,
+  mercadoPagoPublicKey: "APP_USR-78cd65a1-7789-4e78-9a2c-e123456789ab",
+  mercadoPagoAccessToken: "APP_USR-882200114455-9233-a1b2-c3d4-e5f6g7h8i9j0",
+  mercadoPagoSandbox: true,
+  
+  bankTransferActive: true,
+  bankTransferBank: "Banco de Chile",
+  bankTransferAccountType: "Cuenta Corriente",
+  bankTransferAccountNumber: "123-45678-09",
+  bankTransferRut: "76.123.456-K",
+  bankTransferEmail: "pagos@panderey.cl",
+  
+  whatsappCheckoutActive: true,
+  whatsappPhone: "+56912345678",
+  whatsappMessageTemplate: "Hola Pan de Rey! Quisiera procesar mi pedido de transferencia. ID de Pedido: {pedido_id}, Cliente: {cliente}, Total: {monto}. ¿Me confirman los datos?",
+
+  sessionTimeoutMinutes: 30,
+  maxLoginAttempts: 5,
+  ipWhitelist: "192.168.1.1, 192.168.1.45, 200.54.12.89",
+  sslForced: true,
+  securityAuditLogs: [
+    { timestamp: new Date(Date.now() - 5 * 60000).toISOString(), ip: "192.168.1.45", event: "Inicio de sesión de administrador", user: "administrador@panderey.cl", status: "Exitoso" },
+    { timestamp: new Date(Date.now() - 35 * 60000).toISOString(), ip: "185.220.101.12", event: "Intento fallido de login (Contraseña incorrecta)", user: "admin", status: "Advertencia" },
+    { timestamp: new Date(Date.now() - 120 * 60000).toISOString(), ip: "185.220.101.12", event: "IP bloqueada por fuerza bruta (5 intentos fallidos)", user: "admin", status: "Bloqueado" },
+    { timestamp: new Date(Date.now() - 360 * 60000).toISOString(), ip: "192.168.1.45", event: "Actualización de banner en CMS Apariencia", user: "administrador@panderey.cl", status: "Exitoso" },
+    { timestamp: new Date(Date.now() - 720 * 60000).toISOString(), ip: "192.168.1.45", event: "Creación de cupón de descuento REY10", user: "administrador@panderey.cl", status: "Exitoso" }
+  ],
+
+  loyaltyActive: true,
+  pesosPerPoint: 1000, // $1.000 CLP = 1 Punto
+  pointValueCashback: 10, // 1 Punto = $10 CLP de descuento
+
+  redemptionRewards: [
+    { id: "reward-1", title: "Cupón Descuento $2.000 CLP", pointsCost: 200, rewardType: "fixed", rewardValue: 2000 },
+    { id: "reward-2", title: "Cupón Descuento $5.000 CLP", pointsCost: 450, rewardType: "fixed", rewardValue: 5000 },
+    { id: "reward-3", title: "Envío Gratis a Domicilio", pointsCost: 150, rewardType: "free_shipping", rewardValue: 0 },
+    { id: "reward-4", title: "Descuento del 15% en Panadería", pointsCost: 300, rewardType: "percent", rewardValue: 15 }
+  ],
+
+  eventActive: true,
+  eventName: "Campaña Especial de Navidad",
+  eventStartDate: "2026-12-01",
+  eventEndDate: "2026-12-25",
+  eventProductIds: [1, 6, 8, 10], // Clásico Masa Madre, Croissant, Tarta Limón, Brownie
+  eventMinPrepDays: 2,
+  eventMaxOrdersPerDay: 15,
+  eventCustomerMessage: "Los pedidos navideños se preparan con anticipación. Agenda tu retiro de panettones y panes especiales con mínimo 2 días de antelación.",
+
+  facebookPixelId: "FB-PIXEL-9988776655",
+  googleAnalyticsId: "G-PANREY2026",
+  googleTagManagerId: "GTM-PR12345",
+  googleAdsToken: "AW-1029384756",
+  seoDefaultTitle: "Pan de Rey | Masa Madre & Alta Pastelería Artesanal",
+  seoDefaultDescription: "Panes rústicos y piezas de autor horneados diariamente con fermentación natural de 48 horas, harinas orgánicas y viennoiserie fina en Santiago de Chile.",
+  seoDefaultKeywords: "pan de masa madre, pastelería artesanal, croissant providencia, panadería premium santiago, delivery pan masa madre"
+};
+
+export const getLocalSettings = (): SimSettings => {
+  if (typeof window === 'undefined') return defaultSettings;
+  const raw = localStorage.getItem('pan_de_rey_sim_settings');
+  if (!raw) {
+    localStorage.setItem('pan_de_rey_sim_settings', JSON.stringify(defaultSettings));
+    return defaultSettings;
+  }
+  return JSON.parse(raw);
+};
+
+export const saveLocalSettings = (settings: SimSettings): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('pan_de_rey_sim_settings', JSON.stringify(settings));
+};
+
+
 
