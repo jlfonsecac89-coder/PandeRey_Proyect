@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Package, MapPin, LogOut } from 'lucide-react';
 import PersonalInfoTab from './tabs/PersonalInfoTab';
 import OrdersTab from './tabs/OrdersTab';
@@ -10,6 +10,14 @@ type TabType = 'profile' | 'orders' | 'addresses';
 
 export default function ProfileDashboard({ onLogout }: { onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<TabType>('profile');
+  const [customer, setCustomer] = useState({ name: 'Jose L. Fonseca', email: 'jlfonsecac89@gmail.com', points: 2450 });
+
+  useEffect(() => {
+    const saved = localStorage.getItem('pan_de_rey_active_customer');
+    if (saved) {
+      setCustomer(JSON.parse(saved));
+    }
+  }, []);
 
   return (
     <div className="max-w-7xl mx-auto pt-32 pb-24 px-4 sm:px-6 lg:px-8">
@@ -27,16 +35,16 @@ export default function ProfileDashboard({ onLogout }: { onLogout: () => void })
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <p className="text-[9px] uppercase tracking-[0.25em] text-gold font-bold">Pan de Rey Club</p>
-                  <h2 className="font-serif text-xl text-white italic mt-1">Jose L. Fonseca</h2>
+                  <h2 className="font-serif text-xl text-white italic mt-1">{customer.name}</h2>
                 </div>
                 <div className="px-2.5 py-0.5 rounded-full bg-gold/10 border border-gold/30 text-[8px] font-black uppercase tracking-wider text-gold">
-                  Oro
+                  {customer.points >= 2000 ? 'Oro' : customer.points >= 1000 ? 'Plata' : 'Bronce'}
                 </div>
               </div>
               
               <div className="mt-6">
                 <p className="text-[9px] uppercase tracking-widest text-gray-500 font-bold mb-1">Puntos Acumulados</p>
-                <p className="text-3xl font-serif font-black text-white">2.450 <span className="text-xs text-gold font-sans font-bold tracking-widest uppercase">PTS</span></p>
+                <p className="text-3xl font-serif font-black text-white">{customer.points} <span className="text-xs text-gold font-sans font-bold tracking-widest uppercase">PTS</span></p>
               </div>
               
               {/* Progress to next tier */}
