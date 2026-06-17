@@ -3,6 +3,7 @@ import { Manrope, EB_Garamond } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import CartSidebar from "@/components/shop/CartSidebar";
+import Script from "next/script";
 
 const manrope = Manrope({
   variable: "--font-sans",
@@ -33,6 +34,7 @@ export default function RootLayout({
         <CartProvider>
           {children}
           <CartSidebar />
+          <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
         </CartProvider>
       </body>
     </html>
