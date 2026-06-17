@@ -1115,5 +1115,117 @@ export const saveLocalSettings = (settings: SimSettings): void => {
   localStorage.setItem('pan_de_rey_sim_settings', JSON.stringify(settings));
 };
 
+// --- Customer RFM & LTV Segment Types and Helpers ---
+export type SimCustomerRFM = {
+  name: string;
+  email: string;
+  phone: string;
+  recencyDays: number;
+  frequency: number;
+  monetaryValue: number; // Sum of totals
+  ltv: number; // Lifetime value
+  totalUnits: number;
+  isRegistered: boolean;
+  segment: 'Champions' | 'Loyal' | 'New' | 'At Risk' | 'Hibernating';
+};
+
+export const getLocalCustomerRFM = (): SimCustomerRFM[] => {
+  const orders = getLocalOrders();
+  if (orders.length === 0) return [];
+
+  // Group orders by email
+  const customerGroups: { [email: string]: typeof orders } = {};
+  orders.forEach(o => {
+    const emailKey = o.email.toLowerCase().trim() || 'invitado@panderey.cl';
+    if (!customerGroups[emailKey]) {
+      customerGroups[emailKey] = [];
+    }
+    customerGroups[emailKey].push(o);
+  });
+
+  const registeredEmails = [
+    'maria.gonzalez@gmail.com', 
+    'juan.perez@yahoo.com', 
+    'diego.munoz@outlook.com', 
+    'camila.rojas@gmail.com', 
+    'jose.fonseca@gmail.com'
+  ];
+
+  const customers: SimCustomerRFM[] = Object.keys(customerGroups).map(email => {
+    const group = customerGroups[email];
+    
+    // Sort orders of this customer by date desc to get latest info
+    const sorted = [...group].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const latestOrder = sorted[0];
+    
+    // Filter successful orders (exclude canceled)
+    const successfulOrders = group.filter(o => o.status !== 'Cancelado');
+    
+    // Recency: Days since latest successful order
+    // Anchor Date.now() to ensure stable calculations relative to latest orders
+    const lastOrderTime = new Date(latestOrder.createdAt).getTime();
+    const diffTime = Math.max(0, Date.now() - lastOrderTime);
+    const recencyDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Frequency
+    const frequency = successfulOrders.length;
+    
+    // Monetary & LTV
+    const ltv = successfulOrders.reduce((sum, o) => sum + o.total, 0);
+    const monetaryValue = frequency > 0 ? Math.round(ltv / frequency) : 0;
+    
+    // Total Units
+    let totalUnits = 0;
+    successfulOrders.forEach(o => {
+      if (o.itemsRaw && o.itemsRaw.length > 0) {
+        o.itemsRaw.forEach(it => {
+          totalUnits += it.quantity;
+        });
+      } else {
+        o.items.forEach(it => {
+          const match = it.match(/^(\d+)x/);
+          if (match) {
+            totalUnits += parseInt(match[1]);
+          } else {
+            totalUnits += 1;
+          }
+        });
+      }
+    });
+
+    const isRegistered = registeredEmails.includes(email.toLowerCase());
+
+    // Classification RFM
+    let segment: SimCustomerRFM['segment'] = 'Hibernating';
+    if (recencyDays <= 5 && frequency >= 4) {
+      segment = 'Champions';
+    } else if (recencyDays <= 12 && frequency >= 2) {
+      segment = 'Loyal';
+    } else if (recencyDays <= 7 && frequency === 1) {
+      segment = 'New';
+    } else if (recencyDays > 12 && recencyDays <= 24 && frequency >= 2) {
+      segment = 'At Risk';
+    } else {
+      segment = 'Hibernating';
+    }
+
+    return {
+      name: latestOrder.customerName,
+      email: email,
+      phone: latestOrder.phone,
+      recencyDays,
+      frequency,
+      monetaryValue,
+      ltv,
+      totalUnits,
+      isRegistered,
+      segment
+    };
+  });
+
+  return customers;
+};
+
+
 
 
