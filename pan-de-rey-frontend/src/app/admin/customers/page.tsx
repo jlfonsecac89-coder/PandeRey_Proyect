@@ -24,6 +24,7 @@ export default function CustomerAnalyticsPage() {
   const [selectedSegment, setSelectedSegment] = useState<SimCustomerRFM["segment"] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTypeFilter, setActiveTypeFilter] = useState<"all" | "registered" | "leads">("all");
+  const [selectedLeadCampaign, setSelectedLeadCampaign] = useState<"registro" | "segunda" | "encuesta">("registro");
   
   // Modal / notification states
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -115,6 +116,25 @@ export default function CustomerAnalyticsPage() {
     }, 1500);
   };
 
+  // Launch campaign for checkout leads
+  const handleSendLeadCampaign = () => {
+    if (leads.length === 0) return;
+    
+    const campaignNames = {
+      registro: "Conversión a Socio (200 Puntos Gratis)",
+      segunda: "Cupón de Incentivo 2ª Compra (10% OFF)",
+      encuesta: "Encuesta de Calidad + Regalo Croissant"
+    };
+    
+    const activeCampaignName = campaignNames[selectedLeadCampaign];
+    
+    setSendingCampaign(true);
+    setTimeout(() => {
+      setSendingCampaign(false);
+      showToast(`¡Campaña "${activeCampaignName}" enviada con éxito a los ${leads.length} leads de checkout!`, "success");
+    }, 1500);
+  };
+
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -200,7 +220,17 @@ export default function CustomerAnalyticsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         {/* Card: Registered Customers */}
-        <div className="bg-[#161616] border border-white/5 p-6 rounded-xl flex items-center justify-between shadow-lg relative overflow-hidden group">
+        <div 
+          onClick={() => {
+            setActiveTypeFilter(activeTypeFilter === "registered" ? "all" : "registered");
+            setSelectedSegment(null);
+          }}
+          className={`bg-[#161616] p-6 rounded-xl flex items-center justify-between shadow-lg relative overflow-hidden group cursor-pointer transition-all duration-300 border ${
+            activeTypeFilter === "registered" 
+              ? "border-gold bg-gold/[0.02] shadow-[0_0_15px_rgba(212,175,55,0.05)]" 
+              : "border-white/5 hover:border-gold/30"
+          }`}
+        >
           <div className="space-y-2 z-10">
             <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest block">Clientes Registrados (Fidelizados)</span>
             <div className="flex items-baseline gap-2">
@@ -225,7 +255,17 @@ export default function CustomerAnalyticsPage() {
         </div>
 
         {/* Card: Leads / Guests */}
-        <div className="bg-[#161616] border border-white/5 p-6 rounded-xl flex items-center justify-between shadow-lg relative overflow-hidden group">
+        <div 
+          onClick={() => {
+            setActiveTypeFilter(activeTypeFilter === "leads" ? "all" : "leads");
+            setSelectedSegment(null);
+          }}
+          className={`bg-[#161616] p-6 rounded-xl flex items-center justify-between shadow-lg relative overflow-hidden group cursor-pointer transition-all duration-300 border ${
+            activeTypeFilter === "leads" 
+              ? "border-blue-500 bg-blue-500/[0.02] shadow-[0_0_15px_rgba(59,130,246,0.05)]" 
+              : "border-white/5 hover:border-blue-500/30"
+          }`}
+        >
           <div className="space-y-2 z-10">
             <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest block">Leads de Checkout (Comprador Invitado)</span>
             <div className="flex items-baseline gap-2">
@@ -321,7 +361,7 @@ export default function CustomerAnalyticsPage() {
                   <Zap className="w-5 h-5 text-gold shrink-0 mt-0.5 animate-bounce" />
                   <div>
                     <h5 className="text-xs font-bold text-gold uppercase tracking-widest mb-1">Acción de Marketing Recomendada</h5>
-                    <p className="text-xs text-gray-300 leading-relaxed font-light">
+                    <p className="text-xs text-gray-300 leading-relaxed font-light font-sans">
                       {segmentConfig[selectedSegment].suggestion}
                     </p>
                   </div>
@@ -337,6 +377,143 @@ export default function CustomerAnalyticsPage() {
                   </button>
                 </div>
               </div>
+            ) : activeTypeFilter === "leads" ? (
+              <div className="space-y-4 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      Estrategia CRO: Conversión de Leads
+                    </span>
+                    <span className="text-xs text-gray-500">• Campañas para Compradores Invitados</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-sm font-serif text-white font-bold">Comportamiento de los Leads de Checkout</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Son usuarios que completaron una compra rápida sin crear una cuenta. Muestran alta intención de compra, pero tienen un menor porcentaje de retención y recompra a largo plazo al no acumular puntos ni recibir promociones personalizadas.
+                  </p>
+                </div>
+
+                <div className="bg-[#0f0f0f] border border-white/5 rounded-lg p-4 space-y-4">
+                  <div className="flex gap-3.5 items-start">
+                    <Zap className="w-5 h-5 text-gold shrink-0 mt-0.5 animate-bounce" />
+                    <div>
+                      <h5 className="text-xs font-bold text-gold uppercase tracking-widest mb-1">Campañas Ideales Recomendadas</h5>
+                      <p className="text-xs text-gray-300 leading-relaxed font-light">
+                        Selecciona el tipo de campaña que deseas enviar a tus <strong>{leads.length} leads</strong> para incentivar su registro y fidelización.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLeadCampaign("registro")}
+                      className={`p-3 rounded-lg border text-left cursor-pointer transition-all duration-200 ${
+                        selectedLeadCampaign === "registro" 
+                          ? "border-gold bg-gold/5 text-white animate-pulse" 
+                          : "border-white/5 bg-white/[0.01] hover:border-white/10 text-gray-400"
+                      }`}
+                    >
+                      <div className="font-bold text-[11px] text-white flex items-center gap-1.5 mb-1">
+                        <UserPlus className="w-3.5 h-3.5 text-gold" />
+                        Conversión a Socio
+                      </div>
+                      <p className="text-[10px] text-gray-500 leading-tight">
+                        Regala 200 puntos de fidelización si crean su cuenta.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLeadCampaign("segunda")}
+                      className={`p-3 rounded-lg border text-left cursor-pointer transition-all duration-200 ${
+                        selectedLeadCampaign === "segunda" 
+                          ? "border-gold bg-gold/5 text-white" 
+                          : "border-white/5 bg-white/[0.01] hover:border-white/10 text-gray-400"
+                      }`}
+                    >
+                      <div className="font-bold text-[11px] text-white flex items-center gap-1.5 mb-1">
+                        <TrendingUp className="w-3.5 h-3.5 text-gold" />
+                        Incentivo 2ª Compra
+                      </div>
+                      <p className="text-[10px] text-gray-500 leading-tight">
+                        Envía cupón de 10% OFF exclusivo para recompra.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLeadCampaign("encuesta")}
+                      className={`p-3 rounded-lg border text-left cursor-pointer transition-all duration-200 ${
+                        selectedLeadCampaign === "encuesta" 
+                          ? "border-gold bg-gold/5 text-white" 
+                          : "border-white/5 bg-white/[0.01] hover:border-white/10 text-gray-400"
+                      }`}
+                    >
+                      <div className="font-bold text-[11px] text-white flex items-center gap-1.5 mb-1">
+                        <Activity className="w-3.5 h-3.5 text-gold" />
+                        Encuesta + Regalo
+                      </div>
+                      <p className="text-[10px] text-gray-500 leading-tight">
+                        Ofrece croissant gratis en local por responder encuesta.
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={handleSendLeadCampaign}
+                    disabled={sendingCampaign}
+                    className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded text-xs font-bold uppercase tracking-widest transition-all shadow-md cursor-pointer"
+                  >
+                    {sendingCampaign ? (
+                      <>
+                        <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="w-4 h-4" />
+                        Enviar Campaña Masiva ({leads.length} Leads)
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : activeTypeFilter === "registered" ? (
+              <div className="space-y-4 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-gold/10 text-gold border border-gold/20">
+                      Estrategia CRO: Clientes Registrados
+                    </span>
+                    <span className="text-xs text-gray-500">• Fidelización Activa</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-sm font-serif text-white font-bold">Comportamiento de Clientes Registrados</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Son usuarios que han creado una cuenta formal y acumulan puntos con cada compra. Responden mejor a incentivos de valor y personalización de marca que a descuentos directos.
+                  </p>
+                </div>
+
+                <div className="bg-[#0f0f0f] border border-white/5 rounded-lg p-4 flex gap-3.5 items-start">
+                  <Zap className="w-5 h-5 text-gold shrink-0 mt-0.5 animate-bounce" />
+                  <div>
+                    <h5 className="text-xs font-bold text-gold uppercase tracking-widest mb-1">Acción General Recomendada</h5>
+                    <p className="text-xs text-gray-300 leading-relaxed font-light font-sans">
+                      Utiliza los filtros del <strong>Termómetro de Segmentos (Champions, Loyal, New, etc.)</strong> arriba para desplegar campañas microsegmentadas y optimizar el retorno de inversión de tus campañas.
+                    </p>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="py-8 text-center space-y-3">
                 <div className="w-12 h-12 bg-white/[0.02] border border-white/5 rounded-full flex items-center justify-center mx-auto text-gray-500">
@@ -345,7 +522,7 @@ export default function CustomerAnalyticsPage() {
                 <div>
                   <h4 className="text-sm font-serif text-white font-bold">Termómetro de Conversión</h4>
                   <p className="text-xs text-gray-500 max-w-sm mx-auto leading-relaxed mt-1">
-                    Selecciona cualquiera de las tarjetas de segmento superiores para activar la estrategia de retención o reactivación CRO recomendada por el bloque creativo.
+                    Selecciona cualquiera de las tarjetas de segmento superiores, o haz clic en las tarjetas de **Registrados** o **Leads** para activar la estrategia de retención o conversión CRO recomendada por el bloque creativo.
                   </p>
                 </div>
               </div>
