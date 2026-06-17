@@ -102,8 +102,12 @@ export default function GoogleAuthModal({ isOpen, onClose, onSuccess }: GoogleAu
 
     return () => {
       if (checkInterval) clearInterval(checkInterval);
+      const btnContainer = document.getElementById('google-real-btn-container');
+      if (btnContainer) {
+        btnContainer.innerHTML = '';
+      }
     };
-  }, [isOpen, step]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -170,8 +174,7 @@ export default function GoogleAuthModal({ isOpen, onClose, onSuccess }: GoogleAu
         </div>
 
         {/* Step: SELECT / SIGN IN */}
-        {step === 'select' && (
-          <div className="space-y-5">
+        <div className={step === 'select' ? "space-y-5 animate-in fade-in" : "hidden"}>
             {/* Real Google Button Container */}
             <div className="flex flex-col items-center justify-center space-y-3 py-4 bg-white/[0.01] border border-white/5 rounded-xl p-4">
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Acceso Oficial con Cuenta de Google</span>
@@ -240,7 +243,6 @@ export default function GoogleAuthModal({ isOpen, onClose, onSuccess }: GoogleAu
               </button>
             </div>
           </div>
-        )}
 
         {/* Step: CUSTOM ACCOUNT */}
         {step === 'custom' && (
