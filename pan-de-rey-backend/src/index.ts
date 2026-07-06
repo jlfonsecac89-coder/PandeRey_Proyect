@@ -7,6 +7,7 @@ import stockRoutes from './routes/stock';
 import crmRoutes from './routes/crm';
 import settingsRoutes from './routes/settings';
 import ordersRoutes from './routes/orders';
+import { securityHeaders, ipWhitelistFilter } from './middleware/security';
 
 dotenv.config();
 
@@ -15,6 +16,8 @@ const port = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+app.use(securityHeaders);
+app.use(ipWhitelistFilter);
 
 // Routes
 app.use('/api/catalog', catalogRoutes);

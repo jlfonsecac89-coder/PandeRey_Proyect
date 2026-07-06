@@ -1044,8 +1044,8 @@ export const defaultSettings: SimSettings = {
   ticketNotes: "¡Gracias por preferir Pan de Rey! Conservar en lugar fresco y seco. Consumir preferentemente dentro de las 48 hrs.",
 
   mercadoPagoActive: true,
-  mercadoPagoPublicKey: "APP_USR-78cd65a1-7789-4e78-9a2c-e123456789ab",
-  mercadoPagoAccessToken: "APP_USR-882200114455-9233-a1b2-c3d4-e5f6g7h8i9j0",
+  mercadoPagoPublicKey: process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || "APP_USR-6f4ded52-e3d9-4e3e-ac07-8bd4655a9df9",
+  mercadoPagoAccessToken: "APP_USR-46172256••••••••••••••••••••••••••••",
   mercadoPagoSandbox: true,
   
   bankTransferActive: true,
@@ -1103,11 +1103,21 @@ export const defaultSettings: SimSettings = {
 export const getLocalSettings = (): SimSettings => {
   if (typeof window === 'undefined') return defaultSettings;
   const raw = localStorage.getItem('pan_de_rey_sim_settings');
+  let settings: SimSettings;
   if (!raw) {
     localStorage.setItem('pan_de_rey_sim_settings', JSON.stringify(defaultSettings));
-    return defaultSettings;
+    settings = defaultSettings;
+  } else {
+    try {
+      settings = JSON.parse(raw);
+    } catch (e) {
+      settings = defaultSettings;
+    }
   }
-  return JSON.parse(raw);
+  // Enforce secure settings keys from environment and mask secrets
+  settings.mercadoPagoPublicKey = process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || "APP_USR-6f4ded52-e3d9-4e3e-ac07-8bd4655a9df9";
+  settings.mercadoPagoAccessToken = "APP_USR-46172256••••••••••••••••••••••••••••";
+  return settings;
 };
 
 export const saveLocalSettings = (settings: SimSettings): void => {

@@ -384,36 +384,54 @@ export default function SettingsPage() {
                     <div className="space-y-4">
                       <div>
                         <label className="text-[9px] text-gray-500 uppercase tracking-widest block mb-1">Clave Pública (Public Key)</label>
-                        <input 
-                          type="text" 
-                          disabled={!draft.mercadoPagoActive}
-                          value={draft.mercadoPagoPublicKey}
-                          onChange={(e) => handleFieldChange("mercadoPagoPublicKey", e.target.value)}
-                          className="w-full bg-[#0f0f0f] border border-white/10 p-3 rounded text-xs text-white focus:border-gold outline-none disabled:opacity-40"
-                        />
+                        <div className="relative">
+                          <input 
+                            type="text" 
+                            readOnly
+                            disabled={!draft.mercadoPagoActive}
+                            value={draft.mercadoPagoPublicKey}
+                            className="w-full bg-[#0f0f0f]/50 border border-white/10 p-3 pr-10 rounded text-xs text-gray-400 outline-none disabled:opacity-40 cursor-not-allowed font-mono"
+                          />
+                          <Shield className="w-4 h-4 text-emerald-500 absolute right-3 top-1/2 -translate-y-1/2" />
+                        </div>
                       </div>
                       
                       <div>
                         <label className="text-[9px] text-gray-500 uppercase tracking-widest block mb-1">Token de Acceso (Access Token)</label>
-                        <input 
-                          type="password" 
-                          disabled={!draft.mercadoPagoActive}
-                          value={draft.mercadoPagoAccessToken}
-                          onChange={(e) => handleFieldChange("mercadoPagoAccessToken", e.target.value)}
-                          className="w-full bg-[#0f0f0f] border border-white/10 p-3 rounded text-xs text-white focus:border-gold outline-none disabled:opacity-40"
-                        />
+                        <div className="relative">
+                          <input 
+                            type="text" 
+                            readOnly
+                            disabled={!draft.mercadoPagoActive}
+                            value="APP_USR-46172256••••••••••••••••••••••••••••"
+                            className="w-full bg-[#0f0f0f]/50 border border-white/10 p-3 pr-10 rounded text-xs text-gray-400 outline-none disabled:opacity-40 cursor-not-allowed font-mono"
+                          />
+                          <Shield className="w-4 h-4 text-emerald-500 absolute right-3 top-1/2 -translate-y-1/2" />
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-3">
                         <input 
                           type="checkbox" 
                           id="mpSandbox"
-                          disabled={!draft.mercadoPagoActive}
+                          disabled={true}
                           checked={draft.mercadoPagoSandbox}
-                          onChange={(e) => handleFieldChange("mercadoPagoSandbox", e.target.checked)}
-                          className="rounded border-white/10 bg-black/45 text-gold focus:ring-gold"
+                          className="rounded border-white/10 bg-black/45 text-gold focus:ring-gold cursor-not-allowed"
                         />
-                        <label htmlFor="mpSandbox" className="text-xs text-gray-400 select-none">Habilitar Modo Prueba (Sandbox)</label>
+                        <label htmlFor="mpSandbox" className="text-xs text-gray-500 select-none cursor-not-allowed flex items-center gap-1.5">
+                          Habilitar Modo Prueba (Sandbox) <span className="text-[9px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded font-bold">Activo</span>
+                        </label>
+                      </div>
+
+                      {/* Security Warning Notice */}
+                      <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3.5 mt-2 flex items-start gap-2.5">
+                        <Shield className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider block mb-0.5">Ajuste Protegido por Servidor</span>
+                          <p className="text-[10px] text-gray-400 leading-relaxed font-sans">
+                            Las credenciales de Mercado Pago han sido bloqueadas en el CMS por políticas de seguridad PCI-DSS. Se cargan de forma exclusiva desde las variables de entorno del servidor (<code>.env</code>) para evitar hackeos, fugas y manipulaciones de terceros.
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>

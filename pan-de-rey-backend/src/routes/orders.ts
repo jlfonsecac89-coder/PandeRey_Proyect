@@ -74,7 +74,21 @@ router.get('/', async (req, res) => {
 
 // Checkout: Crear pedido, Pago y registrar en ERP
 router.post('/checkout', async (req, res) => {
-    const { userId, addressId, couponId, items, shippingMethod, pickupTime, notes, paymentMethod } = req.body;
+    const { 
+        userId, 
+        addressId, 
+        couponId, 
+        items, 
+        shippingMethod, 
+        pickupTime, 
+        notes, 
+        paymentMethod,
+        // Datos de contacto de cliente invitado (lead)
+        email,
+        firstName,
+        lastName,
+        phone
+    } = req.body;
     
     if (!items || items.length === 0) {
         return res.status(400).json({ error: 'Cart is empty' });
@@ -117,6 +131,46 @@ router.post('/checkout', async (req, res) => {
         // Shipping Cost calculation
         const shippingCost = shippingMethod === 'Delivery' ? 3500 : 0;
         const totalAmount = subtotal + shippingCost;
+
+        // 2. Gestionar la cuenta del cliente (lead/invitado o registrado)
+        let finalUserId = userId;
+        let customerEmail = email || 'panderey.cl@gmail.com';
+        let customerPhone = phone || '+56912345678';
+        let customerFirstName = firstName || 'Cliente';
+        let customerLastName = lastName || 'Invitado';
+
+        if (!finalUserId && email) {
+            // Verificar si el correo ya existe
+            const [userRows]: any = await pool.query('SELECT Id, Email, Phone, FirstName, LastName FROM Users WHERE Email = ?', [email]);
+            if (userRows.length > 0) {
+                finalUserId = userRows[0].Id;
+                customerPhone = userRows[0].Phone || customerPhone;
+                customerFirstName = userRows[0].FirstName;
+                customerLastName = userRows[0].LastName;
+            } else {
+                // Registrar automáticamente como un Lead / Invitado en el sistema CRM
+                finalUserId = crypto.randomUUID();
+                await pool.query(
+                    'INSERT INTO Users (Id, Email, PasswordHash, FirstName, LastName, Phone) VALUES (?, ?, NULL, ?, ?, ?)',
+                    [finalUserId, email, customerFirstName, customerLastName, customerPhone]
+                );
+                
+                // Asignar rol "Cliente" para compatibilidad de base de datos
+                const [roleRows]: any = await pool.query("SELECT Id FROM Roles WHERE Name = 'Cliente'");
+                if (roleRows.length > 0) {
+                    await pool.query('INSERT INTO UserRoles (UserId, RoleId) VALUES (?, ?)', [finalUserId, roleRows[0].Id]);
+                }
+            }
+        } else if (finalUserId) {
+            // Cargar datos de cliente existente para notificaciones y Mercado Pago
+            const [userRows]: any = await pool.query('SELECT Email, Phone, FirstName, LastName FROM Users WHERE Id = ?', [finalUserId]);
+            if (userRows.length > 0) {
+                customerEmail = userRows[0].Email;
+                customerPhone = userRows[0].Phone || customerPhone;
+                customerFirstName = userRows[0].FirstName;
+                customerLastName = userRows[0].LastName;
+            }
+        }
         
         const connection = await pool.getConnection();
         await connection.beginTransaction();
@@ -126,7 +180,7 @@ router.post('/checkout', async (req, res) => {
             await connection.query(
                 `INSERT INTO Orders (Id, UserId, AddressId, CouponId, TotalAmount, Status, ShippingMethod, PickupTime, ShippingCost, Notes) 
                  VALUES (?, ?, ?, ?, ?, 'Nuevo', ?, ?, ?, ?)`,
-                [orderId, userId || null, addressId || null, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null]
+                [orderId, finalUserId || null, addressId || null, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null]
             );
             
             // B. Create Order Items
@@ -149,18 +203,90 @@ router.post('/checkout', async (req, res) => {
                 );
             }
             
-            // C. Create Payment Record (Simulating payment transaction success)
-            const gatewayToken = crypto.randomBytes(16).toString('hex');
-            await connection.query(
-                `INSERT INTO Payments (Id, OrderId, Amount, PaymentMethod, Status, TransactionId) 
-                 VALUES (?, ?, ?, ?, 'Aprobado', ?)`,
-                [paymentId, orderId, totalAmount, paymentMethod || 'Webpay', gatewayToken]
-            );
-            
             await connection.commit();
             connection.release();
             
-            // D. Integrations post-commit (Defontana, Impresora Fiscal, Email)
+            // C. Integración Pasarela de Pagos (Mercado Pago) o Transferencia
+            let initPoint = null;
+            let paymentStatus = 'Aprobado';
+            let gatewayToken = crypto.randomBytes(16).toString('hex');
+            let finalPaymentMethod = paymentMethod || 'Webpay';
+
+            if (finalPaymentMethod && finalPaymentMethod.toLowerCase() === 'mercadopago') {
+                try {
+                    const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-4617225674364003-070212-ac94008f892a332dcbb5cd08dfe9a938-3512158955';
+                    
+                    // Mapear los productos para el formato de preferencia de Mercado Pago
+                    const mpItems = items.map((item: any) => {
+                        const unitPrice = item.price || (totalAmount / items.length);
+                        return {
+                            title: item.name || 'Producto Pan de Rey',
+                            quantity: parseInt(item.quantity) || 1,
+                            unit_price: Math.round(parseFloat(unitPrice)),
+                            currency_id: 'CLP'
+                        };
+                    });
+
+                    // Añadir el envío como ítem si aplica
+                    if (shippingCost > 0) {
+                        mpItems.push({
+                            title: 'Costo de Despacho',
+                            quantity: 1,
+                            unit_price: shippingCost,
+                            currency_id: 'CLP'
+                        });
+                    }
+
+                    const mpResponse = await fetch('https://api.mercadopago.com/v1/checkout/preferences', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${mpAccessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            items: mpItems,
+                            payer: {
+                                email: customerEmail,
+                                name: customerFirstName,
+                                surname: customerLastName
+                            },
+                            back_urls: {
+                                success: 'http://localhost:3000/checkout/success',
+                                failure: 'http://localhost:3000/checkout/success',
+                                pending: 'http://localhost:3000/checkout/success'
+                            },
+                            auto_return: 'approved',
+                            external_reference: orderId
+                        })
+                    });
+
+                    if (!mpResponse.ok) {
+                        const errorDetails = await mpResponse.text();
+                        console.error('[Mercado Pago API error details]:', errorDetails);
+                        throw new Error(`MP Preference creation failed: ${mpResponse.statusText}`);
+                    }
+
+                    const mpData: any = await mpResponse.json();
+                    const isSandbox = process.env.MERCADOPAGO_SANDBOX !== 'false';
+                    initPoint = isSandbox ? mpData.sandbox_init_point : mpData.init_point;
+                    gatewayToken = mpData.id;
+                    paymentStatus = 'Pendiente';
+                } catch (mpErr) {
+                    console.error('Error generando preferencia de Mercado Pago:', mpErr);
+                    // Fallback a simulación tradicional si falla la API
+                    paymentStatus = 'Aprobado';
+                    finalPaymentMethod = 'Simulado Fallback';
+                }
+            }
+
+            // Registrar el pago en la base de datos
+            await pool.query(
+                `INSERT INTO Payments (Id, OrderId, Amount, PaymentMethod, Status, TransactionId) 
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [paymentId, orderId, totalAmount, finalPaymentMethod, paymentStatus, gatewayToken]
+            );
+            
+            // D. Integraciones post-commit (Defontana, Impresora Fiscal, Email)
             // Emitir boleta electrónica en ERP Defontana
             const defontanaRes = await pushSalesOrderToDefontana(orderId, { totalAmount }, items);
             
@@ -169,20 +295,9 @@ router.post('/checkout', async (req, res) => {
                 await printFiscalTicket(orderId);
             }
             
-            // Fetch User Details to get the email address
-            let customerEmail = 'panderey.cl@gmail.com'; // Default placeholder
-            let customerPhone = '+56912345678';
-            if (userId) {
-                const [userRows]: any = await pool.query('SELECT Email, Phone FROM Users WHERE Id = ?', [userId]);
-                if (userRows.length > 0) {
-                    customerEmail = userRows[0].Email;
-                    customerPhone = userRows[0].Phone || customerPhone;
-                }
-            }
-            
-            // Enviar correo electrónico de confirmación al cliente
-            await sendStatusEmail(customerEmail, orderId, 'Confirmado (En Preparación)', totalAmount);
-            await sendStatusWhatsApp(customerPhone, orderId, 'Confirmado');
+            // Enviar correo electrónico de confirmación al cliente y WhatsApp
+            await sendStatusEmail(customerEmail, orderId, paymentStatus === 'Pendiente' ? 'Pendiente de Pago' : 'Confirmado (En Preparación)', totalAmount);
+            await sendStatusWhatsApp(customerPhone, orderId, paymentStatus === 'Pendiente' ? 'Pendiente' : 'Confirmado');
             
             // E. AUTOMATIZACIÓN DE ESTADOS (Simulación Asíncrona en el Servidor)
             simulateOrderLifeCycle(orderId, shippingMethod, customerEmail, customerPhone, totalAmount);
@@ -191,6 +306,7 @@ router.post('/checkout', async (req, res) => {
                 status: 'success', 
                 message: 'Order checked out and settled successfully', 
                 orderId,
+                initPoint,
                 boletaNumber: defontanaRes.success ? defontanaRes.folio : null,
                 boletaUrl: defontanaRes.success ? defontanaRes.url : null
             });

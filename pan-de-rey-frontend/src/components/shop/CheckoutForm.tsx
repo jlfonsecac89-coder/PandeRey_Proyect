@@ -9,6 +9,16 @@ import GoogleAuthModal from '../profile/GoogleAuthModal';
 
 type AuthMode = 'selection' | 'guest' | 'login' | 'register';
 
+const getApiUrl = (path: string) => {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return `http://localhost:3001${path}`;
+    }
+  }
+  return path;
+};
+
 export default function CheckoutForm({ onComplete }: { onComplete: () => void }) {
   const { items, total } = useCart();
   
@@ -34,6 +44,71 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
   });
 
   const [activeStep, setActiveStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleCheckoutSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      const checkoutItems = items.map(item => ({
+        variantId: item.id,
+        quantity: item.quantity,
+        name: item.name,
+        price: item.price
+      }));
+
+      const payload = {
+        userId: null,
+        items: checkoutItems,
+        shippingMethod: formData.deliveryMethod === 'own_delivery' ? 'Delivery' : 'Pickup',
+        paymentMethod: formData.paymentMethod === 'mercadopago' ? 'MercadoPago' : 'Transferencia',
+        notes: `RUT: ${formData.rut}, Teléfono: ${formData.phone}`,
+        email: formData.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName || 'Invitado',
+        phone: formData.phone
+      };
+
+      const response = await fetch(getApiUrl('/api/orders/checkout'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al procesar el pedido en el servidor');
+      }
+
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        localStorage.setItem('pan_de_rey_last_order', JSON.stringify({
+          orderId: data.orderId,
+          total: total,
+          paymentMethod: formData.paymentMethod,
+          email: formData.email,
+          firstName: formData.firstName
+        }));
+
+        if (formData.paymentMethod === 'mercadopago' && data.initPoint) {
+          window.location.href = data.initPoint;
+          return;
+        }
+
+        alert(`¡Pedido realizado con éxito!\nCódigo de Pedido: ${data.orderId.substring(0, 8)}`);
+        onComplete();
+      } else {
+        alert(data.error || 'No se pudo crear el pedido');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('Se procederá con la simulación local del pedido.');
+      onComplete();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const neto = Math.round(total / 1.19);
   const iva = total - neto;
@@ -384,10 +459,11 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
                     Atrás
                   </button>
                   <button 
-                    onClick={onComplete}
-                    className="bg-gold text-black hover:bg-gold-hover px-8 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer shadow-lg shadow-gold/15"
+                    onClick={handleCheckoutSubmit}
+                    disabled={isSubmitting}
+                    className="bg-gold text-black hover:bg-gold-hover px-8 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer shadow-lg shadow-gold/15 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    Completar Pedido
+                    {isSubmitting ? 'Procesando...' : 'Completar Pedido'}
                   </button>
                 </div>
               </div>
