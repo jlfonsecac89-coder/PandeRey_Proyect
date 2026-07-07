@@ -176,10 +176,10 @@ router.post('/checkout', async (req, res) => {
         await connection.beginTransaction();
         
         try {
-            // A. Create Order
+            // A. Create Order (Se crea inicialmente con estado 'Pendiente' por seguridad fiscal)
             await connection.query(
                 `INSERT INTO Orders (Id, UserId, AddressId, CouponId, TotalAmount, Status, ShippingMethod, PickupTime, ShippingCost, Notes) 
-                 VALUES (?, ?, ?, ?, ?, 'Nuevo', ?, ?, ?, ?)`,
+                 VALUES (?, ?, ?, ?, ?, 'Pendiente', ?, ?, ?, ?)`,
                 [orderId, finalUserId || null, addressId || null, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null]
             );
             
@@ -215,6 +215,7 @@ router.post('/checkout', async (req, res) => {
             if (finalPaymentMethod && finalPaymentMethod.toLowerCase() === 'mercadopago') {
                 try {
                     const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-4617225674364003-070212-ac94008f892a332dcbb5cd08dfe9a938-3512158955';
+                    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
                     
                     // Mapear los productos para el formato de preferencia de Mercado Pago
                     const mpItems = items.map((item: any) => {
@@ -251,9 +252,9 @@ router.post('/checkout', async (req, res) => {
                                 surname: customerLastName
                             },
                             back_urls: {
-                                success: 'http://localhost:3000/checkout/success',
-                                failure: 'http://localhost:3000/checkout/success',
-                                pending: 'http://localhost:3000/checkout/success'
+                                success: `${frontendUrl}/checkout/success`,
+                                failure: `${frontendUrl}/checkout/success?status=failure`,
+                                pending: `${frontendUrl}/checkout/success?status=pending`
                             },
                             auto_return: 'approved',
                             external_reference: orderId
@@ -286,30 +287,29 @@ router.post('/checkout', async (req, res) => {
                 [paymentId, orderId, totalAmount, finalPaymentMethod, paymentStatus, gatewayToken]
             );
             
-            // D. Integraciones post-commit (Defontana, Impresora Fiscal, Email)
-            // Emitir boleta electrónica en ERP Defontana
-            const defontanaRes = await pushSalesOrderToDefontana(orderId, { totalAmount }, items);
-            
-            // Imprimir boleta en impresora fiscal de panadería
-            if (defontanaRes.success) {
-                await printFiscalTicket(orderId);
+            // D. Gestión de Confirmación Inmediata vs. Diferida
+            if (finalPaymentMethod.toLowerCase() === 'mercadopago') {
+                // Para Mercado Pago, retornamos el initPoint y retrasamos boletas y cocina hasta que pague
+                res.json({ 
+                    status: 'success', 
+                    message: 'Order created, redirecting to payment gateway', 
+                    orderId,
+                    initPoint,
+                    boletaNumber: null,
+                    boletaUrl: null
+                });
+            } else {
+                // Para otros métodos (como Transferencia o simulación instantánea), aprobamos de inmediato
+                const confirmation = await confirmOrderAndTriggerIntegrations(orderId);
+                res.json({ 
+                    status: 'success', 
+                    message: 'Order checked out and settled successfully', 
+                    orderId,
+                    initPoint: null,
+                    boletaNumber: confirmation.boletaNumber,
+                    boletaUrl: confirmation.boletaUrl
+                });
             }
-            
-            // Enviar correo electrónico de confirmación al cliente y WhatsApp
-            await sendStatusEmail(customerEmail, orderId, paymentStatus === 'Pendiente' ? 'Pendiente de Pago' : 'Confirmado (En Preparación)', totalAmount);
-            await sendStatusWhatsApp(customerPhone, orderId, paymentStatus === 'Pendiente' ? 'Pendiente' : 'Confirmado');
-            
-            // E. AUTOMATIZACIÓN DE ESTADOS (Simulación Asíncrona en el Servidor)
-            simulateOrderLifeCycle(orderId, shippingMethod, customerEmail, customerPhone, totalAmount);
-            
-            res.json({ 
-                status: 'success', 
-                message: 'Order checked out and settled successfully', 
-                orderId,
-                initPoint,
-                boletaNumber: defontanaRes.success ? defontanaRes.folio : null,
-                boletaUrl: defontanaRes.success ? defontanaRes.url : null
-            });
             
         } catch (err) {
             await connection.rollback();
@@ -320,6 +320,104 @@ router.post('/checkout', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Checkout failed' });
+    }
+});
+
+// Webhook: Recibe notificaciones de pago en tiempo real desde Mercado Pago (Producción)
+router.post('/webhook', async (req, res) => {
+    const { action, type, data } = req.body;
+    
+    console.log(`[Mercado Pago Webhook Received] Action: ${action}, Type: ${type}, Data ID:`, data?.id);
+    
+    // Solo nos interesan los pagos creados/actualizados
+    if (type === 'payment' || action === 'payment.created' || action === 'payment.updated') {
+        const paymentId = data?.id || req.query.id || req.body.resource?.split('/').pop();
+        
+        if (paymentId) {
+            try {
+                const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-4617225674364003-070212-ac94008f892a332dcbb5cd08dfe9a938-3512158955';
+                
+                // Consultar detalles de pago a Mercado Pago
+                const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${mpAccessToken}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch payment details: ${response.statusText}`);
+                }
+                
+                const paymentInfo: any = await response.json();
+                const status = paymentInfo.status;
+                const orderId = paymentInfo.external_reference;
+                
+                console.log(`[Mercado Pago Webhook Verification] Payment ${paymentId}: Status: ${status}, Order ID: ${orderId}`);
+                
+                if (status === 'approved' && orderId) {
+                    // Confirmar el pedido y disparar integraciones
+                    const confirmation = await confirmOrderAndTriggerIntegrations(orderId);
+                    console.log(`[Mercado Pago Webhook Success] Order ${orderId} confirmed:`, confirmation);
+                }
+            } catch (err) {
+                console.error('[Mercado Pago Webhook Error]', err);
+                return res.status(500).json({ error: 'Webhook processing failed' });
+            }
+        }
+    }
+    
+    // Retornar 200 OK a Mercado Pago
+    res.status(200).send('OK');
+});
+
+// Verify Payment: Consulta el estado del pago en tiempo real al retornar del checkout
+router.get('/verify-payment', async (req, res) => {
+    const { payment_id } = req.query;
+    
+    if (!payment_id) {
+        return res.status(400).json({ error: 'payment_id is required' });
+    }
+    
+    try {
+        const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-4617225674364003-070212-ac94008f892a332dcbb5cd08dfe9a938-3512158955';
+        
+        const response = await fetch(`https://api.mercadopago.com/v1/payments/${payment_id}`, {
+            headers: {
+                'Authorization': `Bearer ${mpAccessToken}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Failed to fetch payment details: ${response.statusText}`);
+        }
+        
+        const paymentInfo: any = await response.json();
+        const status = paymentInfo.status;
+        const orderId = paymentInfo.external_reference;
+        
+        if (status === 'approved' && orderId) {
+            // Confirmar pedido si aún no ha sido confirmado por el webhook
+            const confirmation = await confirmOrderAndTriggerIntegrations(orderId);
+            return res.json({
+                status: 'success',
+                message: 'Payment verified and order confirmed successfully',
+                orderId,
+                paymentStatus: status,
+                boletaNumber: confirmation.boletaNumber,
+                boletaUrl: confirmation.boletaUrl
+            });
+        }
+        
+        res.json({
+            status: 'pending',
+            message: `Payment status is ${status}`,
+            orderId,
+            paymentStatus: status
+        });
+        
+    } catch (err: any) {
+        console.error('[Verify Payment Error]', err);
+        res.status(500).json({ error: 'Payment verification failed', details: err.message });
     }
 });
 
@@ -487,6 +585,86 @@ const simulateOrderLifeCycle = (orderId: string, shippingMethod: string, email: 
         }
     }, 30000);
 };
+
+// Helper function to confirm a pending order and trigger all operational integrations
+export async function confirmOrderAndTriggerIntegrations(orderId: string): Promise<{ success: boolean; boletaNumber?: string | null; boletaUrl?: string | null }> {
+    const pool = getDbPool();
+    
+    // 1. Verificar si la orden ya está confirmada para evitar facturaciones duplicadas
+    const [orderRows]: any = await pool.query('SELECT Status, TotalAmount, UserId, ShippingMethod FROM Orders WHERE Id = ?', [orderId]);
+    if (orderRows.length === 0) {
+        throw new Error(`Order ${orderId} not found`);
+    }
+    
+    const order = orderRows[0];
+    if (order.Status !== 'Pendiente') {
+        console.log(`[Order Confirmation] Order ${orderId} is already in status ${order.Status}. Skipping.`);
+        const [existingRows]: any = await pool.query('SELECT BoletaNumber, BoletaUrl FROM Orders WHERE Id = ?', [orderId]);
+        return { 
+            success: true, 
+            boletaNumber: existingRows.length > 0 ? existingRows[0].BoletaNumber : null,
+            boletaUrl: existingRows.length > 0 ? existingRows[0].BoletaUrl : null
+        };
+    }
+    
+    // 2. Actualizar estado del pedido a 'Nuevo' (confirmado para preparación en WMS)
+    await pool.query("UPDATE Orders SET Status = 'Nuevo' WHERE Id = ?", [orderId]);
+    
+    // 3. Actualizar estado del pago a 'Aprobado'
+    await pool.query("UPDATE Payments SET Status = 'Aprobado' WHERE OrderId = ?", [orderId]);
+    
+    // 4. Cargar ítems para facturar
+    const [itemRows]: any = await pool.query(
+        'SELECT VariantId, Quantity, UnitPrice, Subtotal FROM OrderItems WHERE OrderId = ?',
+        [orderId]
+    );
+    const items = itemRows.map((item: any) => ({
+        variantId: item.VariantId,
+        quantity: item.Quantity,
+        price: item.UnitPrice
+    }));
+    
+    // 5. Disparar Integraciones Críticas
+    let boletaNumber: string | null = null;
+    let boletaUrl: string | null = null;
+    try {
+        // Emitir boleta electrónica en ERP Defontana
+        const defontanaRes = await pushSalesOrderToDefontana(orderId, { totalAmount: order.TotalAmount }, items);
+        if (defontanaRes.success) {
+            boletaNumber = defontanaRes.folio ? String(defontanaRes.folio) : null;
+            boletaUrl = defontanaRes.url || null;
+            await pool.query('UPDATE Orders SET BoletaNumber = ?, BoletaUrl = ? WHERE Id = ?', [boletaNumber, boletaUrl, orderId]);
+            
+            // Imprimir boleta en impresora fiscal física
+            await printFiscalTicket(orderId);
+        }
+    } catch (integrationErr) {
+        console.error('[Confirmation Integrations Error] Defontana/Printer failed:', integrationErr);
+    }
+    
+    // 6. Enviar Notificaciones al Cliente
+    let customerEmail = 'panderey.cl@gmail.com';
+    let customerPhone = '+56912345678';
+    if (order.UserId) {
+        const [userRows]: any = await pool.query('SELECT Email, Phone FROM Users WHERE Id = ?', [order.UserId]);
+        if (userRows.length > 0) {
+            customerEmail = userRows[0].Email;
+            customerPhone = userRows[0].Phone || customerPhone;
+        }
+    }
+    
+    try {
+        await sendStatusEmail(customerEmail, orderId, 'Confirmado (En Preparación)', order.TotalAmount);
+        await sendStatusWhatsApp(customerPhone, orderId, 'Confirmado');
+    } catch (notifErr) {
+        console.error('[Confirmation Notifications Error] Email/WhatsApp failed:', notifErr);
+    }
+    
+    // 7. Iniciar ciclo de vida automático para WMS
+    simulateOrderLifeCycle(orderId, order.ShippingMethod, customerEmail, customerPhone, order.TotalAmount);
+    
+    return { success: true, boletaNumber, boletaUrl };
+}
 
 // Seeder endpoint to populate MySQL database with simulated testing pool
 router.get('/seed', async (req, res) => {

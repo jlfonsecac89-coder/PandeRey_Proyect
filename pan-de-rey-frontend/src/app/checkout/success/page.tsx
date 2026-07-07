@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
-import { CheckCircle2, ShoppingBag, ArrowRight, ShieldCheck, HelpCircle } from 'lucide-react';
+import { CheckCircle2, ShoppingBag, ArrowRight, ShieldCheck, HelpCircle, FileText } from 'lucide-react';
 import { formatPrice } from '@/utils/format';
 
 interface OrderDetails {
@@ -13,32 +13,147 @@ interface OrderDetails {
   paymentMethod: string;
   email: string;
   firstName: string;
+  boletaNumber?: string | null;
+  boletaUrl?: string | null;
 }
 
 function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
   const [orderInfo, setOrderInfo] = useState<OrderDetails | null>(null);
   
-  // Mercado Pago params
+  // Mercado Pago query parameters
   const paymentId = searchParams.get('payment_id');
   const paymentStatus = searchParams.get('status');
   const preferenceId = searchParams.get('preference_id');
 
+  const [verificationStatus, setVerificationStatus] = useState<'loading' | 'success' | 'failed' | 'not_checked'>('not_checked');
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [boletaInfo, setBoletaInfo] = useState<{ number: string | null; url: string | null }>({ number: null, url: null });
+
   useEffect(() => {
-    // Intentar recuperar los detalles del pedido localmente
+    // 1. Recuperar datos del pedido desde localStorage
     const saved = localStorage.getItem('pan_de_rey_last_order');
+    let localOrder: OrderDetails | null = null;
     if (saved) {
       try {
-        setOrderInfo(JSON.parse(saved));
+        localOrder = JSON.parse(saved);
+        setOrderInfo(localOrder);
+        if (localOrder?.boletaNumber) {
+          setBoletaInfo({ number: localOrder.boletaNumber, url: localOrder.boletaUrl || null });
+        }
       } catch (e) {
         console.error(e);
       }
     }
-  }, []);
 
-  const totalAmount = orderInfo?.total || 15000; // fallback para simulación visual
+    // 2. Si viene de Mercado Pago, verificar el pago en el backend en tiempo real (Doble Seguro)
+    if (paymentId) {
+      setVerificationStatus('loading');
+      
+      const checkPayment = async () => {
+        try {
+          const host = window.location.hostname;
+          const backendBase = (host === 'localhost' || host === '127.0.0.1') ? 'http://localhost:3001' : '';
+          
+          const res = await fetch(`${backendBase}/api/orders/verify-payment?payment_id=${paymentId}`);
+          
+          if (!res.ok) {
+            throw new Error('Error al verificar el estado de la transacción');
+          }
+          
+          const data = await res.json();
+          if (data.status === 'success' || data.paymentStatus === 'approved') {
+            setVerificationStatus('success');
+            if (data.boletaNumber) {
+              setBoletaInfo({ number: data.boletaNumber, url: data.boletaUrl });
+              // Guardar la información de boleta obtenida en el localStorage
+              if (localOrder) {
+                localStorage.setItem('pan_de_rey_last_order', JSON.stringify({
+                  ...localOrder,
+                  boletaNumber: data.boletaNumber,
+                  boletaUrl: data.boletaUrl
+                }));
+              }
+            }
+          } else {
+            setVerificationStatus('failed');
+            setVerificationError(`El pago se encuentra en estado: ${data.paymentStatus || 'pendiente o rechazado'}`);
+          }
+        } catch (err: any) {
+          console.warn('[Payment verification fallback]:', err);
+          // Si el servidor local está offline o inalcanzable, hacemos fallback amigable si status es approved
+          if (paymentStatus === 'approved') {
+            setVerificationStatus('success');
+          } else {
+            setVerificationStatus('failed');
+            setVerificationError('No pudimos contactar al servidor para verificar el estado de su pago.');
+          }
+        }
+      };
+      
+      checkPayment();
+    } else {
+      setVerificationStatus('success');
+    }
+  }, [paymentId, paymentStatus]);
+
+  const totalAmount = orderInfo?.total || 15000;
   const orderIdText = orderInfo?.orderId ? orderInfo.orderId.substring(0, 8) : 'PR-829374';
 
+  // Render para estado cargando verificación
+  if (verificationStatus === 'loading') {
+    return (
+      <div className="min-h-screen bg-[#0B0B0B] flex flex-col text-white">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center pt-32 pb-16 px-4">
+          <div className="w-full max-w-md bg-black/45 border border-white/10 rounded-3xl p-10 text-center backdrop-blur-md relative overflow-hidden shadow-2xl">
+            <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-gold/5 blur-[120px] pointer-events-none animate-pulse" />
+            <div className="w-16 h-16 border-4 border-t-gold border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mx-auto mb-6"></div>
+            <h2 className="text-xl font-serif font-bold text-white mb-2">Verificando Pago...</h2>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest">Confirmando con Mercado Pago Pro</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Render para estado de error o pago rechazado
+  if (verificationStatus === 'failed') {
+    return (
+      <div className="min-h-screen bg-[#0B0B0B] flex flex-col text-white">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center pt-32 pb-16 px-4">
+          <div className="w-full max-w-md bg-black/45 border border-white/10 rounded-3xl p-8 md:p-12 text-center backdrop-blur-md relative overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+            <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-red-500/5 blur-[120px] pointer-events-none" />
+            <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center text-red-400 mx-auto mb-6 shadow-[0_0_20px_rgba(239,68,68,0.1)]">
+              <HelpCircle className="w-8 h-8" />
+            </div>
+            <h2 className="text-2xl font-serif font-black text-white italic mb-2">Pago Rechazado o Incompleto</h2>
+            <p className="text-xs text-gray-400 mb-8 leading-relaxed">
+              {verificationError || 'Mercado Pago no ha procesado el pago correctamente. Si el dinero fue descontado de tu cuenta, por favor comunícate directamente con nuestro soporte por WhatsApp.'}
+            </p>
+            <div className="space-y-3">
+              <Link 
+                href="/checkout" 
+                className="block w-full bg-gold hover:bg-gold-hover text-black px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all"
+              >
+                Volver al Checkout
+              </Link>
+              <Link 
+                href="https://wa.me/56912345678" 
+                target="_blank"
+                className="block w-full border border-white/10 hover:border-white/30 text-gray-300 hover:text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all"
+              >
+                Contactar por WhatsApp
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Render para estado exitoso
   return (
     <div className="min-h-screen bg-[#0B0B0B] flex flex-col text-white">
       <Navbar />
@@ -55,7 +170,7 @@ function CheckoutSuccessContent() {
               <CheckCircle2 className="w-10 h-10" />
             </div>
             <h1 className="text-3xl md:text-4xl font-serif font-black tracking-wide text-white italic">
-              {paymentStatus === 'approved' || !paymentStatus ? '¡Pago Confirmado!' : '¡Pedido Registrado!'}
+              {paymentStatus === 'approved' || !paymentId ? '¡Pago Confirmado!' : '¡Pedido Registrado!'}
             </h1>
             <p className="text-gray-400 text-xs uppercase tracking-widest mt-2">
               Pan de Rey • Masa Madre Premium
@@ -79,17 +194,17 @@ function CheckoutSuccessContent() {
               <div>
                 <span className="text-[10px] text-gray-500 uppercase tracking-widest block mb-1">Método de Pago</span>
                 <span className="text-gray-300 font-bold">
-                  {orderInfo?.paymentMethod === 'mercadopago' ? 'Mercado Pago (Crédito/Débito)' : 'Transferencia Electrónica'}
+                  {orderInfo?.paymentMethod === 'mercadopago' ? 'Mercado Pago (Checkout Pro)' : 'Transferencia Electrónica'}
                 </span>
               </div>
               <div>
                 <span className="text-[10px] text-gray-500 uppercase tracking-widest block mb-1">Estado de Transacción</span>
                 <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold mt-0.5 ${
-                  paymentStatus === 'approved' || !paymentStatus 
+                  paymentStatus === 'approved' || !paymentId 
                     ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                     : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
                 }`}>
-                  {paymentStatus === 'approved' || !paymentStatus ? 'Aprobado' : 'Pendiente'}
+                  {paymentStatus === 'approved' || !paymentId ? 'Aprobado' : 'Pendiente'}
                 </span>
               </div>
             </div>
@@ -106,6 +221,24 @@ function CheckoutSuccessContent() {
                     <span className="truncate block max-w-[200px]">{preferenceId}</span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Bloque para descargar la boleta electrónica de Defontana */}
+            {boletaInfo.url && (
+              <div className="pt-4 border-t border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <span className="text-[10px] text-gray-500 uppercase tracking-widest block mb-0.5">Boleta Electrónica (ERP)</span>
+                  <span className="text-xs font-bold text-gray-300 font-mono">Folio: #{boletaInfo.number}</span>
+                </div>
+                <a 
+                  href={boletaInfo.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-full sm:w-auto bg-white/5 hover:bg-white/10 border border-white/15 px-4 py-2 rounded-xl text-xs font-bold text-gold flex items-center justify-center gap-2 transition-all"
+                >
+                  <FileText className="w-4 h-4" /> Ver Boleta Oficial (PDF)
+                </a>
               </div>
             )}
           </div>
