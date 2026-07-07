@@ -102,7 +102,15 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
         alert(data.error || 'No se pudo crear el pedido');
       }
     } catch (err: any) {
-      console.error(err);
+      console.warn('[Checkout Connection Fallback]:', err.message);
+      // Asegurar que la simulación local guarde el pedido en localStorage para la vista de éxito
+      localStorage.setItem('pan_de_rey_last_order', JSON.stringify({
+        orderId: `sim-${Math.random().toString(36).substr(2, 9)}`,
+        total: total,
+        paymentMethod: formData.paymentMethod,
+        email: formData.email,
+        firstName: formData.firstName
+      }));
       alert('Se procederá con la simulación local del pedido.');
       onComplete();
     } finally {
