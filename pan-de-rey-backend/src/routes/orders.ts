@@ -355,9 +355,24 @@ router.post('/webhook', async (req, res) => {
                 console.log(`[Mercado Pago Webhook Verification] Payment ${paymentId}: Status: ${status}, Order ID: ${orderId}`);
                 
                 if (status === 'approved' && orderId) {
-                    // Confirmar el pedido y disparar integraciones
-                    const confirmation = await confirmOrderAndTriggerIntegrations(orderId);
-                    console.log(`[Mercado Pago Webhook Success] Order ${orderId} confirmed:`, confirmation);
+                    const pool = getDbPool();
+                    const [orderRows]: any = await pool.query('SELECT TotalAmount FROM Orders WHERE Id = ?', [orderId]);
+                    if (orderRows.length > 0) {
+                        const dbTotal = parseFloat(orderRows[0].TotalAmount);
+                        const mpTotal = parseFloat(paymentInfo.transaction_amount);
+                        
+                        // Protección contra Parameter Tampering
+                        if (Math.abs(dbTotal - mpTotal) > 0.01) {
+                            console.error(`[SECURITY ALERT] Payment amount mismatch for Order ${orderId}. DB: ${dbTotal}, MP: ${mpTotal}`);
+                            return res.status(400).send('Payment amount mismatch');
+                        }
+                        
+                        // Confirmar el pedido y disparar integraciones
+                        const confirmation = await confirmOrderAndTriggerIntegrations(orderId);
+                        console.log(`[Mercado Pago Webhook Success] Order ${orderId} confirmed:`, confirmation);
+                    } else {
+                        console.error(`[Webhook error] Order ${orderId} not found in database`);
+                    }
                 }
             } catch (err) {
                 console.error('[Mercado Pago Webhook Error]', err);
@@ -396,16 +411,31 @@ router.get('/verify-payment', async (req, res) => {
         const orderId = paymentInfo.external_reference;
         
         if (status === 'approved' && orderId) {
-            // Confirmar pedido si aún no ha sido confirmado por el webhook
-            const confirmation = await confirmOrderAndTriggerIntegrations(orderId);
-            return res.json({
-                status: 'success',
-                message: 'Payment verified and order confirmed successfully',
-                orderId,
-                paymentStatus: status,
-                boletaNumber: confirmation.boletaNumber,
-                boletaUrl: confirmation.boletaUrl
-            });
+            const pool = getDbPool();
+            const [orderRows]: any = await pool.query('SELECT TotalAmount FROM Orders WHERE Id = ?', [orderId]);
+            if (orderRows.length > 0) {
+                const dbTotal = parseFloat(orderRows[0].TotalAmount);
+                const mpTotal = parseFloat(paymentInfo.transaction_amount);
+                
+                // Protección contra Parameter Tampering
+                if (Math.abs(dbTotal - mpTotal) > 0.01) {
+                    console.error(`[SECURITY ALERT] Payment verification amount mismatch for Order ${orderId}. DB: ${dbTotal}, MP: ${mpTotal}`);
+                    return res.status(400).json({ error: 'Security Exception: Payment amount mismatch' });
+                }
+                
+                // Confirmar pedido si aún no ha sido confirmado por el webhook
+                const confirmation = await confirmOrderAndTriggerIntegrations(orderId);
+                return res.json({
+                    status: 'success',
+                    message: 'Payment verified and order confirmed successfully',
+                    orderId,
+                    paymentStatus: status,
+                    boletaNumber: confirmation.boletaNumber,
+                    boletaUrl: confirmation.boletaUrl
+                });
+            } else {
+                return res.status(404).json({ error: 'Order not found' });
+            }
         }
         
         res.json({
