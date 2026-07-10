@@ -4,20 +4,11 @@ import { useState } from 'react';
 import { useCart } from '@/context/CartContext';
 import { Check, Mail, Lock, User, Calendar, FileText, Smartphone } from 'lucide-react';
 import { formatPrice } from '@/utils/format';
+import { getApiUrl } from '@/utils/api';
 import TermsAndConditions from './TermsAndConditions';
 import GoogleAuthModal from '../profile/GoogleAuthModal';
 
 type AuthMode = 'selection' | 'guest' | 'login' | 'register';
-
-const getApiUrl = (path: string) => {
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') {
-      return `http://localhost:3001${path}`;
-    }
-  }
-  return path;
-};
 
 export default function CheckoutForm({ onComplete }: { onComplete: () => void }) {
   const { items, total } = useCart();

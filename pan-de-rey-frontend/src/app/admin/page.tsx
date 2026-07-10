@@ -5,16 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { DollarSign, Package, ShoppingBag, AlertTriangle, AlertCircle, XCircle, Ban, Store, Truck } from 'lucide-react';
 import { seedLocalDb, getLocalAnalytics, getLocalOrders } from '@/utils/dbSim';
 import { formatPrice } from '@/utils/format';
-
-const getApiUrl = (path: string) => {
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') {
-      return `http://localhost:3001${path}`;
-    }
-  }
-  return path;
-};
+import { getApiUrl } from '@/utils/api';
 
 // Tipos
 type TimeFilter = '1h' | '4h' | '1d' | '7d' | '15d' | '30d';

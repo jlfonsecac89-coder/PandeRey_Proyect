@@ -27,6 +27,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { formatPrice } from '@/utils/format';
+import { getApiUrl } from '@/utils/api';
 import { 
   getLocalOrders, 
   updateLocalOrderStatus, 
@@ -85,15 +86,7 @@ const productVariantsCatalog = [
   { id: 'var-prod-1-semillas', name: 'Pan de Masa Madre Clásico (Con Semillas)', price: 6500 }
 ];
 
-const getApiUrl = (path: string) => {
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') {
-      return `http://localhost:3001${path}`;
-    }
-  }
-  return path;
-};
+
 
 // Componente del Cronómetro del SLA para la grilla Kanban
 function SlaTimer({ startedAt, pausedAt, pausedTime, status }: { startedAt?: string | null, pausedAt?: string | null, pausedTime?: number, status: string }) {
