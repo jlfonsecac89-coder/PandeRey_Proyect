@@ -1,13 +1,10 @@
 import { Pool, PoolClient } from 'pg';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 // Configuration mapped to environment variables
 export const dbConfig = {
     host: process.env.DB_HOST || 'db.cxhjthmgkzqpldkkdqkv.supabase.co',
     user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || '01l93pDapK', // user can modify this in their local .env
+    password: process.env.DB_PASSWORD || '01l93pDapK',
     database: process.env.DB_NAME || 'postgres',
     port: parseInt(process.env.DB_PORT || '5432'),
     ssl: {
@@ -197,7 +194,7 @@ export const getDbPool = (): any => {
             });
             
             poolWrapper = new PgPoolWrapper(pgPool);
-            console.log('[Postgres Pool] Initialized successfully for Supabase.');
+            console.log('[Frontend Postgres Pool] Initialized successfully.');
         } catch (err) {
             console.error('Postgres pool creation failed:', err);
             throw err;
