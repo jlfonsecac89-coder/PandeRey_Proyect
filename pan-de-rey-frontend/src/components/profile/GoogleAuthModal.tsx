@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Shield, ArrowLeft, Info } from 'lucide-react';
+import { Shield } from 'lucide-react';
 
 interface GoogleAuthModalProps {
   isOpen: boolean;
@@ -10,11 +10,8 @@ interface GoogleAuthModalProps {
 }
 
 export default function GoogleAuthModal({ isOpen, onClose, onSuccess }: GoogleAuthModalProps) {
-  const [step, setStep] = useState<'select' | 'custom' | 'loading'>('select');
+  const [step, setStep] = useState<'select' | 'loading'>('select');
   const [loadingUser, setLoadingUser] = useState<string>('');
-  
-  const [customName, setCustomName] = useState('');
-  const [customEmail, setCustomEmail] = useState('');
   const [gsiLoaded, setGsiLoaded] = useState(false);
 
   // Poll for google script load
@@ -53,7 +50,11 @@ export default function GoogleAuthModal({ isOpen, onClose, onSuccess }: GoogleAu
       return;
     }
 
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "438905202863-placeholder.apps.googleusercontent.com";
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      alert('Error: No se ha configurado el Google Client ID en las variables de entorno.');
+      return;
+    }
     
     try {
       const client = google.accounts.oauth2.initTokenClient({
@@ -76,7 +77,7 @@ export default function GoogleAuthModal({ isOpen, onClose, onSuccess }: GoogleAu
                     firstName: payload.given_name || payload.name?.split(' ')[0] || 'Google',
                     lastName: payload.family_name || payload.name?.split(' ')[1] || 'User',
                     picture: payload.picture,
-                    phone: '+56 9 8273 6451'
+                    phone: ''
                   });
                   onClose();
                   setStep('select');
@@ -95,52 +96,6 @@ export default function GoogleAuthModal({ isOpen, onClose, onSuccess }: GoogleAu
       console.error('Error initializing initTokenClient', e);
       alert('Error al iniciar el flujo de Google Login. Verifica tu Client ID.');
     }
-  };
-
-  const mockAccounts = [
-    { name: 'Jose Luis Fonseca', email: 'jlfonsecac89@gmail.com', firstName: 'Jose Luis', lastName: 'Fonseca', phone: '+56 9 8765 4321', color: 'bg-blue-600' },
-    { name: 'Sofía Andrade', email: 'sofia.andrade@gmail.com', firstName: 'Sofía', lastName: 'Andrade', phone: '+56 9 9382 1273', color: 'bg-indigo-600' }
-  ];
-
-  const handleSelectMockAccount = (account: typeof mockAccounts[0]) => {
-    setLoadingUser(account.name);
-    setStep('loading');
-    
-    setTimeout(() => {
-      onSuccess({
-        name: account.name,
-        email: account.email,
-        firstName: account.firstName,
-        lastName: account.lastName,
-        phone: account.phone
-      });
-      onClose();
-      setStep('select');
-    }, 1500);
-  };
-
-  const handleCustomSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customName || !customEmail) return;
-
-    setLoadingUser(customName);
-    setStep('loading');
-
-    const nameParts = customName.trim().split(' ');
-    const firstName = nameParts[0] || 'Usuario';
-    const lastName = nameParts.slice(1).join(' ') || 'Google';
-
-    setTimeout(() => {
-      onSuccess({
-        name: customName,
-        email: customEmail,
-        firstName,
-        lastName,
-        phone: '+56 9 5555 5555'
-      });
-      onClose();
-      setStep('select');
-    }, 1500);
   };
 
   return (
@@ -163,7 +118,7 @@ export default function GoogleAuthModal({ isOpen, onClose, onSuccess }: GoogleAu
         {step === 'select' && (
           <div className="space-y-5 animate-in fade-in">
             {/* Real Google Button Container */}
-            <div className="flex flex-col items-center justify-center space-y-3 py-4 bg-white/[0.01] border border-white/5 rounded-xl p-4">
+            <div className="flex flex-col items-center justify-center space-y-3 py-6 bg-white/[0.01] border border-white/5 rounded-xl p-4">
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Acceso Oficial con Cuenta de Google</span>
               
               <div className="w-full flex justify-center py-2">
@@ -181,52 +136,9 @@ export default function GoogleAuthModal({ isOpen, onClose, onSuccess }: GoogleAu
                 )}
               </div>
               
-              <p className="text-[9px] text-gray-500 text-center leading-normal max-w-xs font-sans">
-                Al hacer clic se levantará la ventana oficial de Google. Requiere registrar tu Client ID real en <code>.env.local</code>.
+              <p className="text-[10px] text-gray-500 text-center leading-normal max-w-xs font-sans">
+                Al hacer clic se abrirá la ventana oficial de inicio de sesión de Google.
               </p>
-            </div>
-
-            {/* Separator */}
-            <div className="relative py-2">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
-              <div className="relative flex justify-center text-[9px]"><span className="bg-[#1c1c1c] px-3 text-gray-500 uppercase tracking-widest font-bold">O usa la Simulación Local</span></div>
-            </div>
-
-            {/* Mock simulator fallback */}
-            <div className="space-y-2.5">
-              <div className="p-3 bg-yellow-500/5 border border-yellow-500/10 rounded-lg flex gap-2 items-start text-left">
-                <Info className="w-4 h-4 text-yellow-500/80 shrink-0 mt-0.5" />
-                <p className="text-[10px] text-gray-400 leading-normal font-sans">
-                  <strong>¿Probando sin Client ID?</strong> Usa estas cuentas sembradas para validar la captura de datos y el flujo de fidelización al instante:
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {mockAccounts.map((account) => (
-                  <button
-                    key={account.email}
-                    type="button"
-                    onClick={() => handleSelectMockAccount(account)}
-                    className="bg-white/[0.02] border border-white/5 hover:border-gold/30 hover:bg-white/[0.04] p-2.5 rounded-lg flex items-center gap-2.5 text-left transition-all group cursor-pointer"
-                  >
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-white text-xs ${account.color}`}>
-                      {account.firstName[0]}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-bold text-white group-hover:text-gold transition-colors truncate">{account.name}</p>
-                      <p className="text-[8px] text-gray-500 truncate">{account.email}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setStep('custom')}
-                className="w-full border border-white/10 hover:bg-white/5 text-gray-300 py-2.5 rounded-xl text-[9px] font-bold uppercase tracking-widest text-center cursor-pointer transition-colors"
-              >
-                Simular con otra cuenta
-              </button>
             </div>
 
             <div className="flex justify-center pt-2 border-t border-white/5">
@@ -239,61 +151,6 @@ export default function GoogleAuthModal({ isOpen, onClose, onSuccess }: GoogleAu
               </button>
             </div>
           </div>
-        )}
-
-        {/* Step: CUSTOM ACCOUNT */}
-        {step === 'custom' && (
-          <form onSubmit={handleCustomSubmit} className="space-y-4">
-            <button
-              type="button"
-              onClick={() => setStep('select')}
-              className="flex items-center gap-1 text-[9px] text-gray-500 hover:text-white uppercase tracking-wider font-bold mb-2 cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" /> Volver a selección
-            </button>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-[9px] uppercase tracking-wider text-gray-500 font-bold block mb-1">Nombre Completo</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej: Laura Silva"
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  className="w-full bg-[#161616] border border-white/10 p-3 rounded-xl text-xs text-white focus:border-gold outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-[9px] uppercase tracking-wider text-gray-500 font-bold block mb-1">Correo Electrónico de Google</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="Ej: laura.silva@gmail.com"
-                  value={customEmail}
-                  onChange={(e) => setCustomEmail(e.target.value)}
-                  className="w-full bg-[#161616] border border-white/10 p-3 rounded-xl text-xs text-white focus:border-gold outline-none"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-gold hover:bg-gold-hover text-black py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest text-center cursor-pointer transition-all mt-4"
-            >
-              Simular inicio de sesión
-            </button>
-
-            <div className="flex justify-center pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-[10px] uppercase font-bold tracking-widest text-gray-500 hover:text-white transition-colors cursor-pointer"
-              >
-                Cancelar
-              </button>
-            </div>
-          </form>
         )}
 
         {/* Step: LOADING CONNECTION */}
