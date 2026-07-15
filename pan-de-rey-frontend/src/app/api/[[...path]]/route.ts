@@ -122,19 +122,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     try {
         // 0. GET /api/test-db
         if (routeStr === 'test-db') {
+            const dbEnvKeys = Object.keys(process.env).filter(k => 
+                k.startsWith('DB_') || k.startsWith('POSTGRES_') || k.startsWith('DATABASE_')
+            );
             try {
                 const [rows]: any = await pool.query('SELECT 1 + 1 as val');
                 return NextResponse.json({ 
                     status: 'success', 
                     message: 'Database connected successfully', 
-                    val: rows[0]?.val || rows[0]?.Val 
+                    val: rows[0]?.val || rows[0]?.Val,
+                    detectedEnvVars: dbEnvKeys
                 });
             } catch (err: any) {
                 return NextResponse.json({ 
                     status: 'error', 
                     message: 'Database connection failed', 
                     error: err.message,
-                    code: err.code
+                    code: err.code,
+                    detectedEnvVars: dbEnvKeys
                 }, { status: 500 });
             }
         }
