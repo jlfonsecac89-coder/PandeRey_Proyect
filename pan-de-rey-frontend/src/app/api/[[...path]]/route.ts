@@ -415,211 +415,216 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         // 3. POST /api/orders/checkout
         if (routeStr === 'orders/checkout') {
-            const { userId, items, shippingMethod, paymentMethod, notes, email, firstName, lastName, phone, addressId, couponId, pickupTime } = body;
-            if (!items || items.length === 0 || !shippingMethod) {
-                return NextResponse.json({ error: 'Missing checkout fields' }, { status: 400 });
-            }
-
-            const orderId = crypto.randomUUID();
-            const paymentId = crypto.randomUUID();
-            let subtotal = 0;
-            const itemInserts: any[] = [];
-
-            for (const item of items) {
-                const [variantRows]: any = await pool.query(
-                    'SELECT PriceAdjustment, BasePrice FROM ProductVariants pv JOIN Products p ON pv.ProductId = p.Id WHERE pv.Id = ?',
-                    [item.variantId]
-                );
-                if (variantRows.length === 0) {
-                    return NextResponse.json({ error: `Variant ${item.variantId} not found` }, { status: 404 });
-                }
-                const price = parseFloat(variantRows[0].BasePrice) + parseFloat(variantRows[0].PriceAdjustment);
-                const qty = parseInt(item.quantity);
-                const itemSubtotal = price * qty;
-                subtotal += itemSubtotal;
-                itemInserts.push([
-                    crypto.randomUUID(),
-                    orderId,
-                    item.variantId,
-                    qty,
-                    price,
-                    itemSubtotal
-                ]);
-            }
-
-            const shippingCost = shippingMethod === 'Delivery' ? 3500 : 0;
-            const totalAmount = subtotal + shippingCost;
-
-            let finalUserId = userId;
-            let customerEmail = email || 'panderey.cl@gmail.com';
-            let customerPhone = phone || '+56912345678';
-            let customerFirstName = firstName || 'Cliente';
-            let customerLastName = lastName || 'Invitado';
-
-            if (!finalUserId && email) {
-                const [userRows]: any = await pool.query('SELECT Id, Email, Phone, FirstName, LastName FROM Users WHERE Email = ?', [email]);
-                if (userRows.length > 0) {
-                    finalUserId = userRows[0].Id;
-                    customerPhone = userRows[0].Phone || customerPhone;
-                    customerFirstName = userRows[0].FirstName;
-                    customerLastName = userRows[0].LastName;
-                } else {
-                    finalUserId = crypto.randomUUID();
-                    await pool.query(
-                        'INSERT INTO Users (Id, Email, FirstName, LastName, Phone) VALUES (?, ?, ?, ?, ?)',
-                        [finalUserId, email, customerFirstName, customerLastName, customerPhone]
-                    );
-                    const [roleRows]: any = await pool.query("SELECT Id FROM Roles WHERE Name = 'Cliente'");
-                    if (roleRows.length > 0) {
-                        await pool.query('INSERT INTO UserRoles (UserId, RoleId) VALUES (?, ?)', [finalUserId, roleRows[0].Id]);
-                    }
-                }
-            } else if (finalUserId) {
-                const [userRows]: any = await pool.query('SELECT Email, Phone, FirstName, LastName FROM Users WHERE Id = ?', [finalUserId]);
-                if (userRows.length > 0) {
-                    customerEmail = userRows[0].Email;
-                    customerPhone = userRows[0].Phone || customerPhone;
-                    customerFirstName = userRows[0].FirstName;
-                    customerLastName = userRows[0].LastName;
-                }
-            }
-
-            const connection = await pool.getConnection();
-            await connection.beginTransaction();
-
             try {
-                let initPoint = null;
-                let paymentStatus = 'Aprobado';
-                let gatewayToken = crypto.randomBytes(16).toString('hex');
-                let finalPaymentMethod = paymentMethod || 'Webpay';
+                const { userId, items, shippingMethod, paymentMethod, notes, email, firstName, lastName, phone, addressId, couponId, pickupTime } = body;
+                if (!items || items.length === 0 || !shippingMethod) {
+                    return NextResponse.json({ error: 'Missing checkout fields' }, { status: 400 });
+                }
 
-                if (finalPaymentMethod && finalPaymentMethod.toLowerCase() === 'mercadopago') {
-                    try {
-                        const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-4617225674364003-070212-ac94008f892a332dcbb5cd08dfe9a938-3512158955';
-                        const client = new MercadoPagoConfig({ accessToken: mpAccessToken });
-                        const preference = new Preference(client);
+                const orderId = crypto.randomUUID();
+                const paymentId = crypto.randomUUID();
+                let subtotal = 0;
+                const itemInserts: any[] = [];
 
-                        const frontendUrl = process.env.FRONTEND_URL || `https://${request.headers.get('host')}` || 'http://localhost:3000';
-                        
-                        const mpItems = items.map((item: any) => {
-                            const unitPrice = item.price || (totalAmount / items.length);
-                            return {
-                                title: item.name || 'Producto Pan de Rey',
-                                quantity: parseInt(item.quantity) || 1,
-                                unit_price: Math.round(parseFloat(unitPrice)),
-                                currency_id: 'CLP'
-                            };
-                        });
+                for (const item of items) {
+                    const [variantRows]: any = await pool.query(
+                        'SELECT PriceAdjustment, BasePrice FROM ProductVariants pv JOIN Products p ON pv.ProductId = p.Id WHERE pv.Id = ?',
+                        [item.variantId]
+                    );
+                    if (variantRows.length === 0) {
+                        return NextResponse.json({ error: `Variant ${item.variantId} not found` }, { status: 404 });
+                    }
+                    const price = parseFloat(variantRows[0].BasePrice) + parseFloat(variantRows[0].PriceAdjustment);
+                    const qty = parseInt(item.quantity);
+                    const itemSubtotal = price * qty;
+                    subtotal += itemSubtotal;
+                    itemInserts.push([
+                        crypto.randomUUID(),
+                        orderId,
+                        item.variantId,
+                        qty,
+                        price,
+                        itemSubtotal
+                    ]);
+                }
 
-                        if (shippingCost > 0) {
-                            mpItems.push({
-                                title: 'Costo de Despacho',
-                                quantity: 1,
-                                unit_price: shippingCost,
-                                currency_id: 'CLP'
-                            });
+                const shippingCost = shippingMethod === 'Delivery' ? 3500 : 0;
+                const totalAmount = subtotal + shippingCost;
+
+                let finalUserId = userId;
+                let customerEmail = email || 'panderey.cl@gmail.com';
+                let customerPhone = phone || '+56912345678';
+                let customerFirstName = firstName || 'Cliente';
+                let customerLastName = lastName || 'Invitado';
+
+                if (!finalUserId && email) {
+                    const [userRows]: any = await pool.query('SELECT Id, Email, Phone, FirstName, LastName FROM Users WHERE Email = ?', [email]);
+                    if (userRows.length > 0) {
+                        finalUserId = userRows[0].Id;
+                        customerPhone = userRows[0].Phone || customerPhone;
+                        customerFirstName = userRows[0].FirstName;
+                        customerLastName = userRows[0].LastName;
+                    } else {
+                        finalUserId = crypto.randomUUID();
+                        await pool.query(
+                            'INSERT INTO Users (Id, Email, FirstName, LastName, Phone) VALUES (?, ?, ?, ?, ?)',
+                            [finalUserId, email, customerFirstName, customerLastName, customerPhone]
+                        );
+                        const [roleRows]: any = await pool.query("SELECT Id FROM Roles WHERE Name = 'Cliente'");
+                        if (roleRows.length > 0) {
+                            await pool.query('INSERT INTO UserRoles (UserId, RoleId) VALUES (?, ?)', [finalUserId, roleRows[0].Id]);
                         }
-
-                        // Notification URL: Webhook address for Mercado Pago to POST notifications
-                        const notificationUrl = `${frontendUrl}/api/orders/webhook`;
-
-                        const response = await preference.create({
-                            body: {
-                                items: mpItems,
-                                payer: {
-                                    email: customerEmail,
-                                    name: customerFirstName,
-                                    surname: customerLastName
-                                },
-                                back_urls: {
-                                    success: `${frontendUrl}/checkout/success`,
-                                    failure: `${frontendUrl}/checkout/success?status=failure`,
-                                    pending: `${frontendUrl}/checkout/success?status=pending`
-                                },
-                                auto_return: 'approved',
-                                external_reference: orderId,
-                                notification_url: notificationUrl
-                            }
-                        });
-
-                        const isSandbox = process.env.MERCADOPAGO_SANDBOX !== 'false';
-                        initPoint = isSandbox ? response.sandbox_init_point : response.init_point;
-                        gatewayToken = response.id || '';
-                        paymentStatus = 'Pendiente';
-                    } catch (mpErr: any) {
-                        console.error('Error generando preferencia de Mercado Pago:', mpErr);
-                        if (mpErr.response) {
-                            console.error('Mercado Pago API Response Error Status:', mpErr.response.status);
-                            console.error('Mercado Pago API Response Error Body:', JSON.stringify(mpErr.response.body || mpErr.response.data || mpErr.response));
-                        }
-
-                        const isDev = process.env.NODE_ENV === 'development';
-                        const allowSim = process.env.ENABLE_LOCAL_CHECKOUT_SIMULATION === 'true';
-
-                        if (isDev && allowSim) {
-                            paymentStatus = 'Aprobado';
-                            finalPaymentMethod = 'Simulado Fallback';
-                            console.log('[Checkout Fallback]: Falling back to Local Simulation because we are in development and simulation is enabled.');
-                        } else {
-                            throw new Error('No pudimos conectar con Mercado Pago, intenta de nuevo.');
-                        }
+                    }
+                } else if (finalUserId) {
+                    const [userRows]: any = await pool.query('SELECT Email, Phone, FirstName, LastName FROM Users WHERE Id = ?', [finalUserId]);
+                    if (userRows.length > 0) {
+                        customerEmail = userRows[0].Email;
+                        customerPhone = userRows[0].Phone || customerPhone;
+                        customerFirstName = userRows[0].FirstName;
+                        customerLastName = userRows[0].LastName;
                     }
                 }
 
-                await connection.query(
-                    `INSERT INTO Orders (Id, UserId, AddressId, CouponId, TotalAmount, Status, ShippingMethod, PickupTime, ShippingCost, Notes) 
-                     VALUES (?, ?, ?, ?, ?, 'Pendiente', ?, ?, ?, ?)`,
-                    [orderId, finalUserId || null, addressId || null, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null]
-                );
+                const connection = await pool.getConnection();
+                await connection.beginTransaction();
 
-                for (const row of itemInserts) {
+                try {
+                    let initPoint = null;
+                    let paymentStatus = 'Aprobado';
+                    let gatewayToken = crypto.randomBytes(16).toString('hex');
+                    let finalPaymentMethod = paymentMethod || 'Webpay';
+
+                    if (finalPaymentMethod && finalPaymentMethod.toLowerCase() === 'mercadopago') {
+                        try {
+                            const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-4617225674364003-070212-ac94008f892a332dcbb5cd08dfe9a938-3512158955';
+                            const client = new MercadoPagoConfig({ accessToken: mpAccessToken });
+                            const preference = new Preference(client);
+
+                            const frontendUrl = process.env.FRONTEND_URL || `https://${request.headers.get('host')}` || 'http://localhost:3000';
+                            
+                            const mpItems = items.map((item: any) => {
+                                const unitPrice = item.price || (totalAmount / items.length);
+                                return {
+                                    title: item.name || 'Producto Pan de Rey',
+                                    quantity: parseInt(item.quantity) || 1,
+                                    unit_price: Math.round(parseFloat(unitPrice)),
+                                    currency_id: 'CLP'
+                                };
+                            });
+
+                            if (shippingCost > 0) {
+                                mpItems.push({
+                                    title: 'Costo de Despacho',
+                                    quantity: 1,
+                                    unit_price: shippingCost,
+                                    currency_id: 'CLP'
+                                });
+                            }
+
+                            // Notification URL: Webhook address for Mercado Pago to POST notifications
+                            const notificationUrl = `${frontendUrl}/api/orders/webhook`;
+
+                            const response = await preference.create({
+                                body: {
+                                    items: mpItems,
+                                    payer: {
+                                        email: customerEmail,
+                                        name: customerFirstName,
+                                        surname: customerLastName
+                                    },
+                                    back_urls: {
+                                        success: `${frontendUrl}/checkout/success`,
+                                        failure: `${frontendUrl}/checkout/success?status=failure`,
+                                        pending: `${frontendUrl}/checkout/success?status=pending`
+                                    },
+                                    auto_return: 'approved',
+                                    external_reference: orderId,
+                                    notification_url: notificationUrl
+                                }
+                            });
+
+                            const isSandbox = process.env.MERCADOPAGO_SANDBOX !== 'false';
+                            initPoint = isSandbox ? response.sandbox_init_point : response.init_point;
+                            gatewayToken = response.id || '';
+                            paymentStatus = 'Pendiente';
+                        } catch (mpErr: any) {
+                            console.error('Error generando preferencia de Mercado Pago:', mpErr);
+                            if (mpErr.response) {
+                                console.error('Mercado Pago API Response Error Status:', mpErr.response.status);
+                                console.error('Mercado Pago API Response Error Body:', JSON.stringify(mpErr.response.body || mpErr.response.data || mpErr.response));
+                            }
+
+                            const isDev = process.env.NODE_ENV === 'development';
+                            const allowSim = process.env.ENABLE_LOCAL_CHECKOUT_SIMULATION === 'true';
+
+                            if (isDev && allowSim) {
+                                paymentStatus = 'Aprobado';
+                                finalPaymentMethod = 'Simulado Fallback';
+                                console.log('[Checkout Fallback]: Falling back to Local Simulation because we are in development and simulation is enabled.');
+                            } else {
+                                throw new Error('No pudimos conectar con Mercado Pago, intenta de nuevo.');
+                            }
+                        }
+                    }
+
                     await connection.query(
-                        'INSERT INTO OrderItems (Id, OrderId, VariantId, Quantity, UnitPrice, Subtotal) VALUES (?, ?, ?, ?, ?, ?)',
-                        row
+                        `INSERT INTO Orders (Id, UserId, AddressId, CouponId, TotalAmount, Status, ShippingMethod, PickupTime, ShippingCost, Notes) 
+                         VALUES (?, ?, ?, ?, ?, 'Pendiente', ?, ?, ?, ?)`,
+                        [orderId, finalUserId || null, addressId || null, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null]
                     );
+
+                    for (const row of itemInserts) {
+                        await connection.query(
+                            'INSERT INTO OrderItems (Id, OrderId, VariantId, Quantity, UnitPrice, Subtotal) VALUES (?, ?, ?, ?, ?, ?)',
+                            row
+                        );
+                        await connection.query(
+                            'UPDATE Inventory SET Quantity = Quantity - ? WHERE VariantId = ?',
+                            [row[3], row[2]]
+                        );
+                        await connection.query(
+                            'INSERT INTO InventoryMovements (Id, VariantId, QuantityChange, MovementType, ReferenceId) VALUES (gen_random_uuid(), ?, ?, \'Venta\', ?)',
+                            [row[2], -row[3], orderId]
+                        );
+                    }
+
                     await connection.query(
-                        'UPDATE Inventory SET Quantity = Quantity - ? WHERE VariantId = ?',
-                        [row[3], row[2]]
+                        `INSERT INTO Payments (Id, OrderId, Amount, PaymentMethod, Status, TransactionId) 
+                         VALUES (?, ?, ?, ?, ?, ?)`,
+                        [paymentId, orderId, totalAmount, finalPaymentMethod, paymentStatus, gatewayToken]
                     );
-                    await connection.query(
-                        'INSERT INTO InventoryMovements (Id, VariantId, QuantityChange, MovementType, ReferenceId) VALUES (gen_random_uuid(), ?, ?, \'Venta\', ?)',
-                        [row[2], -row[3], orderId]
-                    );
+
+                    await connection.commit();
+                    connection.release();
+
+                    if (finalPaymentMethod.toLowerCase() === 'mercadopago') {
+                        return NextResponse.json({ 
+                            status: 'success', 
+                            message: 'Order created, redirecting to payment gateway', 
+                            orderId,
+                            initPoint,
+                            boletaNumber: null,
+                            boletaUrl: null
+                        });
+                    } else {
+                        const confirmation = await confirmOrderAndTriggerIntegrations(orderId);
+                        return NextResponse.json({ 
+                            status: 'success', 
+                            message: 'Order checked out and settled successfully', 
+                            orderId,
+                            initPoint: null,
+                            boletaNumber: confirmation.boletaNumber,
+                            boletaUrl: confirmation.boletaUrl
+                        });
+                    }
+                } catch (err: any) {
+                    await connection.rollback();
+                    connection.release();
+                    return NextResponse.json({ error: err.message || 'Error al procesar el pedido en el servidor' }, { status: 500 });
                 }
-
-                await connection.query(
-                    `INSERT INTO Payments (Id, OrderId, Amount, PaymentMethod, Status, TransactionId) 
-                     VALUES (?, ?, ?, ?, ?, ?)`,
-                    [paymentId, orderId, totalAmount, finalPaymentMethod, paymentStatus, gatewayToken]
-                );
-
-                await connection.commit();
-                connection.release();
-
-                if (finalPaymentMethod.toLowerCase() === 'mercadopago') {
-                    return NextResponse.json({ 
-                        status: 'success', 
-                        message: 'Order created, redirecting to payment gateway', 
-                        orderId,
-                        initPoint,
-                        boletaNumber: null,
-                        boletaUrl: null
-                    });
-                } else {
-                    const confirmation = await confirmOrderAndTriggerIntegrations(orderId);
-                    return NextResponse.json({ 
-                        status: 'success', 
-                        message: 'Order checked out and settled successfully', 
-                        orderId,
-                        initPoint: null,
-                        boletaNumber: confirmation.boletaNumber,
-                        boletaUrl: confirmation.boletaUrl
-                    });
-                }
-            } catch (err: any) {
-                await connection.rollback();
-                connection.release();
-                return NextResponse.json({ error: err.message || 'Error al procesar el pedido en el servidor' }, { status: 500 });
+            } catch (outerErr: any) {
+                console.error('[API POST orders/checkout Error]:', outerErr);
+                return NextResponse.json({ error: outerErr.message || 'Error de conexión con la base de datos' }, { status: 500 });
             }
         }
 
