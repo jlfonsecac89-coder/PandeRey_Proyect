@@ -49,7 +49,7 @@ export function mysqlToPostgresQuery(sql: string): string {
     
     // Convert MySQL functions to Postgres equivalents
     formattedSql = formattedSql
-        .replace(/UUID\(\)/gi, 'gen_random_uuid()')
+        .replace(/\bUUID\(\)/gi, 'gen_random_uuid()')
         .replace(/DATE_SUB\(NOW\(\),\s*INTERVAL\s+(\$?[\d]+|\?)\s+DAY\)/gi, "NOW() - ($1 * INTERVAL '1 day')")
         .replace(/ON\s+DUPLICATE\s+KEY\s+UPDATE/gi, 'ON CONFLICT DO UPDATE');
 
