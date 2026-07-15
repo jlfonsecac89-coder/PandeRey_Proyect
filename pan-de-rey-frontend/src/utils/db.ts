@@ -194,6 +194,10 @@ export const getDbPool = (): any => {
             });
             
             poolWrapper = new PgPoolWrapper(pgPool);
+            // Drop profiles_id_fkey constraint to allow guest checkouts (leads)
+            pgPool.query('ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey CASCADE;').catch(err => {
+                console.warn('[Database Setup WARNING]: Could not drop profiles_id_fkey constraint:', err.message);
+            });
             console.log('[Frontend Postgres Pool] Initialized successfully.');
         } catch (err) {
             console.error('Postgres pool creation failed:', err);

@@ -441,7 +441,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 } else {
                     finalUserId = crypto.randomUUID();
                     await pool.query(
-                        'INSERT INTO Users (Id, Email, PasswordHash, FirstName, LastName, Phone) VALUES (?, ?, NULL, ?, ?, ?)',
+                        'INSERT INTO Users (Id, Email, FirstName, LastName, Phone) VALUES (?, ?, ?, ?, ?)',
                         [finalUserId, email, customerFirstName, customerLastName, customerPhone]
                     );
                     const [roleRows]: any = await pool.query("SELECT Id FROM Roles WHERE Name = 'Cliente'");
