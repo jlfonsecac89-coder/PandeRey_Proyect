@@ -101,6 +101,7 @@ export function mysqlToPostgresQuery(sql: string): string {
         .replace(/CouponId/g, 'coupon_id')
         .replace(/ProductId/g, 'product_id')
         .replace(/CategoryId/g, 'category_id')
+        .replace(/RoleId/g, 'role_id')
         .replace(/TotalAmount/g, 'total_amount')
         .replace(/ShippingMethod/g, 'shipping_method')
         .replace(/PickupTime/g, 'pickup_time')
@@ -125,6 +126,54 @@ export function mysqlToPostgresQuery(sql: string): string {
     return formattedSql;
 }
 
+// Convert lowercase/snake_case database keys to PascalCase for compatibility with original code
+function mapRowKeys(row: any): any {
+    if (!row || typeof row !== 'object') return row;
+    const mapped: any = {};
+    for (const key of Object.keys(row)) {
+        let newKey = key;
+        if (key === 'id') newKey = 'Id';
+        else if (key === 'email') newKey = 'Email';
+        else if (key === 'phone') newKey = 'Phone';
+        else if (key === 'first_name') newKey = 'FirstName';
+        else if (key === 'last_name') newKey = 'LastName';
+        else if (key === 'variant_name') newKey = 'VariantName';
+        else if (key === 'price_adjustment') newKey = 'PriceAdjustment';
+        else if (key === 'base_price') newKey = 'BasePrice';
+        else if (key === 'sku') newKey = 'SKU';
+        else if (key === 'quantity') newKey = 'Quantity';
+        else if (key === 'safety_buffer') newKey = 'SafetyBuffer';
+        else if (key === 'setting_key') newKey = 'SettingKey';
+        else if (key === 'setting_value') newKey = 'SettingValue';
+        else if (key === 'user_id') newKey = 'UserId';
+        else if (key === 'address_id') newKey = 'AddressId';
+        else if (key === 'coupon_id') newKey = 'CouponId';
+        else if (key === 'total_amount') newKey = 'TotalAmount';
+        else if (key === 'status') newKey = 'Status';
+        else if (key === 'shipping_method') newKey = 'ShippingMethod';
+        else if (key === 'pickup_time') newKey = 'PickupTime';
+        else if (key === 'shipping_cost') newKey = 'ShippingCost';
+        else if (key === 'notes') newKey = 'Notes';
+        else if (key === 'boleta_number') newKey = 'BoletaNumber';
+        else if (key === 'boleta_url') newKey = 'BoletaUrl';
+        else if (key === 'created_at') newKey = 'CreatedAt';
+        else if (key === 'updated_at') newKey = 'UpdatedAt';
+        else if (key === 'variant_id') newKey = 'VariantId';
+        else if (key === 'unit_price') newKey = 'UnitPrice';
+        else if (key === 'subtotal') newKey = 'Subtotal';
+        else if (key === 'amount') newKey = 'Amount';
+        else if (key === 'payment_method') newKey = 'PaymentMethod';
+        else if (key === 'transaction_id') newKey = 'TransactionId';
+        else if (key === 'role_id') newKey = 'RoleId';
+        else {
+            // Capitalize first letter
+            newKey = key.charAt(0).toUpperCase() + key.slice(1);
+        }
+        mapped[newKey] = row[key];
+    }
+    return mapped;
+}
+
 class PgConnectionWrapper {
     private client: PoolClient;
     
@@ -135,7 +184,8 @@ class PgConnectionWrapper {
     async query(sql: string, params?: any[]): Promise<[any[], any]> {
         const pgSql = mysqlToPostgresQuery(sql);
         const res = await this.client.query(pgSql, params || []);
-        return [res.rows, null];
+        const mappedRows = res.rows.map(mapRowKeys);
+        return [mappedRows, null];
     }
     
     async beginTransaction(): Promise<void> {
@@ -165,7 +215,8 @@ class PgPoolWrapper {
     async query(sql: string, params?: any[]): Promise<[any[], any]> {
         const pgSql = mysqlToPostgresQuery(sql);
         const res = await this.pool.query(pgSql, params || []);
-        return [res.rows, null];
+        const mappedRows = res.rows.map(mapRowKeys);
+        return [mappedRows, null];
     }
     
     async getConnection(): Promise<any> {
