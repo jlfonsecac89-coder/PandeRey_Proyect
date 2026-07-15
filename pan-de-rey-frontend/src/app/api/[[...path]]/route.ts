@@ -126,7 +126,7 @@ async function ensureDbSeeded(pool: any) {
             { id: 5, name: 'Ofertas', slug: 'offers' }
         ];
         for (const cat of categories) {
-            await pool.query('INSERT INTO public.categories (id, name, slug, is_active) VALUES (?, ?, ?, true) ON CONFLICT (id) DO NOTHING', [cat.id, cat.name, cat.slug]);
+            await pool.query('INSERT INTO public.categories (id, name, slug, is_active) VALUES (?, ?, ?, 1) ON CONFLICT (id) DO NOTHING', [cat.id, cat.name, cat.slug]);
         }
 
         // Seed Products
@@ -157,14 +157,14 @@ async function ensureDbSeeded(pool: any) {
 
         for (const prod of seededProducts) {
             await pool.query(
-                'INSERT INTO public.products (id, category_id, name, slug, base_price, image_url, description, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, true) ON CONFLICT (id) DO NOTHING',
+                'INSERT INTO public.products (id, category_id, name, slug, base_price, image_url, description, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1) ON CONFLICT (id) DO NOTHING',
                 [prod.id, prod.categoryId, prod.name, prod.slug, prod.price, prod.image, prod.description]
             );
 
             const variantId = prod.id.replace(/94(\d\d)$/, '84$1');
             const sku = `SKU-${prod.slug.toUpperCase()}`;
             await pool.query(
-                'INSERT INTO public.product_variants (id, product_id, variant_name, price_adjustment, sku, is_active) VALUES (?, ?, ?, 0.00, ?, true) ON CONFLICT (id) DO NOTHING',
+                'INSERT INTO public.product_variants (id, product_id, variant_name, price_adjustment, sku, is_active) VALUES (?, ?, ?, 0.00, ?, 1) ON CONFLICT (id) DO NOTHING',
                 [variantId, prod.id, 'Clásico', sku]
             );
 

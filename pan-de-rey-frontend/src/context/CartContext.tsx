@@ -35,7 +35,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const saved = localStorage.getItem('pan_de_rey_cart');
     if (saved) {
-      try { setItems(JSON.parse(saved)); } catch (e) {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          const validItems = parsed.filter(item => item && item.productId && uuidRegex.test(item.productId));
+          setItems(validItems);
+        }
+      } catch (e) {}
     }
   }, []);
 
