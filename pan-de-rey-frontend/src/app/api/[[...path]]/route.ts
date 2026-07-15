@@ -120,6 +120,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const routeStr = path.join('/');
 
     try {
+        // 0. GET /api/test-db
+        if (routeStr === 'test-db') {
+            try {
+                const [rows]: any = await pool.query('SELECT 1 + 1 as val');
+                return NextResponse.json({ 
+                    status: 'success', 
+                    message: 'Database connected successfully', 
+                    val: rows[0]?.val || rows[0]?.Val 
+                });
+            } catch (err: any) {
+                return NextResponse.json({ 
+                    status: 'error', 
+                    message: 'Database connection failed', 
+                    error: err.message,
+                    code: err.code
+                }, { status: 500 });
+            }
+        }
+
         // 1. GET /api/catalog/categories
         if (routeStr === 'catalog/categories') {
             const [rows] = await pool.query('SELECT * FROM Categories WHERE IsActive = 1');
