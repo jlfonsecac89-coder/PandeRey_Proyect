@@ -234,26 +234,34 @@ let poolWrapper: PgPoolWrapper | null = null;
 export const getDbPool = (): any => {
     if (!poolWrapper) {
         try {
+            const poolConfig: any = {
+                host: dbConfig.host,
+                user: dbConfig.user,
+                password: dbConfig.password,
+                database: dbConfig.database,
+                port: dbConfig.port,
+                ssl: { rejectUnauthorized: false },
+                max: 10,
+                idleTimeoutMillis: 30000,
+                connectionTimeoutMillis: 5000
+            };
+
             const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
-            const poolConfig: any = connectionString
-                ? { 
-                    connectionString, 
-                    ssl: { rejectUnauthorized: false },
-                    max: 10,
-                    idleTimeoutMillis: 30000,
-                    connectionTimeoutMillis: 5000
-                  }
-                : {
-                    host: dbConfig.host,
-                    user: dbConfig.user,
-                    password: dbConfig.password,
-                    database: dbConfig.database,
-                    port: dbConfig.port,
-                    ssl: dbConfig.ssl,
-                    max: 10,
-                    idleTimeoutMillis: 30000,
-                    connectionTimeoutMillis: 5000
-                  };
+            if (connectionString) {
+                try {
+                    // Remove query parameters like sslmode to avoid pg driver overrides
+                    const cleanUrlString = connectionString.split('?')[0];
+                    const parsed = new URL(cleanUrlString);
+                    poolConfig.host = parsed.hostname;
+                    poolConfig.port = parseInt(parsed.port || '5432');
+                    poolConfig.user = decodeURIComponent(parsed.username);
+                    poolConfig.password = decodeURIComponent(parsed.password);
+                    poolConfig.database = decodeURIComponent(parsed.pathname.substring(1));
+                    console.log('[Database Setup]: Parsed POSTGRES_URL host:', poolConfig.host);
+                } catch (parseErr: any) {
+                    console.error('[Database Setup Error]: Failed to parse connection string:', parseErr.message);
+                }
+            }
 
             const pgPool = new Pool(poolConfig);
             
