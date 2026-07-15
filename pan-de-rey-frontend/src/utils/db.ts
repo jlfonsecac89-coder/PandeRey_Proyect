@@ -234,17 +234,28 @@ let poolWrapper: PgPoolWrapper | null = null;
 export const getDbPool = (): any => {
     if (!poolWrapper) {
         try {
-            const pgPool = new Pool({
-                host: dbConfig.host,
-                user: dbConfig.user,
-                password: dbConfig.password,
-                database: dbConfig.database,
-                port: dbConfig.port,
-                ssl: dbConfig.ssl,
-                max: 10,
-                idleTimeoutMillis: 30000,
-                connectionTimeoutMillis: 5000
-            });
+            const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+            const poolConfig: any = connectionString
+                ? { 
+                    connectionString, 
+                    ssl: { rejectUnauthorized: false },
+                    max: 10,
+                    idleTimeoutMillis: 30000,
+                    connectionTimeoutMillis: 5000
+                  }
+                : {
+                    host: dbConfig.host,
+                    user: dbConfig.user,
+                    password: dbConfig.password,
+                    database: dbConfig.database,
+                    port: dbConfig.port,
+                    ssl: dbConfig.ssl,
+                    max: 10,
+                    idleTimeoutMillis: 30000,
+                    connectionTimeoutMillis: 5000
+                  };
+
+            const pgPool = new Pool(poolConfig);
             
             poolWrapper = new PgPoolWrapper(pgPool);
             // Drop profiles_id_fkey constraint to allow guest checkouts (leads)
