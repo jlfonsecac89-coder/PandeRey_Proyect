@@ -99,6 +99,8 @@ export function mysqlToPostgresQuery(sql: string): string {
         .replace(/UserId/g, 'user_id')
         .replace(/AddressId/g, 'address_id')
         .replace(/CouponId/g, 'coupon_id')
+        .replace(/ProductId/g, 'product_id')
+        .replace(/CategoryId/g, 'category_id')
         .replace(/TotalAmount/g, 'total_amount')
         .replace(/ShippingMethod/g, 'shipping_method')
         .replace(/PickupTime/g, 'pickup_time')
