@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   ShoppingBag, 
   Search, 
@@ -21,6 +21,7 @@ import ProductDetail from './ProductDetail';
 import CheckoutForm from './CheckoutForm';
 import Navbar from '../Navbar';
 import { formatPrice } from '@/utils/format';
+import { getApiUrl } from '@/utils/api';
 
 const categories = [
   { id: 'all', name: 'Todo', icon: Utensils },
@@ -73,6 +74,24 @@ export default function ShopContainer() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<string>('default');
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [products, setProducts] = useState<any[]>(mockProducts);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const res = await fetch(getApiUrl('/api/catalog/products'));
+        if (res.ok) {
+          const dbProducts = await res.json();
+          if (Array.isArray(dbProducts) && dbProducts.length > 0) {
+            setProducts(dbProducts);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load products from database:', err);
+      }
+    };
+    loadProducts();
+  }, []);
 
   const { addToCart, setIsCartOpen, items, updateQuantity } = useCart();
 
@@ -111,7 +130,7 @@ export default function ShopContainer() {
     });
   };
 
-  const filteredProducts = mockProducts
+  const filteredProducts = products
     .filter(p => activeCategory === 'all' || p.category === activeCategory)
     .filter(p => p.price <= priceRange)
     .filter(p => {

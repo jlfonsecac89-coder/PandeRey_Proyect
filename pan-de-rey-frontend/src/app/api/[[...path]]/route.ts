@@ -145,6 +145,85 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             }
         }
 
+        // 0.1. GET /api/orders/seed
+        if (routeStr === 'orders/seed') {
+            try {
+                // Truncate tables using CASCADE to respect foreign key constraints in Postgres
+                await pool.query('TRUNCATE TABLE public.payments CASCADE');
+                await pool.query('TRUNCATE TABLE public.order_items CASCADE');
+                await pool.query('TRUNCATE TABLE public.orders CASCADE');
+                await pool.query('TRUNCATE TABLE public.inventory_movements CASCADE');
+                await pool.query('TRUNCATE TABLE public.inventory CASCADE');
+                await pool.query('TRUNCATE TABLE public.product_variants CASCADE');
+                await pool.query('TRUNCATE TABLE public.products CASCADE');
+                await pool.query('TRUNCATE TABLE public.categories CASCADE');
+
+                // Seed Categories
+                const categories = [
+                    { id: 1, name: 'Panadería', slug: 'bakery' },
+                    { id: 2, name: 'Pastelería', slug: 'pastry' },
+                    { id: 3, name: 'Sin Gluten', slug: 'gluten-free' },
+                    { id: 4, name: 'Bebestibles', slug: 'drinks' },
+                    { id: 5, name: 'Ofertas', slug: 'offers' }
+                ];
+                for (const cat of categories) {
+                    await pool.query('INSERT INTO public.categories (id, name, slug, is_active) VALUES (?, ?, ?, true)', [cat.id, cat.name, cat.slug]);
+                }
+
+                // Seed Products
+                const seededProducts = [
+                    { id: 'd1c93f01-ea94-4003-ac94-070212ac9401', categoryId: 1, name: 'Pan de Masa Madre Clásico', slug: 'pan-de-masa-madre-clasico', price: 4500, image: 'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&q=80', description: 'Nuestro pan insignia. Elaborado con una masa madre de 5 años de antigüedad, harinas orgánicas y una fermentación lenta de 48 horas.' },
+                    { id: 'd1c93f02-ea94-4003-ac94-070212ac9402', categoryId: 1, name: 'Focaccia al Romero', slug: 'focaccia-al-romero', price: 3800, image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80', description: 'Deliciosa focaccia artesanal aromatizada con romero fresco y sal marina.' },
+                    { id: 'd1c93f03-ea94-4003-ac94-070212ac9403', categoryId: 1, name: 'Baguette Tradicional', slug: 'baguette-tradicional', price: 1800, image: 'https://images.unsplash.com/photo-1598373182133-52452f7691ef?w=800&q=80', description: 'Baguette al estilo francés con corteza crujiente y miga aireada.' },
+                    { id: 'd1c93f04-ea94-4003-ac94-070212ac9404', categoryId: 1, name: 'Pan de Centeno Alemán', slug: 'pan-de-centeno-aleman', price: 4200, image: 'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&q=80&crop=edges', description: 'Pan denso de centeno, ideal para sándwiches.' },
+                    { id: 'd1c93f05-ea94-4003-ac94-070212ac9405', categoryId: 1, name: 'Ciabatta Rústica', slug: 'ciabatta-rustica', price: 2200, image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80&crop=faces', description: 'Pan ciabatta rústico, perfecto para bruschetta.' },
+                    
+                    { id: 'd1c93f06-ea94-4003-ac94-070212ac9406', categoryId: 2, name: 'Croissant de Mantequilla', slug: 'croissant-de-mantequilla', price: 2200, image: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?w=800&q=80', description: 'Clásico croissant hojaldrado con 100% mantequilla.' },
+                    { id: 'd1c93f07-ea94-4003-ac94-070212ac9407', categoryId: 2, name: 'Pain au Chocolat', slug: 'pain-au-chocolat', price: 2500, image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80&sat=1', description: 'Hojaldre relleno de chocolate semi-amargo.' },
+                    { id: 'd1c93f08-ea94-4003-ac94-070212ac9408', categoryId: 2, name: 'Tarta de Limón y Merengue', slug: 'tarta-de-limon-y-merengue', price: 3800, image: 'https://images.unsplash.com/photo-1550617931-e17a7b70dce2?w=800&q=80', description: 'Tarta de limón con merengue italiano tostado.' },
+                    { id: 'd1c93f09-ea94-4003-ac94-070212ac9409', categoryId: 2, name: 'Roll de Canela Glaseado', slug: 'roll-de-canela-glaseado', price: 2800, image: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?w=800&q=80&sat=2', description: 'Roll de canela húmedo con glaseado de queso crema.' },
+
+                    { id: 'd1c93f10-ea94-4003-ac94-070212ac9410', categoryId: 3, name: 'Brownie Sin Gluten', slug: 'brownie-sin-gluten', price: 2500, image: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=800&q=80', description: 'Brownie de chocolate intenso apto para celíacos.' },
+                    { id: 'd1c93f11-ea94-4003-ac94-070212ac9411', categoryId: 3, name: 'Pan de Molde Keto', slug: 'pan-de-molde-keto', price: 5500, image: 'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&q=80&bri=1', description: 'Pan de molde bajo en carbohidratos.' },
+                    { id: 'd1c93f12-ea94-4003-ac94-070212ac9412', categoryId: 3, name: 'Galletas de Almendra', slug: 'galletas-de-almendra', price: 1800, image: 'https://images.unsplash.com/photo-1550617931-e17a7b70dce2?w=800&q=80&con=1', description: 'Galletas crujientes de harina de almendras.' },
+
+                    { id: 'd1c93f13-ea94-4003-ac94-070212ac9413', categoryId: 4, name: 'Café Latte XL', slug: 'cafe-latte-xl', price: 3500, image: 'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=800&q=80', description: 'Café espresso con leche vaporizada.' },
+                    { id: 'd1c93f14-ea94-4003-ac94-070212ac9414', categoryId: 4, name: 'Espresso Doble', slug: 'espresso-doble', price: 2200, image: 'https://images.unsplash.com/photo-1511920170033-f8396924c348?w=800&q=80', description: 'Dos cargas de café espresso puro.' },
+                    { id: 'd1c93f15-ea94-4003-ac94-070212ac9415', categoryId: 4, name: 'Cappuccino Italiano', slug: 'cappuccino-italiano', price: 3200, image: 'https://images.unsplash.com/photo-1495474472207-464a8d960c8b?w=800&q=80', description: 'Espresso, leche vaporizada y abundante espuma.' },
+                    { id: 'd1c93f16-ea94-4003-ac94-070212ac9416', categoryId: 4, name: 'Té Matcha Orgánico', slug: 'te-matcha-organico', price: 3800, image: 'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=800&q=80&hue=1', description: 'Té matcha japonés de grado ceremonial.' },
+
+                    { id: 'd1c93f17-ea94-4003-ac94-070212ac9417', categoryId: 5, name: 'Combo 2x1 Baguette', slug: 'combo-2x1-baguette', price: 3200, image: 'https://images.unsplash.com/photo-1598373182133-52452f7691ef?w=800&q=80&bri=-1', description: 'Lleva dos baguettes por el precio de una.' },
+                    { id: 'd1c93f18-ea94-4003-ac94-070212ac9418', categoryId: 5, name: 'Desayuno Promocional', slug: 'desayuno-promocional', price: 5500, image: 'https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&q=80', description: 'Café mediano más croissant de mantequilla.' }
+                ];
+
+                for (const prod of seededProducts) {
+                    await pool.query(
+                        'INSERT INTO public.products (id, category_id, name, slug, base_price, image_url, description, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, true)',
+                        [prod.id, prod.categoryId, prod.name, prod.slug, prod.price, prod.image, prod.description]
+                    );
+
+                    // Predefined Variant UUID mapped from Product UUID
+                    const variantId = prod.id.replace(/94(\d\d)$/, '84$1');
+                    const sku = `SKU-${prod.slug.toUpperCase()}`;
+                    await pool.query(
+                        'INSERT INTO public.product_variants (id, product_id, variant_name, price_adjustment, sku, is_active) VALUES (?, ?, ?, 0.00, ?, true)',
+                        [variantId, prod.id, 'Clásico', sku]
+                    );
+
+                    // Seed Inventory
+                    await pool.query(
+                        'INSERT INTO public.inventory (variant_id, quantity, safety_buffer) VALUES (?, 100, 2)',
+                        [variantId]
+                    );
+                }
+
+                return NextResponse.json({ status: 'success', message: 'Database successfully seeded with categories, products, and default variants.' });
+            } catch (err: any) {
+                console.error('[API Seeding Error]:', err);
+                return NextResponse.json({ error: err.message || 'Seeding failed' }, { status: 500 });
+            }
+        }
+
         // 1. GET /api/catalog/categories
         if (routeStr === 'catalog/categories') {
             const [rows] = await pool.query('SELECT * FROM Categories WHERE IsActive = 1');
@@ -154,10 +233,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         // 2. GET /api/catalog/products
         if (routeStr === 'catalog/products') {
             const categoryId = url.searchParams.get('categoryId');
-            let query = 'SELECT * FROM Products WHERE IsActive = 1';
+            let query = `
+                SELECT 
+                    p.id, 
+                    c.slug as category, 
+                    p.name, 
+                    p.slug, 
+                    p.base_price as price, 
+                    p.image_url as image, 
+                    p.description,
+                    pv.id as "variantId"
+                FROM public.products p
+                LEFT JOIN public.categories c ON p.category_id = c.id
+                LEFT JOIN public.product_variants pv ON p.id = pv.product_id AND pv.variant_name = 'Clásico'
+                WHERE p.is_active = true
+            `;
             const queryParams: any[] = [];
             if (categoryId) {
-                query += ' AND CategoryId = ?';
+                query += ' AND p.category_id = ?';
                 queryParams.push(parseInt(categoryId));
             }
             const [rows] = await pool.query(query, queryParams);
@@ -427,13 +520,45 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 const itemInserts: any[] = [];
 
                 for (const item of items) {
-                    const [variantRows]: any = await pool.query(
-                        'SELECT PriceAdjustment, BasePrice FROM ProductVariants pv JOIN Products p ON pv.ProductId = p.Id WHERE pv.Id = ?',
-                        [item.variantId]
-                    );
-                    if (variantRows.length === 0) {
-                        return NextResponse.json({ error: `Variant ${item.variantId} not found` }, { status: 404 });
+                    let cleanId = item.variantId;
+                    if (typeof cleanId === 'string') {
+                        cleanId = cleanId.replace(/-+$/, '');
                     }
+
+                    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                    const isValidUuid = typeof cleanId === 'string' && uuidRegex.test(cleanId);
+
+                    let variantRows: any[] = [];
+                    if (isValidUuid) {
+                        const [rows]: any = await pool.query(
+                            `SELECT pv.id as "Id", pv.price_adjustment as "PriceAdjustment", p.base_price as "BasePrice" 
+                             FROM public.product_variants pv 
+                             JOIN public.products p ON pv.product_id = p.id 
+                             WHERE pv.id = ? OR pv.product_id = ? 
+                             LIMIT 1`,
+                            [cleanId, cleanId]
+                        );
+                        variantRows = rows;
+                    }
+
+                    // Fallback to name search if not found or if the ID is a mock ID
+                    if (variantRows.length === 0 && item.name) {
+                        const [rows]: any = await pool.query(
+                            `SELECT pv.id as "Id", pv.price_adjustment as "PriceAdjustment", p.base_price as "BasePrice" 
+                             FROM public.product_variants pv 
+                             JOIN public.products p ON pv.product_id = p.id 
+                             WHERE LOWER(p.name) = LOWER(?) OR LOWER(pv.variant_name) = LOWER(?)
+                             LIMIT 1`,
+                            [item.name, item.name]
+                        );
+                        variantRows = rows;
+                    }
+
+                    if (variantRows.length === 0) {
+                        return NextResponse.json({ error: `Variant/Product ${item.variantId} (${item.name}) not found` }, { status: 404 });
+                    }
+
+                    const realVariantId = variantRows[0].Id;
                     const price = parseFloat(variantRows[0].BasePrice) + parseFloat(variantRows[0].PriceAdjustment);
                     const qty = parseInt(item.quantity);
                     const itemSubtotal = price * qty;
@@ -441,7 +566,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                     itemInserts.push([
                         crypto.randomUUID(),
                         orderId,
-                        item.variantId,
+                        realVariantId,
                         qty,
                         price,
                         itemSubtotal
