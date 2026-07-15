@@ -2,11 +2,11 @@ import { Pool, PoolClient } from 'pg';
 
 // Configuration mapped to environment variables
 export const dbConfig = {
-    host: process.env.DB_HOST || 'db.cxhjthmgkzqpldkkdqkv.supabase.com',
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || '01l93pDapK',
-    database: process.env.DB_NAME || 'postgres',
-    port: parseInt(process.env.DB_PORT || '5432'),
+    host: process.env.DB_HOST || process.env.POSTGRES_HOST || 'db.cxhjthmgkzqpldkkdqkv.supabase.com',
+    user: process.env.DB_USER || process.env.POSTGRES_USER || 'postgres',
+    password: process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD || '01l93pDapK',
+    database: process.env.DB_NAME || process.env.POSTGRES_DATABASE || 'postgres',
+    port: parseInt(process.env.DB_PORT || process.env.POSTGRES_PORT || '5432'),
     ssl: {
         rejectUnauthorized: false // Supabase connections require SSL
     }
