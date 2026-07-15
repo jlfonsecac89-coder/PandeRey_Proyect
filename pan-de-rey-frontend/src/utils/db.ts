@@ -2,7 +2,7 @@ import { Pool, PoolClient } from 'pg';
 
 // Configuration mapped to environment variables
 export const dbConfig = {
-    host: process.env.DB_HOST || 'db.cxhjthmgkzqpldkkdqkv.supabase.co',
+    host: process.env.DB_HOST || 'db.cxhjthmgkzqpldkkdqkv.supabase.com',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '01l93pDapK',
     database: process.env.DB_NAME || 'postgres',
