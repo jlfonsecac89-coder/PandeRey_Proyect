@@ -4,6 +4,7 @@ import { getDbPool } from '@/utils/db';
 import { syncStockWithDefontana, pushSalesOrderToDefontana } from '@/services/defontana';
 import { printFiscalTicket } from '@/services/fiscalPrinter';
 import { sendStatusEmail, sendStatusWhatsApp } from '@/services/notifications';
+import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 
 // Simulate WMS Order SLA timing & lifecycle transitions
 const simulateOrderLifeCycle = async (orderId: string, shippingMethod: string, email: string, phone: string, total: number) => {
@@ -519,6 +520,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 if (finalPaymentMethod && finalPaymentMethod.toLowerCase() === 'mercadopago') {
                     try {
                         const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-4617225674364003-070212-ac94008f892a332dcbb5cd08dfe9a938-3512158955';
+                        const client = new MercadoPagoConfig({ accessToken: mpAccessToken });
+                        const preference = new Preference(client);
+
                         const frontendUrl = process.env.FRONTEND_URL || `https://${request.headers.get('host')}` || 'http://localhost:3000';
                         
                         const mpItems = items.map((item: any) => {
@@ -540,13 +544,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                             });
                         }
 
-                        const mpResponse = await fetch('https://api.mercadopago.com/v1/checkout/preferences', {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${mpAccessToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
+                        // Notification URL: Webhook address for Mercado Pago to POST notifications
+                        const notificationUrl = `${frontendUrl}/api/orders/webhook`;
+
+                        const response = await preference.create({
+                            body: {
                                 items: mpItems,
                                 payer: {
                                     email: customerEmail,
@@ -559,18 +561,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                                     pending: `${frontendUrl}/checkout/success?status=pending`
                                 },
                                 auto_return: 'approved',
-                                external_reference: orderId
-                            })
+                                external_reference: orderId,
+                                notification_url: notificationUrl
+                            }
                         });
 
-                        if (!mpResponse.ok) {
-                            throw new Error(`MP Preference creation failed: ${mpResponse.statusText}`);
-                        }
-
-                        const mpData: any = await mpResponse.json();
                         const isSandbox = process.env.MERCADOPAGO_SANDBOX !== 'false';
-                        initPoint = isSandbox ? mpData.sandbox_init_point : mpData.init_point;
-                        gatewayToken = mpData.id;
+                        initPoint = isSandbox ? response.sandbox_init_point : response.init_point;
+                        gatewayToken = response.id || '';
                         paymentStatus = 'Pendiente';
                     } catch (mpErr) {
                         console.error('Error generando preferencia de Mercado Pago:', mpErr);
@@ -618,26 +616,44 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             if (type === 'payment' || action === 'payment.created' || action === 'payment.updated') {
                 const paymentId = data?.id || url.searchParams.get('id') || body.resource?.split('/').pop();
                 if (paymentId) {
-                    const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-4617225674364003-070212-ac94008f892a332dcbb5cd08dfe9a938-3512158955';
-                    const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-                        headers: { 'Authorization': `Bearer ${mpAccessToken}` }
-                    });
-                    if (response.ok) {
-                        const paymentInfo: any = await response.json();
+                    try {
+                        const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-4617225674364003-070212-ac94008f892a332dcbb5cd08dfe9a938-3512158955';
+                        const client = new MercadoPagoConfig({ accessToken: mpAccessToken });
+                        const payment = new Payment(client);
+
+                        const paymentInfo = await payment.get({ id: paymentId.toString() });
                         const status = paymentInfo.status;
                         const orderId = paymentInfo.external_reference;
-                        if (status === 'approved' && orderId) {
-                            const [orderRows]: any = await pool.query('SELECT TotalAmount FROM Orders WHERE Id = ?', [orderId]);
-                            if (orderRows.length > 0) {
-                                const dbTotal = parseFloat(orderRows[0].TotalAmount);
-                                const mpTotal = parseFloat(paymentInfo.transaction_amount);
-                                if (Math.abs(dbTotal - mpTotal) > 0.01) {
-                                    console.error(`[SECURITY ALERT] Payment amount mismatch for Order ${orderId}. DB: ${dbTotal}, MP: ${mpTotal}`);
-                                    return new Response('Payment amount mismatch', { status: 400 });
+
+                        if (orderId) {
+                            // Update Payment status in DB to match Mercado Pago status
+                            let dbPaymentStatus = 'Pendiente';
+                            if (status === 'approved') dbPaymentStatus = 'Aprobado';
+                            else if (status === 'rejected') dbPaymentStatus = 'Rechazado';
+                            else if (status === 'in_process') dbPaymentStatus = 'En Proceso';
+                            else if (status === 'pending') dbPaymentStatus = 'Pendiente';
+
+                            await pool.query(
+                                'UPDATE Payments SET Status = ?, TransactionId = ? WHERE OrderId = ?',
+                                [dbPaymentStatus, paymentId.toString(), orderId]
+                            );
+
+                            if (status === 'approved') {
+                                const [orderRows]: any = await pool.query('SELECT TotalAmount FROM Orders WHERE Id = ?', [orderId]);
+                                if (orderRows.length > 0) {
+                                    const dbTotal = parseFloat(orderRows[0].TotalAmount);
+                                    const mpTotal = parseFloat(paymentInfo.transaction_amount?.toString() || '0');
+                                    if (Math.abs(dbTotal - mpTotal) > 0.01) {
+                                        console.error(`[SECURITY ALERT] Payment amount mismatch for Order ${orderId}. DB: ${dbTotal}, MP: ${mpTotal}`);
+                                        return new Response('Payment amount mismatch', { status: 400 });
+                                    }
+                                    await confirmOrderAndTriggerIntegrations(orderId);
                                 }
-                                await confirmOrderAndTriggerIntegrations(orderId);
                             }
                         }
+                    } catch (webhookErr) {
+                        console.error('Error processing Mercado Pago Webhook:', webhookErr);
+                        return new Response('Webhook processing failed', { status: 500 });
                     }
                 }
             }
