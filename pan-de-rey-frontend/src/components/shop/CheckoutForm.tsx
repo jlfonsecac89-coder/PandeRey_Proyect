@@ -68,7 +68,14 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
       });
 
       if (!response.ok) {
-        throw new Error('Error al procesar el pedido en el servidor');
+        let errMsg = 'Error al procesar el pedido en el servidor';
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) {
+            errMsg = errData.error;
+          }
+        } catch (_) {}
+        throw new Error(errMsg);
       }
 
       const data = await response.json();
@@ -93,17 +100,24 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
         alert(data.error || 'No se pudo crear el pedido');
       }
     } catch (err: any) {
-      console.warn('[Checkout Connection Fallback]:', err.message);
-      // Asegurar que la simulación local guarde el pedido en localStorage para la vista de éxito
-      localStorage.setItem('pan_de_rey_last_order', JSON.stringify({
-        orderId: `sim-${Math.random().toString(36).substr(2, 9)}`,
-        total: total,
-        paymentMethod: formData.paymentMethod,
-        email: formData.email,
-        firstName: formData.firstName
-      }));
-      alert('Se procederá con la simulación local del pedido.');
-      onComplete();
+      console.warn('[Checkout Connection Error]:', err.message);
+      
+      const isDev = process.env.NODE_ENV === 'development';
+      const allowSim = process.env.NEXT_PUBLIC_ENABLE_LOCAL_CHECKOUT_SIMULATION === 'true';
+
+      if (isDev && allowSim) {
+        localStorage.setItem('pan_de_rey_last_order', JSON.stringify({
+          orderId: `sim-${Math.random().toString(36).substr(2, 9)}`,
+          total: total,
+          paymentMethod: formData.paymentMethod,
+          email: formData.email,
+          firstName: formData.firstName
+        }));
+        alert('Se procederá con la simulación local del pedido.');
+        onComplete();
+      } else {
+        alert(err.message || 'No pudimos conectar con Mercado Pago, intenta de nuevo.');
+      }
     } finally {
       setIsSubmitting(false);
     }

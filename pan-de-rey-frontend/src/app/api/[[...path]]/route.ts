@@ -488,30 +488,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             await connection.beginTransaction();
 
             try {
-                await connection.query(
-                    `INSERT INTO Orders (Id, UserId, AddressId, CouponId, TotalAmount, Status, ShippingMethod, PickupTime, ShippingCost, Notes) 
-                     VALUES (?, ?, ?, ?, ?, 'Pendiente', ?, ?, ?, ?)`,
-                    [orderId, finalUserId || null, addressId || null, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null]
-                );
-
-                for (const row of itemInserts) {
-                    await connection.query(
-                        'INSERT INTO OrderItems (Id, OrderId, VariantId, Quantity, UnitPrice, Subtotal) VALUES (?, ?, ?, ?, ?, ?)',
-                        row
-                    );
-                    await connection.query(
-                        'UPDATE Inventory SET Quantity = Quantity - ? WHERE VariantId = ?',
-                        [row[3], row[2]]
-                    );
-                    await connection.query(
-                        'INSERT INTO InventoryMovements (Id, VariantId, QuantityChange, MovementType, ReferenceId) VALUES (gen_random_uuid(), ?, ?, \'Venta\', ?)',
-                        [row[2], -row[3], orderId]
-                    );
-                }
-
-                await connection.commit();
-                connection.release();
-
                 let initPoint = null;
                 let paymentStatus = 'Aprobado';
                 let gatewayToken = crypto.randomBytes(16).toString('hex');
@@ -570,18 +546,55 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                         initPoint = isSandbox ? response.sandbox_init_point : response.init_point;
                         gatewayToken = response.id || '';
                         paymentStatus = 'Pendiente';
-                    } catch (mpErr) {
+                    } catch (mpErr: any) {
                         console.error('Error generando preferencia de Mercado Pago:', mpErr);
-                        paymentStatus = 'Aprobado';
-                        finalPaymentMethod = 'Simulado Fallback';
+                        if (mpErr.response) {
+                            console.error('Mercado Pago API Response Error Status:', mpErr.response.status);
+                            console.error('Mercado Pago API Response Error Body:', JSON.stringify(mpErr.response.body || mpErr.response.data || mpErr.response));
+                        }
+
+                        const isDev = process.env.NODE_ENV === 'development';
+                        const allowSim = process.env.ENABLE_LOCAL_CHECKOUT_SIMULATION === 'true';
+
+                        if (isDev && allowSim) {
+                            paymentStatus = 'Aprobado';
+                            finalPaymentMethod = 'Simulado Fallback';
+                            console.log('[Checkout Fallback]: Falling back to Local Simulation because we are in development and simulation is enabled.');
+                        } else {
+                            throw new Error('No pudimos conectar con Mercado Pago, intenta de nuevo.');
+                        }
                     }
                 }
 
-                await pool.query(
+                await connection.query(
+                    `INSERT INTO Orders (Id, UserId, AddressId, CouponId, TotalAmount, Status, ShippingMethod, PickupTime, ShippingCost, Notes) 
+                     VALUES (?, ?, ?, ?, ?, 'Pendiente', ?, ?, ?, ?)`,
+                    [orderId, finalUserId || null, addressId || null, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null]
+                );
+
+                for (const row of itemInserts) {
+                    await connection.query(
+                        'INSERT INTO OrderItems (Id, OrderId, VariantId, Quantity, UnitPrice, Subtotal) VALUES (?, ?, ?, ?, ?, ?)',
+                        row
+                    );
+                    await connection.query(
+                        'UPDATE Inventory SET Quantity = Quantity - ? WHERE VariantId = ?',
+                        [row[3], row[2]]
+                    );
+                    await connection.query(
+                        'INSERT INTO InventoryMovements (Id, VariantId, QuantityChange, MovementType, ReferenceId) VALUES (gen_random_uuid(), ?, ?, \'Venta\', ?)',
+                        [row[2], -row[3], orderId]
+                    );
+                }
+
+                await connection.query(
                     `INSERT INTO Payments (Id, OrderId, Amount, PaymentMethod, Status, TransactionId) 
                      VALUES (?, ?, ?, ?, ?, ?)`,
                     [paymentId, orderId, totalAmount, finalPaymentMethod, paymentStatus, gatewayToken]
                 );
+
+                await connection.commit();
+                connection.release();
 
                 if (finalPaymentMethod.toLowerCase() === 'mercadopago') {
                     return NextResponse.json({ 
@@ -603,10 +616,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                         boletaUrl: confirmation.boletaUrl
                     });
                 }
-            } catch (err) {
+            } catch (err: any) {
                 await connection.rollback();
                 connection.release();
-                throw err;
+                return NextResponse.json({ error: err.message || 'Error al procesar el pedido en el servidor' }, { status: 500 });
             }
         }
 
