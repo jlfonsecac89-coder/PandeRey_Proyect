@@ -1,8 +1,28 @@
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
 
-const bypassToken = process.argv[2];
+// Load .env.local variables manually
+function loadEnv() {
+  const envPath = path.join(__dirname, '.env.local');
+  if (fs.existsSync(envPath)) {
+    const content = fs.readFileSync(envPath, 'utf8');
+    content.split('\n').forEach(line => {
+      const match = line.trim().match(/^([^#=]+)=(.*)$/);
+      if (match) {
+        const key = match[1].trim();
+        const value = match[2].trim().replace(/^"|"$/g, '');
+        process.env[key] = value;
+      }
+    });
+  }
+}
+
+loadEnv();
+
+const bypassToken = process.env.VERCEL_BYPASS_TOKEN;
 if (!bypassToken) {
-  console.error("❌ Error: Debes pasar el token de bypass como argumento: node fetch_e2e_preview_bypass.js [token]");
+  console.error("❌ Error: No se encontró la variable VERCEL_BYPASS_TOKEN en .env.local.");
   process.exit(1);
 }
 
@@ -14,11 +34,10 @@ const options = {
   }
 };
 
-console.log(`📡 Enviando petición GET a ${url} con bypass token...`);
+console.log(`📡 Enviando petición GET a ${url} utilizando bypass token desde variables locales...`);
 
 https.get(url, options, (res) => {
   console.log(`Status: ${res.statusCode}`);
-  console.log('Headers:', res.headers);
   
   let data = '';
   res.on('data', (chunk) => {
