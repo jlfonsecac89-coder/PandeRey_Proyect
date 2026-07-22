@@ -265,7 +265,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             };
 
             // Security: block in production, require secret token
-            const isProd = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production';
+            const isProd = process.env.VERCEL_ENV === 'production';
             const secretParam = url.searchParams.get('secret');
             const expectedSecret = process.env.E2E_SECRET;
 
