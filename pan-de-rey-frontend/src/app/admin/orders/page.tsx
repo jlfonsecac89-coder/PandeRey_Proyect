@@ -51,6 +51,7 @@ type OrderItemRaw = {
 type Order = {
   id: string;
   realId?: string;
+  orderNumber?: string;
   customerName: string;
   email: string;
   phone: string;
@@ -72,6 +73,10 @@ type Order = {
   orderState?: 'Pendiente' | 'Aceptado';
   labelPrintedCount?: number;
   actualDeliveryTime?: string | null;
+};
+
+const getDisplayOrderId = (order: any): string => {
+  return order?.orderNumber || (order?.id ? `#${order.id.substring(0, 8).toUpperCase()}` : '');
 };
 
 // Catálogo de variantes fijas de la panadería para la sustitución de stock
@@ -1070,7 +1075,7 @@ export default function OrdersDashboard() {
                                 onClick={() => setSelectedOrder(order)}
                                 className="font-bold text-gold hover:text-white underline decoration-gold/40 transition-colors uppercase text-[13px] tracking-wide"
                               >
-                                #{order.id.substring(0, 8).toUpperCase()}
+                                {getDisplayOrderId(order)}
                               </button>
                               <span className="text-[9px] text-gray-500 mt-1 font-mono font-bold tracking-wider">
                                 {order.createdAt ? new Date(order.createdAt).toLocaleDateString([], { day: '2-digit', month: '2-digit' }) : '--/--'} {order.time}
@@ -1252,7 +1257,7 @@ export default function OrdersDashboard() {
                             {/* ID y Tipo de Envío */}
                             <div className="flex justify-between items-center mb-3">
                               <span className="font-mono font-black text-xs text-white group-hover:text-gold transition-colors tracking-widest uppercase">
-                                #{order.id.substring(0, 8).toUpperCase()}
+                                {getDisplayOrderId(order)}
                               </span>
                             </div>
                             
@@ -1408,7 +1413,7 @@ export default function OrdersDashboard() {
                   {incompleteOrders.map(order => (
                     <tr key={order.id} className="border-b border-charcoal-border/50 hover:bg-charcoal-light/10 transition-colors">
                       <td className="p-4 font-bold text-white">
-                        #{order.id.substring(0, 8).toUpperCase()}
+                        {getDisplayOrderId(order)}
                       </td>
                       <td className="p-4 space-y-1">
                         <p className="font-semibold text-gray-200">{order.customerName}</p>
@@ -1461,7 +1466,7 @@ export default function OrdersDashboard() {
                           
                           {/* WhatsApp Link Directo */}
                           <a
-                            href={`https://wa.me/${order.phone.replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(order.customerName)},%20te%20escribimos%20de%20Pan%20de%20Rey%20sobre%20tu%20pedido%20%23${order.id.substring(0, 8).toUpperCase()}.%20Lamentablemente%20no%20contamos%20con%20stock%20de%20uno%20de%20los%20productos.%20¿Te%20gustaría%20cambiarlo%20por%20otro%20del%20mismo%20valor?`}
+                            href={`https://wa.me/${order.phone.replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(order.customerName)},%20te%20escribimos%20de%20Pan%20de%20Rey%20sobre%20tu%20pedido%20${getDisplayOrderId(order)}.%20Lamentablemente%20no%20contamos%20con%20stock%20de%20uno%20de%20los%20productos.%20¿Te%20gustaría%20cambiarlo%20por%20otro%20del%20mismo%20valor?`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1.5 border border-green-500/30 text-green-500 hover:bg-green-500 hover:text-black px-3 py-1.5 rounded text-[10px] font-bold uppercase transition-colors"
@@ -1547,7 +1552,7 @@ export default function OrdersDashboard() {
             </div>
             
             <p className="text-xs text-gray-400 mb-6 leading-relaxed">
-              Modifica los ítems del pedido <strong>#{subOrder.id.substring(0, 8).toUpperCase()}</strong>. Se devolverá la cantidad al stock del producto quitado y se descontará del stock del producto de reemplazo.
+              Modifica los ítems del pedido <strong>{getDisplayOrderId(subOrder)}</strong>. Se devolverá la cantidad al stock del producto quitado y se descontará del stock del producto de reemplazo.
             </p>
             
             <div className="space-y-4">
@@ -1648,7 +1653,7 @@ export default function OrdersDashboard() {
               </div>
               
               <div className="space-y-0.5 text-[10px] border-b border-dashed border-gray-300 pb-2">
-                <p><span className="font-bold">NRO PEDIDO:</span> #{labelPrintOrder.id.substring(0, 8).toUpperCase()}</p>
+                <p><span className="font-bold">NRO PEDIDO:</span> {getDisplayOrderId(labelPrintOrder)}</p>
                 <p><span className="font-bold">FECHA:</span> {new Date(labelPrintOrder.createdAt).toLocaleDateString()} {labelPrintOrder.time}</p>
                 <p><span className="font-bold">CLIENTE:</span> {labelPrintOrder.customerName}</p>
                 <p><span className="font-bold">ENTREGA:</span> {labelPrintOrder.shippingMethod === 'Delivery' ? 'ENVÍO A DOMICILIO' : 'RETIRO EN MOSTRADOR'}</p>
@@ -1695,7 +1700,7 @@ export default function OrdersDashboard() {
                   <p className="text-[9px] text-gray-600 italic mb-3 whitespace-pre-wrap">"{settings.ticketNotes}"</p>
                 )}
                 <p className="font-bold tracking-[0.25em] text-[10px] leading-none mb-1">|||| | | ||| || ||| | ||</p>
-                <p className="text-[8px] text-gray-500">#{labelPrintOrder.id.substring(0, 10).toUpperCase()}*</p>
+                <p className="text-[8px] text-gray-500">{getDisplayOrderId(labelPrintOrder)}*</p>
                 <p className="text-[8px] text-red-600 font-bold uppercase mt-2 border border-red-200 px-1 py-0.5 rounded inline-block bg-red-50">
                   TICKET NO FISCAL - SOLO LOGÍSTICA
                 </p>
@@ -1730,7 +1735,7 @@ export default function OrdersDashboard() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-charcoal-light w-full max-w-lg rounded-lg border border-charcoal-border shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-charcoal-border flex justify-between items-center bg-charcoal-light/25 rounded-t-lg">
-              <h2 className="text-lg text-white font-serif tracking-wide">Pedido #{selectedOrder.id.substring(0, 8).toUpperCase()}</h2>
+              <h2 className="text-lg text-white font-serif tracking-wide">Pedido {getDisplayOrderId(selectedOrder)}</h2>
               <button onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-white font-bold text-sm cursor-pointer">Cerrar</button>
             </div>
             

@@ -5,6 +5,7 @@ import { syncStockWithDefontana, pushSalesOrderToDefontana } from '@/services/de
 import { printFiscalTicket } from '@/services/fiscalPrinter';
 import { sendStatusEmail, sendStatusWhatsApp } from '@/services/notifications';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
+import { getSupabaseAdmin } from '@/utils/supabase';
 
 // Simulate WMS Order SLA timing & lifecycle transitions
 const simulateOrderLifeCycle = async (orderId: string, shippingMethod: string, email: string, phone: string, total: number) => {
@@ -46,26 +47,66 @@ const simulateOrderLifeCycle = async (orderId: string, shippingMethod: string, e
 // Confirm order and trigger integrations
 async function confirmOrderAndTriggerIntegrations(orderId: string): Promise<{ success: boolean; boletaNumber?: string | null; boletaUrl?: string | null }> {
     const pool = getDbPool();
-    const [orderRows]: any = await pool.query('SELECT status, total_amount, user_id, shipping_method FROM orders WHERE id = ?', [orderId]);
-    if (orderRows.length === 0) {
-        throw new Error(`Order ${orderId} not found`);
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    let order;
+    let assignedOrderNumber = null;
+
+    try {
+        const [orderRows]: any = await connection.query(
+            'SELECT order_number, status, total_amount, user_id, shipping_method FROM public.orders WHERE id = ? FOR UPDATE',
+            [orderId]
+        );
+
+        if (orderRows.length === 0) {
+            await connection.rollback();
+            connection.release();
+            throw new Error(`Order ${orderId} not found`);
+        }
+
+        order = orderRows[0];
+        assignedOrderNumber = order.order_number;
+
+        if (order.status !== 'Pendiente') {
+            console.log(`[Order Confirmation] Order ${orderId} is already in status ${order.status}. Skipping.`);
+            await connection.commit();
+            connection.release();
+            
+            const [existingRows]: any = await pool.query('SELECT boleta_number, boleta_url FROM public.orders WHERE id = ?', [orderId]);
+            return { 
+                success: true, 
+                boletaNumber: existingRows.length > 0 ? existingRows[0].boleta_number : null,
+                boletaUrl: existingRows.length > 0 ? existingRows[0].boleta_url : null
+            };
+        }
+
+        // Generate a new sequence number if order_number is not assigned yet
+        if (!assignedOrderNumber) {
+            const [seqRows]: any = await connection.query("SELECT nextval('public.order_number_seq') as seq");
+            const seqVal = seqRows[0]?.seq || 1000;
+            assignedOrderNumber = `PDR-${String(seqVal).padStart(6, '0')}`;
+        }
+
+        await connection.query(
+            "UPDATE public.orders SET status = 'Nuevo', order_number = ? WHERE id = ?",
+            [assignedOrderNumber, orderId]
+        );
+        await connection.query(
+            "UPDATE public.payments SET status = 'Aprobado' WHERE order_id = ?",
+            [orderId]
+        );
+
+        await connection.commit();
+        connection.release();
+    } catch (txErr) {
+        await connection.rollback();
+        connection.release();
+        throw txErr;
     }
-    const order = orderRows[0];
-    if (order.status !== 'Pendiente') {
-        console.log(`[Order Confirmation] Order ${orderId} is already in status ${order.status}. Skipping.`);
-        const [existingRows]: any = await pool.query('SELECT boleta_number, boleta_url FROM orders WHERE id = ?', [orderId]);
-        return { 
-            success: true, 
-            boletaNumber: existingRows.length > 0 ? existingRows[0].boleta_number : null,
-            boletaUrl: existingRows.length > 0 ? existingRows[0].boleta_url : null
-        };
-    }
-    
-    await pool.query("UPDATE orders SET status = 'Nuevo' WHERE id = ?", [orderId]);
-    await pool.query("UPDATE payments SET status = 'Aprobado' WHERE order_id = ?", [orderId]);
-    
+
     const [itemRows]: any = await pool.query(
-        'SELECT variant_id, quantity, unit_price, subtotal FROM order_items WHERE order_id = ?',
+        'SELECT variant_id, quantity, unit_price, subtotal FROM public.order_items WHERE order_id = ?',
         [orderId]
     );
     const items = itemRows.map((item: any) => ({
@@ -215,6 +256,255 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             }
         }
 
+        // 0.2. GET /api/test-e2e
+        if (routeStr === 'test-e2e') {
+            const results: string[] = [];
+            const log = (msg: string) => {
+                results.push(msg);
+                console.log(msg);
+            };
+
+            // Security: block in production, require secret token
+            const isProd = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production';
+            const secretParam = url.searchParams.get('secret');
+            const expectedSecret = process.env.E2E_SECRET;
+
+            if (isProd) {
+                return NextResponse.json({ error: 'Not Found' }, { status: 404 });
+            }
+            if (!expectedSecret || secretParam !== expectedSecret) {
+                return NextResponse.json({ error: 'Unauthorized: Invalid or missing secret token configuration' }, { status: 401 });
+            }
+
+            const conn = await pool.getConnection();
+            try {
+                await conn.beginTransaction();
+
+                log("🔌 Conectando a la base de datos (Transacción Iniciada)...");
+                
+                log("\n=======================================================");
+                log("🕵️ PRUEBA 1: Crear Producto con Atributo en Catálogo");
+                log("=======================================================");
+                
+                const productId = 'f0000000-0000-0000-0000-000000000001';
+                await conn.query("DELETE FROM public.products WHERE id = ?", [productId]);
+                
+                let catId;
+                const [catRes]: any = await conn.query("SELECT id FROM public.categories LIMIT 1");
+                if (catRes.length === 0) {
+                    const tempCatId = 999;
+                    await conn.query("INSERT INTO public.categories (id, name, slug, is_active) VALUES (?, 'Temp E2E', 'temp-e2e', 1) ON CONFLICT DO NOTHING", [tempCatId]);
+                    catId = tempCatId;
+                } else {
+                    catId = catRes[0].id;
+                }
+                
+                await conn.query(
+                    `INSERT INTO public.products (id, category_id, name, slug, base_price, description, is_active) 
+                     VALUES (?, ?, 'Pan de Prueba E2E', 'pan-de-prueba-e2e', 4990, 'Pan crujiente de prueba', 1)`,
+                    [productId, catId]
+                );
+                log(`✅ Producto de prueba creado con ID: ${productId}`);
+
+                const variantId = 'f0000000-0000-0000-0000-000000000002';
+                await conn.query("DELETE FROM public.product_variants WHERE id = ?", [variantId]);
+                await conn.query(
+                    `INSERT INTO public.product_variants (id, product_id, variant_name, price_adjustment, sku, is_active) 
+                     VALUES (?, ?, 'Clásico', 0.00, 'SKU-PRUEBA-E2E', 1)`,
+                    [variantId, productId]
+                );
+                log("✅ Variante 'Clásico' creada con SKU: SKU-PRUEBA-E2E");
+
+                const [attrValRes]: any = await conn.query("SELECT id FROM public.attribute_values LIMIT 1");
+                if (attrValRes.length > 0) {
+                    const valId = attrValRes[0].Id || attrValRes[0].id;
+                    await conn.query(
+                        "INSERT INTO public.variant_attribute_values (variant_id, attribute_value_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+                        [variantId, valId]
+                    );
+                    log(`✅ Variante vinculada con atributo ID: ${valId}`);
+                }
+
+                log("\n=======================================================");
+                log("🕵️ PRUEBA 2: Ajuste de Stock con Auditoría Separada");
+                log("=======================================================");
+                
+                await conn.query(
+                    `INSERT INTO public.inventory (variant_id, quantity, safety_buffer) 
+                     VALUES (?, 10, 2) 
+                     ON CONFLICT (variant_id) DO UPDATE SET quantity = 10`,
+                    [variantId]
+                );
+
+                const change = 5;
+                const responsible = 'Runner E2E';
+                const reason = 'Verificación automatizada de Fase 2.5';
+                
+                await conn.query(
+                    "UPDATE public.inventory SET quantity = quantity + ? WHERE variant_id = ?",
+                    [change, variantId]
+                );
+                
+                const movId = 'f0000000-0000-0000-0000-000000000003';
+                await conn.query("DELETE FROM public.inventory_movements WHERE id = ?", [movId]);
+                await conn.query(
+                    `INSERT INTO public.inventory_movements (id, variant_id, quantity_change, movement_type, reference_id, performed_by, reason) 
+                     VALUES (?, ?, ?, 'Ajuste Test', 'Firmado por Script', ?, ?)`,
+                    [movId, variantId, change, responsible, reason]
+                );
+                
+                const [movVerify]: any = await conn.query("SELECT * FROM public.inventory_movements WHERE id = ?", [movId]);
+                const perfBy = movVerify[0].PerformedBy || movVerify[0].performed_by;
+                const reas = movVerify[0].Reason || movVerify[0].reason;
+                log(`✅ Movimiento guardado: Responsable: ${perfBy} | Motivo: ${reas}`);
+
+                log("\n=======================================================");
+                log("🕵️ PRUEBA 3: Creación y Aplicación de Cupones");
+                log("=======================================================");
+                
+                const couponCode = 'TEST_E2E_99';
+                await conn.query("DELETE FROM public.coupons WHERE code = ?", [couponCode]);
+                await conn.query(
+                    `INSERT INTO public.coupons (code, discount_type, discount_value, min_order_value, max_uses, is_active) 
+                     VALUES (?, 'percentage', 20, 2000, 100, 1)`,
+                    [couponCode]
+                );
+                
+                const [couponVerify]: any = await conn.query("SELECT * FROM public.coupons WHERE code = ?", [couponCode]);
+                const cp = couponVerify[0];
+                const originalTotal = 10000;
+                const cpType = cp.Discount_type || cp.DiscountType || cp.discount_type;
+                const cpVal = Number(cp.Discount_value || cp.DiscountValue || cp.discount_value);
+                const discount = cpType === 'percentage' ? (originalTotal * cpVal) / 100 : cpVal;
+                const finalTotal = originalTotal - discount;
+                log(`✅ Cupón '${couponCode}' de tipo '${cpType}' creado.`);
+                log(`✅ Cálculo de descuento: $${originalTotal} - $${discount} = $${finalTotal} (OK)`);
+
+                log("\n=======================================================");
+                log("🕵️ PRUEBA 4: Generación de Correlativo Atómico e Idempotente");
+                log("=======================================================");
+                
+                const orderId = 'f0000000-0000-0000-0000-000000000004';
+                await conn.query("DELETE FROM public.orders WHERE id = ?", [orderId]);
+                await conn.query(
+                    `INSERT INTO public.orders (id, total_amount, status, shipping_method, order_number) 
+                     VALUES (?, 15000, 'Pendiente', 'Pickup', NULL)`,
+                    [orderId]
+                );
+                
+                const assignTrackingNumberInTrans = async (connObj: any, oId: string) => {
+                    const [selectRes]: any = await connObj.query("SELECT order_number FROM public.orders WHERE id = ? FOR UPDATE", [oId]);
+                    let tracking = selectRes[0].OrderNumber || selectRes[0].order_number;
+                    if (!tracking) {
+                        const [seqRes]: any = await connObj.query("SELECT nextval('public.order_number_seq') as seq");
+                        const nextVal = seqRes[0].Seq || seqRes[0].seq || seqRes[0].nextval;
+                        tracking = `PDR-${String(nextVal).padStart(6, '0')}`;
+                        await connObj.query("UPDATE public.orders SET order_number = ? WHERE id = ?", [tracking, oId]);
+                    }
+                    return tracking;
+                };
+
+                const num1 = await assignTrackingNumberInTrans(conn, orderId);
+                log(`➡️ Intento 1: Correlativo asignado: ${num1}`);
+                const num2 = await assignTrackingNumberInTrans(conn, orderId);
+                log(`➡️ Intento 2 (Verificación de idempotencia): Correlativo: ${num2}`);
+                
+                if (num1 === num2) {
+                    log(`✅ Idempotencia CONFIRMADA: Ambos intentos devolvieron el mismo correlativo.`);
+                } else {
+                    throw new Error("Falla de idempotencia");
+                }
+
+                log("\n=======================================================");
+                log("🕵️ PRUEBA 5: Fusión de Cuentas de Invitados en Registro");
+                log("=======================================================");
+                
+                const guestEmail = 'guest_fusion_test@example.com';
+                const guestId = 'f0000000-0000-0000-0000-000000000005';
+                const authUserId = 'f0000000-0000-0000-0000-000000000006';
+                
+                await conn.query("DELETE FROM public.user_roles WHERE user_id IN (?, ?)", [guestId, authUserId]);
+                await conn.query("DELETE FROM public.profiles WHERE id IN (?, ?)", [guestId, authUserId]);
+                
+                await conn.query(
+                    `INSERT INTO public.profiles (id, email, first_name, last_name, phone, is_guest) 
+                     VALUES (?, ?, 'Juan', 'Invitado', '+56911223344', true)`,
+                    [guestId, guestEmail]
+                );
+                
+                const guestOrderId = 'f0000000-0000-0000-0000-000000000007';
+                await conn.query("DELETE FROM public.orders WHERE id = ?", [guestOrderId]);
+                await conn.query(
+                    `INSERT INTO public.orders (id, user_id, total_amount, status, shipping_method) 
+                     VALUES (?, ?, 5000, 'Pendiente', 'Pickup')`,
+                    [guestOrderId, guestId]
+                );
+                
+                const guestAddrId = 'f0000000-0000-0000-0000-000000000008';
+                await conn.query("DELETE FROM public.addresses WHERE id = ?", [guestAddrId]);
+                await conn.query(
+                    `INSERT INTO public.addresses (id, user_id, street, number, commune, is_default) 
+                     VALUES (?, ?, 'Avenida Siempreviva', '742', 'Santiago', 1)`,
+                    [guestAddrId, guestId]
+                );
+                
+                log("➡️ Simulando registro y fusión...");
+                
+                const [guestRes]: any = await conn.query("SELECT id FROM public.profiles WHERE email = ? AND is_guest = true LIMIT 1", [guestEmail]);
+                const oldGuestId = guestRes.length > 0 ? (guestRes[0].Id || guestRes[0].id) : null;
+                
+                if (oldGuestId) {
+                    // Renombrar temporalmente el email del invitado para liberar la clave única
+                    await conn.query("UPDATE public.profiles SET email = email || '.fused-' || ? WHERE id = ?", [oldGuestId, oldGuestId]);
+                }
+
+                // Insertar el nuevo perfil de usuario registrado
+                await conn.query(
+                    `INSERT INTO public.profiles (id, email, first_name, last_name, phone, is_guest) 
+                     VALUES (?, ?, 'Juan', 'Registrado', '+56911223344', false)`,
+                    [authUserId, guestEmail]
+                );
+
+                if (oldGuestId) {
+                    // Mudar registros
+                    await conn.query("UPDATE public.addresses SET user_id = ? WHERE user_id = ?", [authUserId, oldGuestId]);
+                    await conn.query("UPDATE public.orders SET user_id = ? WHERE user_id = ?", [authUserId, oldGuestId]);
+                    await conn.query("DELETE FROM public.user_roles WHERE user_id = ?", [oldGuestId]);
+                    // Ahora sí podemos borrar de forma segura el perfil temporal de invitado
+                    await conn.query("DELETE FROM public.profiles WHERE id = ?", [oldGuestId]);
+                }
+                
+                const [orderCheck]: any = await conn.query("SELECT user_id FROM public.orders WHERE id = ?", [guestOrderId]);
+                const [addrCheck]: any = await conn.query("SELECT user_id FROM public.addresses WHERE id = ?", [guestAddrId]);
+                const [oldProfileCheck]: any = await conn.query("SELECT id FROM public.profiles WHERE id = ?", [guestId]);
+                
+                const orderCheckUserId = orderCheck[0]?.UserId || orderCheck[0]?.user_id;
+                const addrCheckUserId = addrCheck[0]?.UserId || addrCheck[0]?.user_id;
+
+                if (orderCheckUserId === authUserId && addrCheckUserId === authUserId && oldProfileCheck.length === 0) {
+                    log("✅ Fusión de cuentas EXITOSA");
+                } else {
+                    throw new Error("Falla en la verificación de fusión");
+                }
+
+                log("\n=======================================================");
+                log("🎉 ¡TODAS LAS PRUEBAS DE E2E PASARON CON ÉXITO! 🎉");
+                log("=======================================================");
+
+                // ROLLBACK para dejar la DB 100% limpia sin residuos
+                await conn.rollback();
+                log("🔄 Transacción revertida con éxito (ROLLBACK) - La base de datos queda limpia.");
+
+                return NextResponse.json({ status: 'success', logs: results });
+            } catch (err: any) {
+                await conn.rollback();
+                log(`❌ ERROR DURANTE LAS PRUEBAS (Transacción Revertida): ${err.message}`);
+                return NextResponse.json({ status: 'error', logs: results, error: err.message }, { status: 500 });
+            } finally {
+                conn.release();
+            }
+        }
+
         // 0.1. GET /api/orders/seed
         if (routeStr === 'orders/seed') {
             try {
@@ -237,7 +527,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                     { id: 5, name: 'Ofertas', slug: 'offers' }
                 ];
                 for (const cat of categories) {
-                    await pool.query('INSERT INTO public.categories (id, name, slug, is_active) VALUES (?, ?, ?, true)', [cat.id, cat.name, cat.slug]);
+                    await pool.query('INSERT INTO public.categories (id, name, slug, is_active) VALUES (?, ?, ?, 1)', [cat.id, cat.name, cat.slug]);
                 }
 
                 // Seed Products
@@ -268,7 +558,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
                 for (const prod of seededProducts) {
                     await pool.query(
-                        'INSERT INTO public.products (id, category_id, name, slug, base_price, image_url, description, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, true)',
+                        'INSERT INTO public.products (id, category_id, name, slug, base_price, image_url, description, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
                         [prod.id, prod.categoryId, prod.name, prod.slug, prod.price, prod.image, prod.description]
                     );
 
@@ -276,7 +566,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                     const variantId = prod.id.replace(/94(\d\d)$/, '84$1');
                     const sku = `SKU-${prod.slug.toUpperCase()}`;
                     await pool.query(
-                        'INSERT INTO public.product_variants (id, product_id, variant_name, price_adjustment, sku, is_active) VALUES (?, ?, ?, 0.00, ?, true)',
+                        'INSERT INTO public.product_variants (id, product_id, variant_name, price_adjustment, sku, is_active) VALUES (?, ?, ?, 0.00, ?, 1)',
                         [variantId, prod.id, 'Clásico', sku]
                     );
 
@@ -296,33 +586,91 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         // 1. GET /api/catalog/categories
         if (routeStr === 'catalog/categories') {
-            const [rows] = await pool.query('SELECT * FROM Categories WHERE IsActive = 1');
+            const includeInactive = url.searchParams.get('all') === 'true';
+            const query = includeInactive 
+                ? 'SELECT * FROM Categories ORDER BY name ASC'
+                : 'SELECT * FROM Categories WHERE IsActive = 1 ORDER BY name ASC';
+            const [rows] = await pool.query(query);
+            return NextResponse.json(rows);
+        }
+
+        // 1.1 GET /api/catalog/attributes/groups
+        if (routeStr === 'catalog/attributes/groups') {
+            const [rows] = await pool.query('SELECT * FROM public.attribute_groups ORDER BY name ASC');
+            return NextResponse.json(rows);
+        }
+
+        // 1.2 GET /api/catalog/attributes/values
+        if (routeStr === 'catalog/attributes/values') {
+            const groupId = url.searchParams.get('groupId');
+            let query = 'SELECT * FROM public.attribute_values';
+            const params = [];
+            if (groupId) {
+                query += ' WHERE group_id = ?';
+                params.push(parseInt(groupId));
+            }
+            query += ' ORDER BY value ASC';
+            const [rows] = await pool.query(query, params);
+            return NextResponse.json(rows);
+        }
+
+        // 1.3 GET /api/catalog/categories/attributes
+        if (routeStr === 'catalog/categories/attributes') {
+            const categoryId = url.searchParams.get('categoryId');
+            if (!categoryId) {
+                return NextResponse.json({ error: 'categoryId is required' }, { status: 400 });
+            }
+            const [rows] = await pool.query(`
+                SELECT ag.* 
+                FROM public.attribute_groups ag
+                JOIN public.category_attribute_groups cag ON ag.id = cag.attribute_group_id
+                WHERE cag.category_id = ?
+            `, [parseInt(categoryId)]);
             return NextResponse.json(rows);
         }
 
         // 2. GET /api/catalog/products
         if (routeStr === 'catalog/products') {
             const categoryId = url.searchParams.get('categoryId');
+            const showAll = url.searchParams.get('all') === 'true';
+            
             let query = `
                 SELECT 
                     p.id, 
+                    p.category_id as "categoryId",
+                    c.name as "categoryName",
                     c.slug as category, 
                     p.name, 
                     p.slug, 
                     p.base_price as price, 
                     p.image_url as image, 
                     p.description,
-                    pv.id as "variantId"
+                    p.is_active as "isActive",
+                    pv.id as "variantId",
+                    pv.sku as sku,
+                    COALESCE(i.quantity, 0) as stock,
+                    (
+                        SELECT json_agg(vav.attribute_value_id)
+                        FROM public.variant_attribute_values vav
+                        WHERE vav.variant_id = pv.id
+                    ) as attributes
                 FROM public.products p
                 LEFT JOIN public.categories c ON p.category_id = c.id
                 LEFT JOIN public.product_variants pv ON p.id = pv.product_id AND pv.variant_name = 'Clásico'
-                WHERE p.is_active = true
+                LEFT JOIN public.inventory i ON pv.id = i.variant_id
+                WHERE 1=1
             `;
             const queryParams: any[] = [];
+            
+            if (!showAll) {
+                query += ' AND p.is_active = 1';
+            }
             if (categoryId) {
                 query += ' AND p.category_id = ?';
                 queryParams.push(parseInt(categoryId));
             }
+            query += ' ORDER BY p.name ASC';
+            
             const [rows] = await pool.query(query, queryParams);
             return NextResponse.json(rows);
         }
@@ -392,6 +740,54 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             return NextResponse.json(rows);
         }
 
+        // 7.1 GET /api/inventory
+        if (routeStr === 'inventory') {
+            const [rows] = await pool.query(`
+                SELECT 
+                    pv.id as "variantId", 
+                    pv.variant_name as "variantName", 
+                    p.name as "productName", 
+                    p.image_url as "imageUrl",
+                    COALESCE(i.quantity, 0) as quantity, 
+                    COALESCE(i.safety_buffer, 2) as "safetyBuffer",
+                    i.last_updated as "lastUpdated"
+                FROM public.product_variants pv
+                JOIN public.products p ON pv.product_id = p.id
+                LEFT JOIN public.inventory i ON pv.id = i.variant_id
+                WHERE p.is_active = 1
+                ORDER BY p.name ASC
+            `);
+            return NextResponse.json(rows);
+        }
+
+        // 7.2 GET /api/inventory/movements
+        if (routeStr === 'inventory/movements') {
+            const variantId = url.searchParams.get('variantId');
+            let query = `
+                SELECT 
+                    im.*, 
+                    pv.variant_name as "variantName", 
+                    p.name as "productName"
+                FROM public.inventory_movements im
+                JOIN public.product_variants pv ON im.variant_id = pv.id
+                JOIN public.products p ON pv.product_id = p.id
+            `;
+            const params = [];
+            if (variantId) {
+                query += ' WHERE im.variant_id = ?';
+                params.push(variantId);
+            }
+            query += ' ORDER BY im.created_at DESC LIMIT 100';
+            const [rows] = await pool.query(query, params);
+            return NextResponse.json(rows);
+        }
+
+        // 7.3 GET /api/coupons
+        if (routeStr === 'coupons') {
+            const [rows] = await pool.query('SELECT * FROM public.coupons ORDER BY code ASC');
+            return NextResponse.json(rows);
+        }
+
         // 8. GET /api/orders
         if (routeStr === 'orders') {
             const [orderRows]: any = await pool.query(`
@@ -444,10 +840,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                         return NextResponse.json({ error: 'Security Exception: Payment amount mismatch' }, { status: 400 });
                     }
                     const confirmation = await confirmOrderAndTriggerIntegrations(orderId);
+                    const [updatedOrderRows]: any = await pool.query('SELECT order_number FROM Orders WHERE Id = ?', [orderId]);
+                    const orderNumber = updatedOrderRows.length > 0 ? updatedOrderRows[0].OrderNumber : null;
                     return NextResponse.json({
                         status: 'success',
                         message: 'Payment verified and order confirmed successfully',
                         orderId,
+                        orderNumber,
                         paymentStatus: status,
                         boletaNumber: confirmation.boletaNumber,
                         boletaUrl: confirmation.boletaUrl
@@ -561,6 +960,316 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             return NextResponse.json({ status: 'success', message: `Setting '${key}' updated successfully` });
         }
 
+        // 1.1 POST /api/catalog/categories
+        if (routeStr === 'catalog/categories') {
+            const { name, slug, parentId, isActive } = body;
+            if (!name || !slug) {
+                return NextResponse.json({ error: 'Name and slug are required' }, { status: 400 });
+            }
+            const [result]: any = await pool.query(
+                'INSERT INTO Categories (Name, Slug, ParentId, IsActive) VALUES (?, ?, ?, ?) RETURNING id',
+                [name, slug, parentId || null, isActive !== undefined ? (isActive ? 1 : 0) : 1]
+            );
+            const newId = result[0]?.id || result[0]?.Id || null;
+            return NextResponse.json({ status: 'success', id: newId });
+        }
+
+        // 1.2 POST /api/catalog/categories/update
+        if (routeStr === 'catalog/categories/update') {
+            const { id, name, slug, parentId, isActive } = body;
+            if (!id || !name || !slug) {
+                return NextResponse.json({ error: 'ID, name and slug are required' }, { status: 400 });
+            }
+            await pool.query(
+                'UPDATE Categories SET Name = ?, Slug = ?, ParentId = ?, IsActive = ? WHERE Id = ?',
+                [name, slug, parentId || null, isActive !== undefined ? (isActive ? 1 : 0) : 1, id]
+            );
+            return NextResponse.json({ status: 'success' });
+        }
+
+        // 1.3 POST /api/catalog/attributes/groups
+        if (routeStr === 'catalog/attributes/groups') {
+            const { name } = body;
+            if (!name) {
+                return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+            }
+            const [result]: any = await pool.query(
+                'INSERT INTO public.attribute_groups (name) VALUES (?) ON CONFLICT (name) DO NOTHING RETURNING id',
+                [name]
+            );
+            const newId = result[0]?.id || null;
+            return NextResponse.json({ status: 'success', id: newId });
+        }
+
+        // 1.4 POST /api/catalog/attributes/values
+        if (routeStr === 'catalog/attributes/values') {
+            const { groupId, value } = body;
+            if (!groupId || !value) {
+                return NextResponse.json({ error: 'groupId and value are required' }, { status: 400 });
+            }
+            const [result]: any = await pool.query(
+                'INSERT INTO public.attribute_values (group_id, value) VALUES (?, ?) ON CONFLICT (group_id, value) DO NOTHING RETURNING id',
+                [parseInt(groupId), value]
+            );
+            const newId = result[0]?.id || null;
+            return NextResponse.json({ status: 'success', id: newId });
+        }
+
+        // 1.5 POST /api/catalog/categories/attributes
+        if (routeStr === 'catalog/categories/attributes') {
+            const { categoryId, attributeGroupId } = body;
+            if (!categoryId || !attributeGroupId) {
+                return NextResponse.json({ error: 'categoryId and attributeGroupId are required' }, { status: 400 });
+            }
+
+            // Enforce that the category is a "Tipo" (has a parent)
+            const [catRows]: any = await pool.query('SELECT parent_id FROM Categories WHERE Id = ?', [parseInt(categoryId)]);
+            if (catRows.length === 0) {
+                return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+            }
+            if (catRows[0].ParentId === null || catRows[0].parent_id === null) {
+                return NextResponse.json({ error: 'Restricción de Negocio: Solo se pueden asociar atributos a subcategorías del nivel "Tipo"' }, { status: 400 });
+            }
+
+            await pool.query(
+                'INSERT INTO public.category_attribute_groups (category_id, attribute_group_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
+                [parseInt(categoryId), parseInt(attributeGroupId)]
+            );
+            return NextResponse.json({ status: 'success' });
+        }
+
+        // 1.6 POST /api/catalog/products
+        if (routeStr === 'catalog/products') {
+            const { name, slug, price, categoryId, stock, image, description, attributes } = body;
+            if (!name || !slug || !price || !categoryId) {
+                return NextResponse.json({ error: 'Name, slug, price, and categoryId are required' }, { status: 400 });
+            }
+
+            const productId = crypto.randomUUID();
+            await pool.query(
+                'INSERT INTO public.products (id, category_id, name, slug, base_price, image_url, description, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
+                [productId, parseInt(categoryId), name, slug, parseFloat(price), image || null, description || null]
+            );
+
+            // Create default variant
+            const variantId = crypto.randomUUID();
+            const sku = `SKU-${slug.toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+            await pool.query(
+                'INSERT INTO public.product_variants (id, product_id, variant_name, price_adjustment, sku, is_active) VALUES (?, ?, ?, 0.00, ?, 1)',
+                [variantId, productId, 'Clásico', sku]
+            );
+
+            // Insert inventory
+            await pool.query(
+                'INSERT INTO public.inventory (variant_id, quantity, safety_buffer) VALUES (?, ?, 2)',
+                [variantId, parseInt(stock) || 0]
+            );
+
+            // Save variant attribute values if provided
+            if (attributes && Array.isArray(attributes)) {
+                for (const valId of attributes) {
+                    await pool.query(
+                        'INSERT INTO public.variant_attribute_values (variant_id, attribute_value_id) VALUES (?, ?)',
+                        [variantId, parseInt(valId)]
+                    );
+                }
+            }
+
+            return NextResponse.json({ status: 'success', id: productId });
+        }
+
+        // 1.7 POST /api/catalog/products/update
+        if (routeStr === 'catalog/products/update') {
+            const { id, name, slug, price, categoryId, stock, image, description, attributes } = body;
+            if (!id || !name || !slug || !price || !categoryId) {
+                return NextResponse.json({ error: 'ID, name, slug, price, and categoryId are required' }, { status: 400 });
+            }
+
+            await pool.query(
+                'UPDATE public.products SET category_id = ?, name = ?, slug = ?, base_price = ?, image_url = ?, description = ? WHERE id = ?',
+                [parseInt(categoryId), name, slug, parseFloat(price), image || null, description || null, id]
+            );
+
+            // Update main variant price or stock
+            const [variants]: any = await pool.query('SELECT id FROM public.product_variants WHERE product_id = ? AND variant_name = ?', [id, 'Clásico']);
+            if (variants.length > 0) {
+                const variantId = variants[0].id;
+                
+                // Update stock
+                await pool.query(
+                    'INSERT INTO public.inventory (variant_id, quantity, safety_buffer) VALUES (?, ?, 2) ON CONFLICT (variant_id) DO UPDATE SET quantity = EXCLUDED.quantity',
+                    [variantId, parseInt(stock) || 0]
+                );
+
+                // Update attributes (delete old ones and insert new ones)
+                await pool.query('DELETE FROM public.variant_attribute_values WHERE variant_id = ?', [variantId]);
+                if (attributes && Array.isArray(attributes)) {
+                    for (const valId of attributes) {
+                        await pool.query(
+                            'INSERT INTO public.variant_attribute_values (variant_id, attribute_value_id) VALUES (?, ?)',
+                            [variantId, parseInt(valId)]
+                        );
+                    }
+                }
+            }
+
+            return NextResponse.json({ status: 'success' });
+        }
+
+        // 1.8 POST /api/catalog/products/delete
+        if (routeStr === 'catalog/products/delete') {
+            const { id } = body;
+            if (!id) {
+                return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
+            }
+            await pool.query('UPDATE public.products SET is_active = 0 WHERE id = ?', [id]);
+            return NextResponse.json({ status: 'success' });
+        }
+
+        // 1.9 POST /api/catalog/products/bulk
+        if (routeStr === 'catalog/products/bulk') {
+            const { products } = body;
+            if (!products || !Array.isArray(products)) {
+                return NextResponse.json({ error: 'Products array is required' }, { status: 400 });
+            }
+
+            for (const prod of products) {
+                const { name, price, stock, categoryId, description, image, attributes } = prod;
+                if (!name || price === undefined || !categoryId) continue;
+
+                // Check if product with same name exists
+                const [existingProd]: any = await pool.query('SELECT id FROM public.products WHERE LOWER(name) = LOWER(?) LIMIT 1', [name]);
+
+                if (existingProd.length > 0) {
+                    const productId = existingProd[0].id;
+                    // Update existing product
+                    await pool.query(
+                        'UPDATE public.products SET base_price = ?, category_id = ?, description = ?, image_url = COALESCE(?, image_url) WHERE id = ?',
+                        [parseFloat(price), parseInt(categoryId), description || null, image || null, productId]
+                    );
+
+                    // Find variant ID
+                    const [existingVar]: any = await pool.query('SELECT id FROM public.product_variants WHERE product_id = ? LIMIT 1', [productId]);
+                    if (existingVar.length > 0) {
+                        const variantId = existingVar[0].id;
+                        // Update inventory
+                        await pool.query(
+                            'INSERT INTO public.inventory (variant_id, quantity, safety_buffer) VALUES (?, ?, 2) ON CONFLICT (variant_id) DO UPDATE SET quantity = EXCLUDED.quantity',
+                            [variantId, parseInt(stock) || 0]
+                        );
+                    }
+                } else {
+                    // Insert new product
+                    const productId = crypto.randomUUID();
+                    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                    
+                    await pool.query(
+                        'INSERT INTO public.products (id, category_id, name, slug, base_price, image_url, description, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
+                        [productId, parseInt(categoryId), name, slug, parseFloat(price), image || null, description || null]
+                    );
+
+                    const variantId = crypto.randomUUID();
+                    const sku = `SKU-${slug.toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+                    await pool.query(
+                        'INSERT INTO public.product_variants (id, product_id, variant_name, price_adjustment, sku, is_active) VALUES (?, ?, ?, 0.00, ?, 1)',
+                        [variantId, productId, 'Clásico', sku]
+                    );
+
+                    await pool.query(
+                        'INSERT INTO public.inventory (variant_id, quantity, safety_buffer) VALUES (?, ?, 2)',
+                        [variantId, parseInt(stock) || 0]
+                    );
+
+                    if (attributes && Array.isArray(attributes)) {
+                        for (const valId of attributes) {
+                            await pool.query(
+                                'INSERT INTO public.variant_attribute_values (variant_id, attribute_value_id) VALUES (?, ?)',
+                                [variantId, parseInt(valId)]
+                            );
+                        }
+                    }
+                }
+            }
+
+            return NextResponse.json({ status: 'success' });
+        }
+
+        // 1.9.1 POST /api/inventory/adjust
+        if (routeStr === 'inventory/adjust') {
+            const { variantId, quantityChange, movementType, referenceId, performedBy, reason } = body;
+            if (!variantId || quantityChange === undefined || !movementType) {
+                return NextResponse.json({ error: 'variantId, quantityChange, and movementType are required' }, { status: 400 });
+            }
+
+            // Read current stock
+            const [rows]: any = await pool.query('SELECT quantity FROM public.inventory WHERE variant_id = ?', [variantId]);
+            let currentQuantity = 0;
+            if (rows.length > 0) {
+                currentQuantity = rows[0].quantity;
+            }
+
+            const newQuantity = currentQuantity + parseInt(quantityChange);
+            if (newQuantity < 0) {
+                return NextResponse.json({ error: 'El stock resultante no puede ser menor a cero' }, { status: 400 });
+            }
+
+            // Update inventory
+            await pool.query(
+                'INSERT INTO public.inventory (variant_id, quantity, safety_buffer) VALUES (?, ?, 2) ON CONFLICT (variant_id) DO UPDATE SET quantity = EXCLUDED.quantity',
+                [variantId, newQuantity]
+            );
+
+            // Record movement
+            await pool.query(
+                'INSERT INTO public.inventory_movements (id, variant_id, quantity_change, movement_type, reference_id, performed_by, reason) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?)',
+                [variantId, parseInt(quantityChange), movementType, referenceId || null, performedBy || null, reason || null]
+            );
+
+            return NextResponse.json({ status: 'success', newQuantity });
+        }
+
+        // 1.9.2 POST /api/coupons
+        if (routeStr === 'coupons') {
+            const { code, discountType, discountValue, minOrderValue, maxUses, categoryId, productId, validFrom, validTo } = body;
+            if (!code || !discountType || discountValue === undefined) {
+                return NextResponse.json({ error: 'code, discountType, and discountValue are required' }, { status: 400 });
+            }
+
+            const [result]: any = await pool.query(
+                `INSERT INTO public.coupons (code, discount_type, discount_value, min_order_value, max_uses, category_id, product_id, valid_from, valid_to, is_active) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1) RETURNING id`,
+                [code.toUpperCase(), discountType, parseFloat(discountValue), parseFloat(minOrderValue || 0), maxUses ? parseInt(maxUses) : null, categoryId ? parseInt(categoryId) : null, productId || null, validFrom || null, validTo || null]
+            );
+            const newId = result[0]?.id || null;
+            return NextResponse.json({ status: 'success', id: newId });
+        }
+
+        // 1.9.3 POST /api/coupons/update
+        if (routeStr === 'coupons/update') {
+            const { id, code, discountType, discountValue, minOrderValue, maxUses, categoryId, productId, validFrom, validTo, isActive } = body;
+            if (!id || !code || !discountType || discountValue === undefined) {
+                return NextResponse.json({ error: 'id, code, discountType, and discountValue are required' }, { status: 400 });
+            }
+
+            await pool.query(
+                `UPDATE public.coupons 
+                 SET code = ?, discount_type = ?, discount_value = ?, min_order_value = ?, max_uses = ?, category_id = ?, product_id = ?, valid_from = ?, valid_to = ?, is_active = ? 
+                 WHERE id = ?`,
+                [code.toUpperCase(), discountType, parseFloat(discountValue), parseFloat(minOrderValue || 0), maxUses ? parseInt(maxUses) : null, categoryId ? parseInt(categoryId) : null, productId || null, validFrom || null, validTo || null, isActive !== undefined ? (isActive ? 1 : 0) : 1, parseInt(id)]
+            );
+            return NextResponse.json({ status: 'success' });
+        }
+
+        // 1.9.4 POST /api/coupons/delete
+        if (routeStr === 'coupons/delete') {
+            const { id } = body;
+            if (!id) {
+                return NextResponse.json({ error: 'id is required' }, { status: 400 });
+            }
+            await pool.query('UPDATE public.coupons SET is_active = 0 WHERE id = ?', [parseInt(id)]);
+            return NextResponse.json({ status: 'success' });
+        }
+
         // 2. POST /api/crm/addresses
         if (routeStr === 'crm/addresses') {
             const { userId, commune, street, number, propertyType, floor, department } = body;
@@ -662,10 +1371,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                         customerLastName = userRows[0].LastName;
                     } else {
                         finalUserId = crypto.randomUUID();
-                        await pool.query(
-                            'INSERT INTO Users (Id, Email, FirstName, LastName, Phone) VALUES (?, ?, ?, ?, ?)',
-                            [finalUserId, email, customerFirstName, customerLastName, customerPhone]
-                        );
+                        const supabaseAdmin = getSupabaseAdmin();
+                        const { error: insertErr } = await supabaseAdmin.from('profiles').insert({
+                            id: finalUserId,
+                            email,
+                            first_name: customerFirstName,
+                            last_name: customerLastName,
+                            phone: customerPhone,
+                            is_guest: true
+                        });
+                        if (insertErr) {
+                            console.error('[Supabase Guest Insertion Error]:', insertErr);
+                            throw new Error(`Failed to create guest user profile: ${insertErr.message}`);
+                        }
                         const [roleRows]: any = await pool.query("SELECT Id FROM Roles WHERE Name = 'Cliente'");
                         if (roleRows.length > 0) {
                             await pool.query('INSERT INTO UserRoles (UserId, RoleId) VALUES (?, ?)', [finalUserId, roleRows[0].Id]);

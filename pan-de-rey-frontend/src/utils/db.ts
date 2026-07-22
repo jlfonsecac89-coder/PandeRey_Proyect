@@ -2,7 +2,7 @@ import { Pool, PoolClient } from 'pg';
 
 // Configuration mapped to environment variables
 export const dbConfig = {
-    host: process.env.DB_HOST || process.env.POSTGRES_HOST || 'db.cxhjthmgkzqpldkkdqkv.supabase.com',
+    host: process.env.DB_HOST || process.env.POSTGRES_HOST || 'db.cxhjthmgkzqpldkkdqkv.supabase.co',
     user: process.env.DB_USER || process.env.POSTGRES_USER || 'postgres',
     password: process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD || '01l93pDapK',
     database: process.env.DB_NAME || process.env.POSTGRES_DATABASE || 'postgres',
@@ -87,6 +87,8 @@ export function mysqlToPostgresQuery(sql: string): string {
         .replace(/QuantityChange/g, 'quantity_change')
         .replace(/MovementType/g, 'movement_type')
         .replace(/ReferenceId/g, 'reference_id')
+        .replace(/PerformedBy/g, 'performed_by')
+        .replace(/Reason/g, 'reason')
         .replace(/PropertyType/g, 'property_type')
         .replace(/IsDefault/g, 'is_default')
         .replace(/DiscountType/g, 'discount_type')
@@ -108,6 +110,7 @@ export function mysqlToPostgresQuery(sql: string): string {
         .replace(/ShippingCost/g, 'shipping_cost')
         .replace(/BoletaNumber/g, 'boleta_number')
         .replace(/BoletaUrl/g, 'boleta_url')
+        .replace(/OrderNumber/g, 'order_number')
         .replace(/FiscalPrinterStatus/g, 'fiscal_printer_status')
         .replace(/OrderId/g, 'order_id')
         .replace(/VariantId/g, 'variant_id')
@@ -156,6 +159,9 @@ function mapRowKeys(row: any): any {
         else if (key === 'notes') newKey = 'Notes';
         else if (key === 'boleta_number') newKey = 'BoletaNumber';
         else if (key === 'boleta_url') newKey = 'BoletaUrl';
+        else if (key === 'order_number') newKey = 'OrderNumber';
+        else if (key === 'performed_by') newKey = 'PerformedBy';
+        else if (key === 'reason') newKey = 'Reason';
         else if (key === 'created_at') newKey = 'CreatedAt';
         else if (key === 'updated_at') newKey = 'UpdatedAt';
         else if (key === 'variant_id') newKey = 'VariantId';
@@ -270,6 +276,18 @@ export const getDbPool = (): any => {
             pgPool.query('ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey CASCADE;').catch(err => {
                 console.warn('[Database Setup WARNING]: Could not drop profiles_id_fkey constraint:', err.message);
             });
+            // Auto-patch schema for Phase 3 & 4 (order_number_seq, order_number, performed_by, reason)
+            (async () => {
+                try {
+                    await pgPool.query('CREATE SEQUENCE IF NOT EXISTS public.order_number_seq START WITH 1000;');
+                    await pgPool.query('ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS order_number VARCHAR(50) UNIQUE;');
+                    await pgPool.query('ALTER TABLE public.inventory_movements ADD COLUMN IF NOT EXISTS performed_by VARCHAR(100) NULL;');
+                    await pgPool.query('ALTER TABLE public.inventory_movements ADD COLUMN IF NOT EXISTS reason TEXT NULL;');
+                    console.log('[Database Setup]: sequence and custom columns checked/created successfully.');
+                } catch (err: any) {
+                    console.warn('[Database Setup WARNING]: Could not create sequence or columns:', err.message);
+                }
+            })();
             console.log('[Frontend Postgres Pool] Initialized successfully.');
         } catch (err) {
             console.error('Postgres pool creation failed:', err);

@@ -64,16 +64,16 @@ function CheckoutSuccessContent() {
           const data = await res.json();
           if (data.status === 'success' || data.paymentStatus === 'approved') {
             setVerificationStatus('success');
+            const updatedOrder = {
+              ...localOrder,
+              orderId: data.orderNumber || localOrder?.orderId || '',
+              boletaNumber: data.boletaNumber || localOrder?.boletaNumber || null,
+              boletaUrl: data.boletaUrl || localOrder?.boletaUrl || null
+            };
+            setOrderInfo(updatedOrder as any);
+            localStorage.setItem('pan_de_rey_last_order', JSON.stringify(updatedOrder));
             if (data.boletaNumber) {
               setBoletaInfo({ number: data.boletaNumber, url: data.boletaUrl });
-              // Guardar la información de boleta obtenida en el localStorage
-              if (localOrder) {
-                localStorage.setItem('pan_de_rey_last_order', JSON.stringify({
-                  ...localOrder,
-                  boletaNumber: data.boletaNumber,
-                  boletaUrl: data.boletaUrl
-                }));
-              }
             }
           } else {
             setVerificationStatus('failed');
@@ -98,7 +98,9 @@ function CheckoutSuccessContent() {
   }, [paymentId, paymentStatus]);
 
   const totalAmount = orderInfo?.total || 15000;
-  const orderIdText = orderInfo?.orderId ? orderInfo.orderId.substring(0, 8) : 'PR-829374';
+  const orderIdText = orderInfo?.orderId 
+    ? (orderInfo.orderId.startsWith('PDR-') ? orderInfo.orderId : orderInfo.orderId.substring(0, 8)) 
+    : 'PR-829374';
 
   // Render para estado cargando verificación
   if (verificationStatus === 'loading') {
