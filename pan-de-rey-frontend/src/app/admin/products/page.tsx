@@ -117,6 +117,8 @@ export default function CatalogManager() {
     categoryId: number;
     description: string;
     image: string;
+    sku?: string;
+    attributes?: number[];
     status: 'new' | 'has_change' | 'no_change';
     changeDetails: string;
     approved: boolean;
@@ -526,14 +528,20 @@ export default function CatalogManager() {
         const getIndex = (name: string) => headers.findIndex(h => h.toLowerCase().trim() === name.toLowerCase());
 
         const idxName = getIndex('nombre');
-        const idxPrice = getIndex('precio');
+        const idxPrice = getIndex('price') !== -1 ? getIndex('price') : getIndex('precio');
         const idxStock = getIndex('stock');
         const idxCatId = getIndex('categoria_id');
-        const idxDesc = getIndex('descripcion');
-        const idxImage = getIndex('imagenurl');
+        const idxCatName = getIndex('categoria');
+        const idxSku = getIndex('sku');
+        const idxDesc = getIndex('descripcion') !== -1 ? getIndex('descripcion') : getIndex('description');
+        const idxImage = getIndex('imagenurl') !== -1 ? getIndex('imagenurl') : (getIndex('imageurl') !== -1 ? getIndex('imageurl') : getIndex('image'));
+        const idxSubcat = getIndex('subcategoria');
+        const idxTipo = getIndex('tipo');
+        const idxRelleno = getIndex('relleno');
+        const idxCobertura = getIndex('cobertura');
 
-        if (idxName === -1 || idxPrice === -1 || idxStock === -1 || idxCatId === -1) {
-          showToast('Formato de CSV incorrecto. Faltan columnas obligatorias.', 'error');
+        if (idxName === -1 || idxPrice === -1 || idxStock === -1 || (idxCatId === -1 && idxCatName === -1)) {
+          showToast('Formato de CSV incorrecto. Faltan columnas obligatorias (Nombre, Precio, Stock y Categoría).', 'error');
           return;
         }
 
@@ -545,11 +553,51 @@ export default function CatalogManager() {
           const name = rowVals[idxName];
           const price = parseFloat(rowVals[idxPrice]);
           const stock = parseInt(rowVals[idxStock], 10);
-          const categoryId = parseInt(rowVals[idxCatId], 10);
+          
+          let categoryId = 0;
+          if (idxCatId !== -1 && rowVals[idxCatId]) {
+            categoryId = parseInt(rowVals[idxCatId], 10);
+          } else if (idxCatName !== -1) {
+            const catVal = rowVals[idxCatName];
+            const subcatVal = idxSubcat !== -1 ? rowVals[idxSubcat] : '';
+            const tipoVal = idxTipo !== -1 ? rowVals[idxTipo] : '';
+            
+            // Resolve from loaded categories
+            const matched = categories.find(c => {
+              const nameLower = c.name.toLowerCase().trim();
+              if (tipoVal && nameLower === tipoVal.toLowerCase().trim()) return true;
+              if (!tipoVal && subcatVal && nameLower === subcatVal.toLowerCase().trim()) return true;
+              if (!tipoVal && !subcatVal && catVal && nameLower === catVal.toLowerCase().trim()) return true;
+              return false;
+            });
+            if (matched) {
+              categoryId = matched.id;
+            }
+          }
+          
           const description = idxDesc !== -1 ? rowVals[idxDesc] : '';
           const image = idxImage !== -1 && rowVals[idxImage] ? rowVals[idxImage] : '';
+          const sku = idxSku !== -1 ? rowVals[idxSku] : '';
+          
+          // Parse Attributes
+          const attributes: number[] = [];
+          if (idxRelleno !== -1 && rowVals[idxRelleno]) {
+            const rellenoVal = rowVals[idxRelleno].toLowerCase().trim();
+            const matchedAttr = attributeValues.find(v => v.group_id === 1 && v.value.toLowerCase().trim() === rellenoVal);
+            if (matchedAttr) attributes.push(matchedAttr.id);
+          }
+          
+          if (idxCobertura !== -1 && rowVals[idxCobertura]) {
+            const cobVal = rowVals[idxCobertura];
+            // Might have multiple values split by |
+            const parts = cobVal.split('|').map(p => p.toLowerCase().trim());
+            for (const part of parts) {
+              const matchedAttr = attributeValues.find(v => v.group_id === 2 && v.value.toLowerCase().trim() === part);
+              if (matchedAttr) attributes.push(matchedAttr.id);
+            }
+          }
 
-          if (!name || isNaN(price) || isNaN(stock) || isNaN(categoryId)) continue;
+          if (!name || isNaN(price) || isNaN(stock) || !categoryId) continue;
 
           // Match against existing products
           const existing = products.find(p => p.name.toLowerCase().trim() === name.toLowerCase().trim());
@@ -589,6 +637,8 @@ export default function CatalogManager() {
             categoryId,
             description,
             image,
+            sku,
+            attributes,
             status,
             changeDetails,
             approved

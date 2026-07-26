@@ -1134,7 +1134,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             }
 
             for (const prod of products) {
-                const { name, price, stock, categoryId, description, image, attributes } = prod;
+                const { name, price, stock, categoryId, description, image, sku, attributes } = prod;
                 if (!name || price === undefined || !categoryId) continue;
 
                 // Check if product with same name exists
@@ -1159,20 +1159,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                         );
                     }
                 } else {
-                    // Insert new product
+                    // Insert new product (as inactive, is_active = false)
                     const productId = crypto.randomUUID();
                     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
                     
                     await pool.query(
-                        'INSERT INTO public.products (id, category_id, name, slug, base_price, image_url, description, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
+                        'INSERT INTO public.products (id, category_id, name, slug, base_price, image_url, description, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, false)',
                         [productId, parseInt(categoryId), name, slug, parseFloat(price), image || null, description || null]
                     );
 
                     const variantId = crypto.randomUUID();
-                    const sku = `SKU-${slug.toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+                    const skuToUse = sku || `SKU-${slug.toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
                     await pool.query(
-                        'INSERT INTO public.product_variants (id, product_id, variant_name, price_adjustment, sku, is_active) VALUES (?, ?, ?, 0.00, ?, 1)',
-                        [variantId, productId, 'Clásico', sku]
+                        'INSERT INTO public.product_variants (id, product_id, variant_name, price_adjustment, sku, is_active) VALUES (?, ?, ?, 0.00, ?, false)',
+                        [variantId, productId, 'Clásico', skuToUse]
                     );
 
                     await pool.query(
