@@ -1,8 +1,8 @@
-import { getDbPool } from '@/utils/db';
-import { generateSlug } from '@/lib/normalize';
-import { Product, ProductDTO, ProductVariant } from '@/types/Product';
-import { NotFoundError, ValidationError } from '@/lib/errors';
-import { logger } from '@/lib/logger';
+import { getDbPool } from '@/shared/utils/db';
+import { generateSlug } from '@/shared/utils/normalize';
+import { Product, ProductDTO, ProductVariant } from '@/domains/catalog/types/Product';
+import { NotFoundError, ValidationError } from '@/shared/errors';
+import { logger } from '@/shared/logger';
 
 export class ProductService {
     

@@ -1,8 +1,8 @@
-import { getDbPool } from '@/utils/db';
-import { generateSlug } from '@/lib/normalize';
-import { Category, CategoryDTO } from '@/types/Category';
-import { NotFoundError, ValidationError } from '@/lib/errors';
-import { logger } from '@/lib/logger';
+import { getDbPool } from '@/shared/utils/db';
+import { generateSlug } from '@/shared/utils/normalize';
+import { Category, CategoryDTO } from '@/domains/catalog/types/Category';
+import { NotFoundError, ValidationError } from '@/shared/errors';
+import { logger } from '@/shared/logger';
 
 export class CategoryService {
     

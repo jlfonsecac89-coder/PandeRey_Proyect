@@ -1,4 +1,18 @@
-import { getDbPool } from '@/utils/db';
+import { getDbPool } from '@/shared/utils/db';
+
+/**
+ * ARCHITECTURE NOTE: BATCH PROCESSING & ASYNC JOBS
+ * 
+ * This service is prepared for asynchronous batch processing.
+ * If the expected volume of products exceeds a few thousands (e.g., > 5000),
+ * the `processImport` method can be easily decoupled and executed within a 
+ * background job queue (like BullMQ, Inngest, or a Serverless Cron).
+ * 
+ * Future Enterprise Ready features:
+ * - Chunking array inputs into smaller batches (e.g. 500 products per transaction).
+ * - Webhook callbacks on import completion.
+ * - Progress tracking stored in Redis or DB.
+ */
 
 export interface BulkImportProduct {
     name: string;

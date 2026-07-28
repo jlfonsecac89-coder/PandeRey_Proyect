@@ -34,7 +34,7 @@ import {
   incrementLocalOrderLabel, 
   seedLocalDb,
   getLocalSettings
-} from '@/utils/dbSim';
+} from '@/shared/utils/dbSim';
 
 // Tipos
 type OrderStatus = 'Nuevo' | 'Preparación' | 'Listo' | 'Enviado';

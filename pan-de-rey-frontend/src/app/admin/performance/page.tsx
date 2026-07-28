@@ -24,7 +24,7 @@ import {
   SimCoupon, 
   SimOrder,
   SimProduct
-} from '@/utils/dbSim';
+} from '@/shared/utils/dbSim';
 import { formatPrice } from '@/utils/format';
 
 export default function PerformancePromos() {

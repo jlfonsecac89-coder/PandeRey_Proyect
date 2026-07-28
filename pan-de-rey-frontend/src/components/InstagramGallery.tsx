@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { getLocalAppearance } from '@/utils/dbSim';
+import { getLocalAppearance } from '@/shared/utils/dbSim';
 
 const fallbackImages = [
   'https://images.unsplash.com/photo-1509440159596-0249088772ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',

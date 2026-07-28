@@ -1,7 +1,7 @@
-import { getDbPool } from '@/utils/db';
-import { Inventory, InventoryAdjustDTO } from '@/types/Inventory';
-import { ValidationError } from '@/lib/errors';
-import { logger } from '@/lib/logger';
+import { getDbPool } from '@/shared/utils/db';
+import { Inventory, InventoryAdjustDTO } from '@/domains/inventory/types/Inventory';
+import { ValidationError } from '@/shared/errors';
+import { logger } from '@/shared/logger';
 
 export class InventoryService {
     

@@ -1,4 +1,4 @@
-import { getDbPool } from '@/utils/db';
+import { getDbPool } from '@/shared/utils/db';
 
 export const printFiscalTicket = async (orderId: string) => {
     try {

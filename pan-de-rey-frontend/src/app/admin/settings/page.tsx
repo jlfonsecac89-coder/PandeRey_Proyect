@@ -26,7 +26,7 @@ import {
   type SimSettings, 
   type SimRedemptionReward, 
   type SimProduct 
-} from "@/utils/dbSim";
+} from "@/shared/utils/dbSim";
 
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);

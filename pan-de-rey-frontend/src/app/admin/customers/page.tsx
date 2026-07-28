@@ -16,7 +16,7 @@ import {
   ChevronRight,
   Info
 } from "lucide-react";
-import { getLocalCustomerRFM, type SimCustomerRFM } from "@/utils/dbSim";
+import { getLocalCustomerRFM, type SimCustomerRFM } from "@/shared/utils/dbSim";
 
 export default function CustomerAnalyticsPage() {
   const [mounted, setMounted] = useState(false);

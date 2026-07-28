@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LabelList } from 'recharts';
 import { DollarSign, Package, ShoppingBag, AlertTriangle, AlertCircle, XCircle, Ban, Store, Truck } from 'lucide-react';
-import { seedLocalDb, getLocalAnalytics, getLocalOrders } from '@/utils/dbSim';
+import { seedLocalDb, getLocalAnalytics, getLocalOrders } from '@/shared/utils/dbSim';
 import { formatPrice } from '@/utils/format';
 import { getApiUrl } from '@/utils/api';
 

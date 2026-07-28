@@ -1,5 +1,5 @@
-import { getDbPool } from '@/utils/db';
-import { Product } from '@/types/Product';
+import { getDbPool } from '@/shared/utils/db';
+import { Product } from '@/domains/catalog/types/Product';
 
 export class CatalogService {
     

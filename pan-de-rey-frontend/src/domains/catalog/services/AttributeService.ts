@@ -1,8 +1,8 @@
-import { getDbPool } from '@/utils/db';
-import { AttributeGroup, AttributeValue } from '@/types/Category';
-import { ValidationError } from '@/lib/errors';
-import { logger } from '@/lib/logger';
-import { normalizeString } from '@/lib/normalize';
+import { getDbPool } from '@/shared/utils/db';
+import { AttributeGroup, AttributeValue } from '@/domains/catalog/types/Category';
+import { ValidationError } from '@/shared/errors';
+import { logger } from '@/shared/logger';
+import { normalizeString } from '@/shared/utils/normalize';
 
 export class AttributeService {
     

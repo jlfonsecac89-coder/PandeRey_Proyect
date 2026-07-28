@@ -1,4 +1,4 @@
-import { ValidationError } from './errors';
+import { ValidationError } from '../errors';
 
 export function validateRequired(value: any, fieldName: string) {
     if (value === undefined || value === null || value === '') {

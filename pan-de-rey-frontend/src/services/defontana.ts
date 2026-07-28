@@ -1,4 +1,4 @@
-import { getDbPool } from '@/utils/db';
+import { getDbPool } from '@/shared/utils/db';
 
 export const syncStockWithDefontana = async (sku: string, currentQuantity: number) => {
     try {

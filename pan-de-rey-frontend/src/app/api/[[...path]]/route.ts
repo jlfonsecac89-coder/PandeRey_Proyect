@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { getDbPool } from '@/utils/db';
-import { printFiscalTicket } from '@/services/fiscalPrinter';
-import { sendStatusEmail, sendStatusWhatsApp } from '@/services/notifications';
+import { getDbPool } from '@/shared/utils/db';
+import { printFiscalTicket } from '@/domains/orders/services/fiscalPrinter';
+import { sendStatusEmail, sendStatusWhatsApp } from '@/domains/orders/services/notifications';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
-import { getSupabaseAdmin } from '@/utils/supabase';
-import { CatalogImportService } from '@/services/catalogImportService';
-import { ProductService } from '@/services/ProductService';
-import { logger } from '@/lib/logger';
-import { CategoryService } from '@/services/CategoryService';
-import { InventoryService } from '@/services/InventoryService';
-import { CatalogService } from '@/services/CatalogService';
-import { AttributeService } from '@/services/AttributeService';
+import { getSupabaseAdmin } from '@/shared/utils/supabase';
+import { CatalogImportService } from '@/domains/catalog/services/CatalogImportService';
+import { ProductService } from '@/domains/catalog/services/ProductService';
+import { logger } from '@/shared/logger';
+import { CategoryService } from '@/domains/catalog/services/CategoryService';
+import { InventoryService } from '@/domains/inventory/services/InventoryService';
+import { CatalogService } from '@/domains/catalog/services/CatalogService';
+import { AttributeService } from '@/domains/catalog/services/AttributeService';
 
 // Simulate WMS Order SLA timing & lifecycle transitions
 const simulateOrderLifeCycle = async (orderId: string, shippingMethod: string, email: string, phone: string, total: number) => {
@@ -243,6 +243,12 @@ function checkTrackRateLimit(ip: string): boolean {
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ path?: string[] }> }) {
+    const requestId = crypto.randomUUID();
+    const startTime = Date.now();
+    const method = 'GET';
+    const endpoint = request.url;
+    let statusCode = 200;
+    try {
     const { path } = await params;
     const url = new URL(request.url);
     const pool = getDbPool();
@@ -254,7 +260,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const routeStr = path.join('/');
 
-    try {
         // 0. GET /api/test-db
         if (routeStr === 'test-db') {
             const dbEnvKeys = Object.keys(process.env).filter(k => 
@@ -976,13 +981,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         }
 
         return NextResponse.json({ error: 'Route not found' }, { status: 404 });
-    } catch (err: any) {
-        console.error(`[API GET ${routeStr} Error]`, err);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+    } catch (error: any) {
+        statusCode = 500;
+        logger.error('Unhandled API Exception', { requestId, method, endpoint, statusCode, error });
+        return NextResponse.json({ error: 'Internal Server Error', requestId }, { status: 500 });
+    } finally {
+        const durationMs = Date.now() - startTime;
+        logger.info('API Request completed', { requestId, method, endpoint, statusCode, durationMs });
     }
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ path?: string[] }> }) {
+    const requestId = crypto.randomUUID();
+    const startTime = Date.now();
+    const method = 'POST';
+    const endpoint = request.url;
+    let statusCode = 200;
+    try {
     const { path } = await params;
     const url = new URL(request.url);
     const pool = getDbPool();
@@ -994,10 +1009,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const routeStr = path.join('/');
     
-    try {
-        const body = await request.json().catch(() => ({}));
+    const body = await request.json().catch(() => ({}));
 
-        // 1. POST /api/settings/update
+    // 1. POST /api/settings/update
         if (routeStr === 'settings/update') {
             const { key, value } = body;
             if (!key) {
@@ -1685,8 +1699,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         }
 
         return NextResponse.json({ error: 'Route not found' }, { status: 404 });
-    } catch (err: any) {
-        console.error(`[API POST ${routeStr} Error]`, err);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+    } catch (error: any) {
+        statusCode = 500;
+        logger.error('Unhandled API Exception', { requestId, method, endpoint, statusCode, error });
+        return NextResponse.json({ error: 'Internal Server Error', requestId }, { status: 500 });
+    } finally {
+        const durationMs = Date.now() - startTime;
+        logger.info('API Request completed', { requestId, method, endpoint, statusCode, durationMs });
     }
 }

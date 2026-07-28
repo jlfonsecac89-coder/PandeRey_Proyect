@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { getLocalAppearance } from '@/utils/dbSim';
+import { getLocalAppearance } from '@/shared/utils/dbSim';
 
 export default function Storytelling({ previewData }: { previewData?: any } = {}) {
   const [mounted, setMounted] = useState(false);

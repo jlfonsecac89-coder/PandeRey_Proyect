@@ -7,7 +7,7 @@ import CategoryGrid from "@/components/CategoryGrid";
 import Storytelling from "@/components/Storytelling";
 import InstagramGallery from "@/components/InstagramGallery";
 import ContactSection from "@/components/ContactSection";
-import { getLocalAppearance } from "@/utils/dbSim";
+import { getLocalAppearance } from "@/shared/utils/dbSim";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);

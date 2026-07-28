@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDbPool } from '@/utils/db';
-import { getSupabaseAdmin } from '@/utils/supabase';
+import { getDbPool } from '@/shared/utils/db';
+import { getSupabaseAdmin } from '@/shared/utils/supabase';
 
 // Helper to parse CSV row handling quotes and commas
 function parseCsvLine(line: string): string[] {

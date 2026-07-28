@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getLocalAppearance } from '@/utils/dbSim';
+import { getLocalAppearance } from '@/shared/utils/dbSim';
 
 export default function ContactSection({ previewData }: { previewData?: any } = {}) {
   const [mounted, setMounted] = useState(false);

@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { getDbPool } from '@/utils/db';
+import { getDbPool } from '@/shared/utils/db';
 
 // SMTP Transport Configurer
 const getTransporter = async () => {

@@ -23,7 +23,7 @@ import {
   Tag,
   Link as LinkIcon
 } from 'lucide-react';
-import { supabase } from '@/utils/supabase';
+import { supabase } from '@/shared/utils/supabase';
 import Image from 'next/image';
 import { formatPrice } from '@/utils/format';
 

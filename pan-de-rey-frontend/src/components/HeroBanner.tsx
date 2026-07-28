@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { getLocalAppearance } from '@/utils/dbSim';
+import { getLocalAppearance } from '@/shared/utils/dbSim';
 
 // Fallback slides in case DB has not loaded yet
 const fallbackSlides = [
