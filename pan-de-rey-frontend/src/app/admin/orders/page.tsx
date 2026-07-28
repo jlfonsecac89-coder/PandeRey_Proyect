@@ -802,17 +802,6 @@ export default function OrdersDashboard() {
         if (completeness >= 100) return false;
       } else if (kpiFilter === 'cancelado') {
         if (order.status !== 'Cancelado') return false;
-      // 1. Filtrar por KPI Dashboard Superior
-      if (kpiFilter !== 'all') {
-        if (kpiFilter === 'incompleto') {
-          if (order.status !== 'Incompleto' && (order.completenessPercent === undefined || order.completenessPercent >= 100)) return false;
-        } else if (kpiFilter === 'listo') {
-          if (!['listo', 'listo para retiro', 'listo para despacho'].includes(String(order.status || '').toLowerCase())) return false;
-        } else {
-          // Simplificación: Para los demás (nuevo, preparando, en_ruta, entregado, cancelado) comparamos string normalizado
-          const orderStatNorm = String(order.status || '').toLowerCase().replace(/ó/g, 'o').replace(/ /g, '_');
-          if (!orderStatNorm.includes(kpiFilter) && kpiFilter !== orderStatNorm) return false;
-        }
       }
 
       // 2. Filtrar por Pipeline (Kanban superior: received, kitchen, ready, route, delivered)
