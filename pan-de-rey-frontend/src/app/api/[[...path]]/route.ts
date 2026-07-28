@@ -6,6 +6,7 @@ import { printFiscalTicket } from '@/services/fiscalPrinter';
 import { sendStatusEmail, sendStatusWhatsApp } from '@/services/notifications';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { getSupabaseAdmin } from '@/utils/supabase';
+import { CatalogImportService } from '@/services/catalogImportService';
 
 // Simulate WMS Order SLA timing & lifecycle transitions
 const simulateOrderLifeCycle = async (orderId: string, shippingMethod: string, email: string, phone: string, total: number) => {
@@ -1219,65 +1220,37 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 return NextResponse.json({ error: 'Products array is required' }, { status: 400 });
             }
 
-            for (const prod of products) {
-                const { name, price, stock, categoryId, description, image, sku, attributes } = prod;
-                if (!name || price === undefined || !categoryId) continue;
+            try {
+                const importService = new CatalogImportService();
+                
+                // Batch execution architecture (Chunks of 200 items max)
+                const chunkSize = 200;
+                let finalReport = {
+                    totalRows: 0,
+                    successCount: 0,
+                    failCount: 0,
+                    errors: [] as string[],
+                    generatedCategories: [] as string[],
+                    generatedAttributes: [] as string[]
+                };
 
-                // Check if product with same name exists
-                const [existingProd]: any = await pool.query('SELECT id FROM public.products WHERE LOWER(name) = LOWER(?) LIMIT 1', [name]);
-
-                if (existingProd.length > 0) {
-                    const productId = existingProd[0].id;
-                    // Update existing product
-                    await pool.query(
-                        'UPDATE public.products SET base_price = ?, category_id = ?, description = ?, image_url = COALESCE(?, image_url) WHERE id = ?',
-                        [parseFloat(price), parseInt(categoryId), description || null, image || null, productId]
-                    );
-
-                    // Find variant ID
-                    const [existingVar]: any = await pool.query('SELECT id FROM public.product_variants WHERE product_id = ? LIMIT 1', [productId]);
-                    if (existingVar.length > 0) {
-                        const variantId = existingVar[0].id;
-                        // Update inventory
-                        await pool.query(
-                            'INSERT INTO public.inventory (variant_id, quantity, safety_buffer) VALUES (?, ?, 2) ON CONFLICT (variant_id) DO UPDATE SET quantity = EXCLUDED.quantity',
-                            [variantId, parseInt(stock) || 0]
-                        );
-                    }
-                } else {
-                    // Insert new product (as inactive, is_active = false)
-                    const productId = crypto.randomUUID();
-                    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                for (let i = 0; i < products.length; i += chunkSize) {
+                    const chunk = products.slice(i, i + chunkSize);
+                    const chunkReport = await importService.processImport(chunk);
                     
-                    await pool.query(
-                        'INSERT INTO public.products (id, category_id, name, slug, base_price, image_url, description, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, false)',
-                        [productId, parseInt(categoryId), name, slug, parseFloat(price), image || null, description || null]
-                    );
-
-                    const variantId = crypto.randomUUID();
-                    const skuToUse = sku || `SKU-${slug.toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-                    await pool.query(
-                        'INSERT INTO public.product_variants (id, product_id, variant_name, price_adjustment, sku, is_active) VALUES (?, ?, ?, 0.00, ?, false)',
-                        [variantId, productId, 'Clásico', skuToUse]
-                    );
-
-                    await pool.query(
-                        'INSERT INTO public.inventory (variant_id, quantity, safety_buffer) VALUES (?, ?, 2)',
-                        [variantId, parseInt(stock) || 0]
-                    );
-
-                    if (attributes && Array.isArray(attributes)) {
-                        for (const valId of attributes) {
-                            await pool.query(
-                                'INSERT INTO public.variant_attribute_values (variant_id, attribute_value_id) VALUES (?, ?)',
-                                [variantId, parseInt(valId)]
-                            );
-                        }
-                    }
+                    finalReport.totalRows += chunkReport.totalRows;
+                    finalReport.successCount += chunkReport.successCount;
+                    finalReport.failCount += chunkReport.failCount;
+                    finalReport.errors = [...finalReport.errors, ...chunkReport.errors];
+                    finalReport.generatedCategories = [...new Set([...finalReport.generatedCategories, ...chunkReport.generatedCategories])];
+                    finalReport.generatedAttributes = [...new Set([...finalReport.generatedAttributes, ...chunkReport.generatedAttributes])];
                 }
-            }
 
-            return NextResponse.json({ status: 'success' });
+                return NextResponse.json({ status: 'success', report: finalReport });
+            } catch (err: any) {
+                console.error('[Bulk Import Error]:', err);
+                return NextResponse.json({ error: 'Error processing bulk import: ' + err.message }, { status: 500 });
+            }
         }
 
         // 1.9.1 POST /api/inventory/adjust

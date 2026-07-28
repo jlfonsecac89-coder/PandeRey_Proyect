@@ -114,11 +114,16 @@ export default function CatalogManager() {
     name: string;
     price: number;
     stock: number;
-    categoryId: number;
+    categoryId?: number;
+    rawCategory?: string;
+    rawSubCategory?: string;
+    rawType?: string;
     description: string;
     image: string;
     sku?: string;
     attributes?: number[];
+    rawFillings?: string[];
+    rawToppings?: string[];
     status: 'new' | 'has_change' | 'no_change';
     changeDetails: string;
     approved: boolean;
@@ -169,7 +174,23 @@ export default function CatalogManager() {
       const res = await fetch('/api/catalog/products?all=true');
       if (res.ok) {
         const data = await res.json();
-        setProducts(data);
+        const mappedData = data.map((p: any) => ({
+          id: p.id || p.Id,
+          categoryId: p.categoryId || p.CategoryId,
+          categoryName: p.categoryName || p.CategoryName,
+          category: p.category || p.Category,
+          name: p.name || p.Name,
+          slug: p.slug || p.Slug,
+          price: parseFloat(p.price || p.Price || 0),
+          image: p.image || p.Image || p.ImageUrl || p.image_url,
+          description: p.description || p.Description,
+          isActive: p.isActive !== undefined ? p.isActive : (p.IsActive !== undefined ? p.IsActive : true),
+          variantId: p.variantId || p.VariantId,
+          sku: p.sku || p.Sku || p.SKU,
+          stock: parseInt(p.stock || p.Stock || 0, 10),
+          attributes: p.attributes || p.Attributes || []
+        }));
+        setProducts(mappedData);
       }
     } catch (err) {
       console.error(err);
@@ -530,6 +551,9 @@ export default function CatalogManager() {
           return;
         }
 
+        const headerLine = lines[0];
+        const delimiter = headerLine.includes(';') ? ';' : ',';
+
         const parseRow = (line: string) => {
           const result: string[] = [];
           let current = '';
@@ -537,7 +561,7 @@ export default function CatalogManager() {
           for (let i = 0; i < line.length; i++) {
             const char = line[i];
             if (char === '"') inQuotes = !inQuotes;
-            else if (char === ',' && !inQuotes) {
+            else if (char === delimiter && !inQuotes) {
               result.push(current.trim().replace(/^"|"$/g, ''));
               current = '';
             } else current += char;
@@ -577,19 +601,23 @@ export default function CatalogManager() {
           const stock = parseInt(rowVals[idxStock], 10);
           
           let categoryId = 0;
+          let rawCategory = '';
+          let rawSubCategory = '';
+          let rawType = '';
+
           if (idxCatId !== -1 && rowVals[idxCatId]) {
             categoryId = parseInt(rowVals[idxCatId], 10);
           } else if (idxCatName !== -1) {
-            const catVal = rowVals[idxCatName];
-            const subcatVal = idxSubcat !== -1 ? rowVals[idxSubcat] : '';
-            const tipoVal = idxTipo !== -1 ? rowVals[idxTipo] : '';
+            rawCategory = rowVals[idxCatName];
+            rawSubCategory = idxSubcat !== -1 ? rowVals[idxSubcat] : '';
+            rawType = idxTipo !== -1 ? rowVals[idxTipo] : '';
             
             // Resolve from loaded categories
             const matched = categories.find(c => {
               const nameLower = String(c.name || '').toLowerCase().trim();
-              if (tipoVal && nameLower === String(tipoVal || '').toLowerCase().trim()) return true;
-              if (!tipoVal && subcatVal && nameLower === String(subcatVal || '').toLowerCase().trim()) return true;
-              if (!tipoVal && !subcatVal && catVal && nameLower === String(catVal || '').toLowerCase().trim()) return true;
+              if (rawType && nameLower === String(rawType || '').toLowerCase().trim()) return true;
+              if (!rawType && rawSubCategory && nameLower === String(rawSubCategory || '').toLowerCase().trim()) return true;
+              if (!rawType && !rawSubCategory && rawCategory && nameLower === String(rawCategory || '').toLowerCase().trim()) return true;
               return false;
             });
             if (matched) {
@@ -603,23 +631,32 @@ export default function CatalogManager() {
           
           // Parse Attributes
           const attributes: number[] = [];
+          const rawFillings: string[] = [];
+          const rawToppings: string[] = [];
+
           if (idxRelleno !== -1 && rowVals[idxRelleno]) {
-            const rellenoVal = rowVals[idxRelleno].toLowerCase().trim();
-            const matchedAttr = attributeValues.find(v => v.group_id === 1 && v.value.toLowerCase().trim() === rellenoVal);
-            if (matchedAttr) attributes.push(matchedAttr.id);
+            const rellenoVal = rowVals[idxRelleno].trim();
+            if (rellenoVal) {
+              rawFillings.push(rellenoVal);
+              const matchedAttr = attributeValues.find(v => v.group_id === 1 && v.value.toLowerCase().trim() === rellenoVal.toLowerCase());
+              if (matchedAttr) attributes.push(matchedAttr.id);
+            }
           }
           
           if (idxCobertura !== -1 && rowVals[idxCobertura]) {
             const cobVal = rowVals[idxCobertura];
-            // Might have multiple values split by |
-            const parts = cobVal.split('|').map(p => p.toLowerCase().trim());
-            for (const part of parts) {
-              const matchedAttr = attributeValues.find(v => v.group_id === 2 && v.value?.toLowerCase().trim() === part);
-              if (matchedAttr) attributes.push(matchedAttr.id);
+            if (cobVal) {
+              const parts = cobVal.split('|').map(p => p.trim());
+              for (const part of parts) {
+                if (!part) continue;
+                rawToppings.push(part);
+                const matchedAttr = attributeValues.find(v => v.group_id === 2 && v.value?.toLowerCase().trim() === part.toLowerCase());
+                if (matchedAttr) attributes.push(matchedAttr.id);
+              }
             }
           }
 
-          if (!name || isNaN(price) || isNaN(stock) || !categoryId) continue;
+          if (!name || isNaN(price) || isNaN(stock) || (!categoryId && !rawCategory)) continue;
 
           // Match against existing products
           const existing = products.find(p => String(p.name || '').toLowerCase().trim() === String(name || '').toLowerCase().trim());
@@ -656,11 +693,16 @@ export default function CatalogManager() {
             name,
             price,
             stock,
-            categoryId,
+            categoryId: categoryId || undefined,
+            rawCategory,
+            rawSubCategory,
+            rawType,
             description,
             image,
             sku,
             attributes,
+            rawFillings,
+            rawToppings,
             status,
             changeDetails,
             approved
