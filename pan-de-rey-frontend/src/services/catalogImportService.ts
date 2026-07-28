@@ -64,22 +64,28 @@ export class CatalogImportService {
             // Map cache for fast lookup by normalized name
             const categoryCache = new Map<string, number>();
             categoriesRaw.forEach((c: any) => {
-                categoryCache.set(c.id.toString(), c.id);
+                const cId = c.id || c.Id;
+                categoryCache.set(cId.toString(), cId);
             });
 
             // Re-build taxonomy map helper
             const getCategoryId = (name: string, parentId?: number) => {
                 const normalized = normalizeString(name);
-                const found = categoriesRaw.find((c: any) => 
-                    normalizeString(c.name) === normalized && 
-                    (parentId === undefined || c.parent_id == parentId) // abstract equality for null/undefined
-                );
-                return found ? found.id : null;
+                const found = categoriesRaw.find((c: any) => {
+                    const cName = c.name || c.Name;
+                    const cParentId = c.parent_id !== undefined ? c.parent_id : c.ParentId;
+                    return normalizeString(cName) === normalized && 
+                    (parentId === undefined || cParentId == parentId); // abstract equality for null/undefined
+                });
+                return found ? (found.id || found.Id) : null;
             };
 
             const attrCache = new Map<string, number>(); // format: "groupId|normalizedValue" -> id
             attributesRaw.forEach((a: any) => {
-                attrCache.set(`${a.group_id}|${normalizeString(a.value)}`, a.id);
+                const aId = a.id || a.Id;
+                const aGroupId = a.group_id !== undefined ? a.group_id : a.GroupId;
+                const aValue = a.value || a.Value;
+                attrCache.set(`${aGroupId}|${normalizeString(aValue)}`, aId);
             });
 
             await connection.beginTransaction();
