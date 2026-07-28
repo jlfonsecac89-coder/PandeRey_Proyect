@@ -1213,6 +1213,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             return NextResponse.json({ status: 'success' });
         }
 
+        // 1.10 DELETE /api/catalog/products/[id]
+        if (routeStr.startsWith('catalog/products/') && method === 'DELETE') {
+            const id = routeStr.split('/')[2];
+            
+            // Fix: Delete inventory and attributes linked to variants first, then variants, then the product to avoid FK constraint errors.
+            const [variants]: any = await pool.query('SELECT id FROM public.product_variants WHERE product_id = ?', [id]);
+            for (const v of variants) {
+                const vid = v.id || v.Id;
+                await pool.query('DELETE FROM public.inventory WHERE variant_id = ?', [vid]);
+                await pool.query('DELETE FROM public.variant_attribute_values WHERE variant_id = ?', [vid]);
+                await pool.query('DELETE FROM public.product_variants WHERE id = ?', [vid]);
+            }
+            
+            await pool.query('DELETE FROM public.products WHERE id = ?', [id]);
+            return NextResponse.json({ status: 'success' });
+        }
+
         // 1.9 POST /api/catalog/products/bulk
         if (routeStr === 'catalog/products/bulk') {
             const { products } = body;
