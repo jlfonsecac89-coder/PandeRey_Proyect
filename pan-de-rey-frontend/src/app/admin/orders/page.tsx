@@ -78,7 +78,7 @@ type Order = {
 };
 
 const getDisplayOrderId = (order: any): string => {
-  return order?.orderNumber || (order?.id ? `#${order.id.substring(0, 8).toUpperCase()}` : '');
+  return order?.orderNumber || (order?.id ? `#${String(order.id).substring(0, 8).toUpperCase()}` : '');
 };
 
 // Catálogo de variantes fijas de la panadería para la sustitución de stock
@@ -250,7 +250,7 @@ function OrderPipelineTracker({ order }: { order: Order }) {
         { label: 'Entregado', key: 'entregado', statuses: ['entregado'] },
       ];
 
-  const statusLower = status.toLowerCase();
+  const statusLower = String(status || '').toLowerCase();
   
   // Find active step index
   let activeIndex = 0;
@@ -449,7 +449,34 @@ export default function OrdersDashboard() {
       const res = await fetch(getApiUrl('/api/orders'));
       if (!res.ok) throw new Error('API offline');
       const data = await res.json();
-      setOrders(data);
+      const mappedOrders = data.map((o: any) => ({
+        id: String(o.id || o.Id || ''),
+        orderNumber: o.orderNumber || o.OrderNumber,
+        customerName: o.customerName || (o.FirstName ? `${o.FirstName} ${o.LastName || ''}`.trim() : 'Cliente'),
+        email: o.email || o.Email,
+        phone: o.phone || o.Phone,
+        total: o.total || o.TotalAmount || 0,
+        status: String(o.status || o.Status || 'Pendiente'),
+        time: o.time || o.CreatedAt,
+        createdAt: o.createdAt || o.CreatedAt,
+        shippingMethod: o.shippingMethod || o.ShippingMethod || 'Desconocido',
+        slaStartedAt: o.slaStartedAt || o.SlaStartedAt,
+        slaPausedAt: o.slaPausedAt || o.SlaPausedAt,
+        slaPausedTime: o.slaPausedTime || o.SlaPausedTime,
+        deliveryPin: o.deliveryPin || o.DeliveryPin,
+        driverId: o.driverId || o.DriverId,
+        deliveryStatus: o.deliveryStatus || o.DeliveryStatus,
+        itemsRaw: (o.items || o.Items || []).map((it: any) => ({
+          variantId: it.variantId || it.VariantId || '',
+          productName: it.productName || it.ProductName || '',
+          variantName: it.variantName || it.VariantName || '',
+          quantity: it.quantity || it.Quantity || 1,
+          price: it.price || it.Price || 0,
+          subtotal: it.subtotal || it.Subtotal || 0
+        })),
+        items: (o.items || o.Items || []).map((it: any) => `${it.quantity || it.Quantity || 1}x ${it.productName || it.ProductName || ''} (${it.variantName || it.VariantName || ''})`)
+      }));
+      setOrders(mappedOrders);
       setIsLive(true);
     } catch (err) {
       console.warn('Orders API not available, running local simulator.');
@@ -748,7 +775,7 @@ export default function OrdersDashboard() {
   const totalOrders = orders.length;
   const nuevosCount = orders.filter(o => o.status === 'Nuevo' || o.status === 'Aceptado').length;
   const preparandoCount = orders.filter(o => o.status === 'Preparando' || o.status === 'En Preparación').length;
-  const listosCount = orders.filter(o => ['listo', 'listo para retiro', 'listo para despacho'].includes(o.status.toLowerCase())).length;
+  const listosCount = orders.filter(o => ['listo', 'listo para retiro', 'listo para despacho'].includes(String(o.status || '').toLowerCase())).length;
   const enRutaCount = orders.filter(o => o.status === 'En Ruta' || o.status === 'En Camino').length;
   const entregadosCount = orders.filter(o => o.status === 'Entregado').length;
   const incompletosCount = orders.filter(o => o.status === 'Incompleto' || (o.completenessPercent !== undefined && o.completenessPercent < 100)).length;
@@ -765,7 +792,7 @@ export default function OrdersDashboard() {
       } else if (kpiFilter === 'preparando') {
         if (order.status !== 'Preparando' && order.status !== 'En Preparación') return false;
       } else if (kpiFilter === 'listo') {
-        if (!['listo', 'listo para retiro', 'listo para despacho'].includes(order.status.toLowerCase())) return false;
+        if (!['listo', 'listo para retiro', 'listo para despacho'].includes(String(order.status || '').toLowerCase())) return false;
       } else if (kpiFilter === 'en_ruta') {
         if (order.status !== 'En Ruta' && order.status !== 'En Camino') return false;
       } else if (kpiFilter === 'entregado') {
@@ -775,25 +802,37 @@ export default function OrdersDashboard() {
         if (completeness >= 100) return false;
       } else if (kpiFilter === 'cancelado') {
         if (order.status !== 'Cancelado') return false;
+      // 1. Filtrar por KPI Dashboard Superior
+      if (kpiFilter !== 'all') {
+        if (kpiFilter === 'incompleto') {
+          if (order.status !== 'Incompleto' && (order.completenessPercent === undefined || order.completenessPercent >= 100)) return false;
+        } else if (kpiFilter === 'listo') {
+          if (!['listo', 'listo para retiro', 'listo para despacho'].includes(String(order.status || '').toLowerCase())) return false;
+        } else {
+          // Simplificación: Para los demás (nuevo, preparando, en_ruta, entregado, cancelado) comparamos string normalizado
+          const orderStatNorm = String(order.status || '').toLowerCase().replace(/ó/g, 'o').replace(/ /g, '_');
+          if (!orderStatNorm.includes(kpiFilter) && kpiFilter !== orderStatNorm) return false;
+        }
       }
 
-      // 2. Pipeline status filter
+      // 2. Filtrar por Pipeline (Kanban superior: received, kitchen, ready, route, delivered)
       if (pipelineFilter !== 'all') {
-        const statusLower = order.status.toLowerCase();
-        if (pipelineFilter === 'nuevo' && order.status !== 'Nuevo' && order.status !== 'Aceptado') return false;
-        if (pipelineFilter === 'preparando' && order.status !== 'Preparando' && order.status !== 'En Preparación') return false;
+        const statusLower = String(order.status || '').toLowerCase();
+        
+        const isDelivery = order.shippingMethod === 'Delivery';
+        if (pipelineFilter === 'recibido' && !['nuevo', 'aceptado', 'pendiente'].includes(statusLower)) return false;
+        if (pipelineFilter === 'cocina' && !['preparando', 'en preparación'].includes(statusLower)) return false;
         if (pipelineFilter === 'listo' && !['listo', 'listo para retiro', 'listo para despacho'].includes(statusLower)) return false;
-        if (pipelineFilter === 'enviado' && !['en ruta', 'en camino', 'entregado'].includes(statusLower)) return false;
-        if (pipelineFilter === 'incompleto' && order.status !== 'Incompleto') return false;
-        if (pipelineFilter === 'cancelado' && order.status !== 'Cancelado') return false;
+        if (pipelineFilter === 'ruta' && (!isDelivery || !['en ruta', 'en camino'].includes(statusLower))) return false;
+        if (pipelineFilter === 'entregado' && statusLower !== 'entregado') return false;
       }
 
-      // 3. Search query filter
+      // 3. Filtrar por Búsqueda de Texto
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
-        const idMatches = order.id.toLowerCase().includes(query);
-        const nameMatches = order.customerName.toLowerCase().includes(query);
-        const phoneMatches = order.phone.includes(query);
+        const idMatches = String(order.id || '').toLowerCase().includes(query);
+        const nameMatches = String(order.customerName || '').toLowerCase().includes(query);
+        const phoneMatches = String(order.phone || '').includes(query);
         return idMatches || nameMatches || phoneMatches;
       }
 
@@ -1819,7 +1858,7 @@ export default function OrdersDashboard() {
                       ))
                     ) : (
                       labelPrintOrder.items.map((it, idx) => {
-                        const parts = it.split('x ');
+                        const parts = it?.split?.('x ') || [it];
                         const qty = parts[0];
                         const name = parts[1] || it;
                         return (
@@ -1939,7 +1978,7 @@ export default function OrdersDashboard() {
                         ))
                       ) : (
                         selectedOrder.items.map((it, idx) => {
-                          const parts = it.split('x ');
+                          const parts = it?.split?.('x ') || [it];
                           const qty = parts[0];
                           const name = parts[1] || it;
                           // Fallback prices for mock items

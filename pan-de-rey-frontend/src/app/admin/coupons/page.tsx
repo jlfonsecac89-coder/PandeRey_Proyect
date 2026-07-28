@@ -292,7 +292,7 @@ export default function CouponsManagement() {
 
   // Filtered coupons list
   const filteredCoupons = coupons.filter(c => {
-    const matchesSearch = c.code.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = String(c.code || '').toLowerCase().includes(String(searchQuery || '').toLowerCase());
     const matchesStatus = 
       statusFilter === 'all' || 
       (statusFilter === 'active' && c.is_active === 1) || 

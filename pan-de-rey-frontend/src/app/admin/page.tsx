@@ -91,7 +91,18 @@ export default function AdminDashboard() {
       const data = await res.json();
       
       setRawAnalytics(data);
-      setKpiData(data.kpis);
+      // Map PascalCase DB response to camelCase/custom keys expected by UI
+      setKpiData({
+        ventas: parseFloat(data.kpis?.TotalRevenue || data.kpis?.ventas || 0),
+        pedidos: parseInt(data.kpis?.TotalOrders || data.kpis?.pedidos || 0),
+        unidades: parseInt(data.kpis?.TotalUnits || data.kpis?.unidades || 0),
+        pendientesRetiro: parseInt(data.pendingCount || data.kpis?.pendientesRetiro || 0),
+        pendientesEnvio: 0,
+        alerta: 0,
+        riesgo: 0,
+        critico: 0,
+        sinStock: data.inventoryAlerts?.length || 0
+      });
       setIsLive(true);
       
       // Fetch recent orders
@@ -99,12 +110,16 @@ export default function AdminDashboard() {
         const ordRes = await fetch(getApiUrl('/api/orders'));
         if (ordRes.ok) {
           const ordData = await ordRes.json();
-          const formatted = ordData.slice(0, 5).map((o: any) => ({
-            id: o.id.substring(0, 8).toUpperCase(),
-            monto: o.total,
-            tipo: o.shippingMethod === 'Delivery' ? 'Envío Propio' : 'Retiro en Tienda',
-            estado: o.status === 'Preparando' ? 'Preparación' : o.status === 'Listo' ? 'Listo' : o.status === 'En Ruta' ? 'En Ruta' : o.status === 'Entregado' ? 'Entregado' : o.status
-          }));
+          const formatted = ordData.slice(0, 5).map((o: any) => {
+            const currentId = String(o.id || o.Id || '');
+            const currentStatus = String(o.status || o.Status || 'Pendiente');
+            return {
+              id: currentId ? currentId.substring(0, 8).toUpperCase() : 'N/A',
+              monto: o.total || o.TotalAmount || 0,
+              tipo: (o.shippingMethod || o.ShippingMethod) === 'Delivery' ? 'Envío Propio' : 'Retiro en Tienda',
+              estado: currentStatus === 'Preparando' ? 'Preparación' : currentStatus === 'Listo' ? 'Listo' : currentStatus === 'En Ruta' ? 'En Ruta' : currentStatus === 'Entregado' ? 'Entregado' : currentStatus
+            };
+          });
           setRecentOrdersList(formatted);
         }
       } catch (err) {
@@ -120,12 +135,16 @@ export default function AdminDashboard() {
       setRawAnalytics(localData);
       setKpiData(localData.kpis);
       
-      const localOrders = getLocalOrders().slice(0, 5).map((o: any) => ({
-        id: o.id.replace('order-sim-', 'ORD-').toUpperCase(),
-        monto: o.total,
-        tipo: o.shippingMethod === 'Delivery' ? 'Envío Propio' : 'Retiro en Tienda',
-        estado: o.status === 'Preparando' ? 'Preparación' : o.status === 'Listo' ? 'Listo' : o.status === 'En Ruta' ? 'En Ruta' : o.status === 'Entregado' ? 'Entregado' : o.status
-      }));
+      const localOrders = getLocalOrders().slice(0, 5).map((o: any) => {
+        const currentId = String(o.id || '');
+        const currentStatus = String(o.status || 'Pendiente');
+        return {
+          id: currentId ? currentId.replace('order-sim-', 'ORD-').toUpperCase() : 'N/A',
+          monto: o.total || 0,
+          tipo: o.shippingMethod === 'Delivery' ? 'Envío Propio' : 'Retiro en Tienda',
+          estado: currentStatus === 'Preparando' ? 'Preparación' : currentStatus === 'Listo' ? 'Listo' : currentStatus === 'En Ruta' ? 'En Ruta' : currentStatus === 'Entregado' ? 'Entregado' : currentStatus
+        };
+      });
       setRecentOrdersList(localOrders);
     } finally {
       setLoading(false);
@@ -164,16 +183,16 @@ export default function AdminDashboard() {
       // Note: timeFilter multiplier is simulated for mock charts, for live database we show raw aggregated totals
       if (mainView === 'productos') {
         const mapped = (rawAnalytics.productSales || []).map((p: any) => ({
-          name: p.name,
-          ventas: parseFloat(p.totalAmount || 0),
-          unidades: parseInt(p.totalUnits || 0)
+          name: p.name || p.ProductName || 'Desconocido',
+          ventas: parseFloat(p.totalAmount || p.TotalRevenue || 0),
+          unidades: parseInt(p.totalUnits || p.TotalUnits || 0)
         }));
         setMainData(mapped);
       } else {
         const mapped = (rawAnalytics.categoryDistribution || []).map((c: any) => ({
-          name: c.name,
-          ventas: parseFloat(c.value || 0),
-          unidades: parseInt(c.units || (c.value / 3000))
+          name: c.name || c.CategoryName || 'Desconocido',
+          ventas: parseFloat(c.value || c.ItemCount || 0),
+          unidades: parseInt(c.units || c.ItemCount || ((c.value || 0) / 3000))
         }));
         setMainData(mapped);
       }

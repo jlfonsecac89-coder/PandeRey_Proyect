@@ -147,8 +147,8 @@ export default function SettingsPage() {
 
   // Filtered Audit Logs
   const filteredLogs = draft.securityAuditLogs.filter(log => {
-    const matchesSearch = log.event.toLowerCase().includes(auditSearch.toLowerCase()) || 
-                          log.user.toLowerCase().includes(auditSearch.toLowerCase()) ||
+    const matchesSearch = String(log.event || '').toLowerCase().includes(String(auditSearch || '').toLowerCase()) || 
+                          String(log.user || '').toLowerCase().includes(String(auditSearch || '').toLowerCase()) ||
                           log.ip.includes(auditSearch);
     const matchesFilter = auditFilter === "all" || log.status === auditFilter;
     return matchesSearch && matchesFilter;

@@ -124,7 +124,7 @@ export default function StockControl() {
 
   // Filtered Inventory List
   const filteredInventory = inventory.filter(p => {
-    const matchesSearch = p.productName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = String(p.productName || '').toLowerCase().includes(String(searchQuery || '').toLowerCase());
     const status = getStockStatus(p.quantity);
     const matchesStatus = statusFilter === 'all' || status.key === statusFilter;
     return matchesSearch && matchesStatus;

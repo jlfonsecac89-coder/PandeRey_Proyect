@@ -73,8 +73,8 @@ export default function CustomerAnalyticsPage() {
 
   // Filtered List
   const filteredCustomers = customers.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch = String(c.name || '').toLowerCase().includes(String(searchQuery || '').toLowerCase()) || 
+                          String(c.email || '').toLowerCase().includes(String(searchQuery || '').toLowerCase()) ||
                           c.phone.includes(searchQuery);
     
     const matchesSegment = !selectedSegment || c.segment === selectedSegment;

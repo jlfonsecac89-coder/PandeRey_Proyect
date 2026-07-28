@@ -185,7 +185,14 @@ export default function CatalogManager() {
       const res = await fetch('/api/catalog/categories?all=true');
       if (res.ok) {
         const data = await res.json();
-        setCategories(data);
+        const mappedData = data.map((c: any) => ({
+          id: c.id || c.Id,
+          name: c.name || c.Name,
+          slug: c.slug || c.Slug,
+          parent_id: c.parent_id !== undefined ? c.parent_id : c.ParentId,
+          is_active: c.is_active !== undefined ? c.is_active : c.IsActive
+        }));
+        setCategories(mappedData);
       }
     } catch (err) {
       console.error(err);
@@ -203,8 +210,14 @@ export default function CatalogManager() {
         fetch('/api/catalog/attributes/values')
       ]);
       if (groupsRes.ok && valuesRes.ok) {
-        setAttributeGroups(await groupsRes.json());
-        setAttributeValues(await valuesRes.json());
+        const rawGroups = await groupsRes.json();
+        const rawValues = await valuesRes.json();
+        setAttributeGroups(rawGroups.map((g: any) => ({ id: g.id || g.Id, name: g.name || g.Name })));
+        setAttributeValues(rawValues.map((v: any) => ({
+          id: v.id || v.Id,
+          group_id: v.group_id || v.GroupId,
+          value: v.value || v.Value
+        })));
       }
     } catch (err) {
       console.error(err);
@@ -222,14 +235,20 @@ export default function CatalogManager() {
   if (!mounted) return null;
 
   // Visual helper for category tree
-  const buildCategoryTree = (parentId: number | null = null, depth = 0): any[] => {
+  const buildCategoryTree = (parentId: number | null = null, depth = 0, visited = new Set<number>()): any[] => {
+    if (depth > 10) return [];
+    
     return categories
       .filter(c => c.parent_id === parentId)
-      .map(c => ({
-        ...c,
-        depth,
-        children: buildCategoryTree(c.id, depth + 1)
-      }));
+      .map(c => {
+        if (visited.has(c.id)) return { ...c, depth, children: [] };
+        const newVisited = new Set(visited).add(c.id);
+        return {
+          ...c,
+          depth,
+          children: buildCategoryTree(c.id, depth + 1, newVisited)
+        };
+      });
   };
 
   const categoryTree = buildCategoryTree(null);
@@ -244,9 +263,12 @@ export default function CatalogManager() {
   };
 
   // Find all category IDs down the tree
-  const getSubcategoryIds = (catId: number): number[] => {
+  const getSubcategoryIds = (catId: number, visited = new Set<number>(), depth = 0): number[] => {
+    if (depth > 10 || visited.has(catId)) return [];
+    visited.add(catId);
+    
     const directChildren = categories.filter(c => c.parent_id === catId).map(c => c.id);
-    return [catId, ...directChildren.flatMap(id => getSubcategoryIds(id))];
+    return [catId, ...directChildren.flatMap(id => getSubcategoryIds(id, visited, depth + 1))];
   };
 
   // Handle Product Save
@@ -564,10 +586,10 @@ export default function CatalogManager() {
             
             // Resolve from loaded categories
             const matched = categories.find(c => {
-              const nameLower = c.name.toLowerCase().trim();
-              if (tipoVal && nameLower === tipoVal.toLowerCase().trim()) return true;
-              if (!tipoVal && subcatVal && nameLower === subcatVal.toLowerCase().trim()) return true;
-              if (!tipoVal && !subcatVal && catVal && nameLower === catVal.toLowerCase().trim()) return true;
+              const nameLower = String(c.name || '').toLowerCase().trim();
+              if (tipoVal && nameLower === String(tipoVal || '').toLowerCase().trim()) return true;
+              if (!tipoVal && subcatVal && nameLower === String(subcatVal || '').toLowerCase().trim()) return true;
+              if (!tipoVal && !subcatVal && catVal && nameLower === String(catVal || '').toLowerCase().trim()) return true;
               return false;
             });
             if (matched) {
@@ -592,7 +614,7 @@ export default function CatalogManager() {
             // Might have multiple values split by |
             const parts = cobVal.split('|').map(p => p.toLowerCase().trim());
             for (const part of parts) {
-              const matchedAttr = attributeValues.find(v => v.group_id === 2 && v.value.toLowerCase().trim() === part);
+              const matchedAttr = attributeValues.find(v => v.group_id === 2 && v.value?.toLowerCase().trim() === part);
               if (matchedAttr) attributes.push(matchedAttr.id);
             }
           }
@@ -600,7 +622,7 @@ export default function CatalogManager() {
           if (!name || isNaN(price) || isNaN(stock) || !categoryId) continue;
 
           // Match against existing products
-          const existing = products.find(p => p.name.toLowerCase().trim() === name.toLowerCase().trim());
+          const existing = products.find(p => String(p.name || '').toLowerCase().trim() === String(name || '').toLowerCase().trim());
 
           let status: 'new' | 'has_change' | 'no_change' = 'new';
           let changeDetails = '';
@@ -827,15 +849,15 @@ export default function CatalogManager() {
 
   // Filter products list
   const filteredProducts = products.filter(product => {
-    const matchesSearch = 
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.categoryName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesSearch = searchQuery === '' || 
+      String(product.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(product.categoryName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (product.description && String(product.description || '').toLowerCase().includes(searchQuery.toLowerCase()));
 
     let matchesCategory = true;
     if (selectedCategoryFilter !== 'all') {
       const selectedId = parseInt(selectedCategoryFilter);
-      const allowedIds = getSubcategoryIds(selectedId);
+      const allowedIds = getSubcategoryIds(selectedId, new Set<number>(), 0);
       matchesCategory = allowedIds.includes(product.categoryId);
     }
 
