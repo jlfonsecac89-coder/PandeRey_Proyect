@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getDbPool } from '@/utils/db';
-import { syncStockWithDefontana, pushSalesOrderToDefontana } from '@/services/defontana';
 import { printFiscalTicket } from '@/services/fiscalPrinter';
 import { sendStatusEmail, sendStatusWhatsApp } from '@/services/notifications';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { getSupabaseAdmin } from '@/utils/supabase';
 import { CatalogImportService } from '@/services/catalogImportService';
+import { ProductService } from '@/services/ProductService';
+import { logger } from '@/lib/logger';
+import { CategoryService } from '@/services/CategoryService';
+import { InventoryService } from '@/services/InventoryService';
+import { CatalogService } from '@/services/CatalogService';
+import { AttributeService } from '@/services/AttributeService';
 
 // Simulate WMS Order SLA timing & lifecycle transitions
 const simulateOrderLifeCycle = async (orderId: string, shippingMethod: string, email: string, phone: string, total: number) => {
@@ -118,16 +123,12 @@ async function confirmOrderAndTriggerIntegrations(orderId: string): Promise<{ su
     
     let boletaNumber: string | null = null;
     let boletaUrl: string | null = null;
+    // (Defontana integration removed as requested)
+    
     try {
-        const defontanaRes = await pushSalesOrderToDefontana(orderId, { totalAmount: order.total_amount }, items);
-        if (defontanaRes.success) {
-            boletaNumber = defontanaRes.folio ? String(defontanaRes.folio) : null;
-            boletaUrl = defontanaRes.url || null;
-            await pool.query('UPDATE orders SET boleta_number = ?, boleta_url = ? WHERE id = ?', [boletaNumber, boletaUrl, orderId]);
-            await printFiscalTicket(orderId);
-        }
+        await printFiscalTicket(orderId);
     } catch (integrationErr) {
-        console.error('[Confirmation Integrations Error] Defontana/Printer failed:', integrationErr);
+        console.error('[Confirmation Integrations Error] Printer failed:', integrationErr);
     }
     
     let customerEmail = 'panderey.cl@gmail.com';
@@ -653,48 +654,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         // 2. GET /api/catalog/products
         if (routeStr === 'catalog/products') {
-            const categoryId = url.searchParams.get('categoryId');
+            const categoryId = url.searchParams.get('categoryId') || undefined;
             const showAll = url.searchParams.get('all') === 'true';
             
-            let query = `
-                SELECT 
-                    p.id, 
-                    p.category_id as "categoryId",
-                    c.name as "categoryName",
-                    c.slug as category, 
-                    p.name, 
-                    p.slug, 
-                    p.base_price as price, 
-                    p.image_url as image, 
-                    p.description,
-                    p.is_active as "isActive",
-                    pv.id as "variantId",
-                    pv.sku as sku,
-                    COALESCE(i.quantity, 0) as stock,
-                    (
-                        SELECT json_agg(vav.attribute_value_id)
-                        FROM public.variant_attribute_values vav
-                        WHERE vav.variant_id = pv.id
-                    ) as attributes
-                FROM public.products p
-                LEFT JOIN public.categories c ON p.category_id = c.id
-                LEFT JOIN public.product_variants pv ON p.id = pv.product_id AND pv.variant_name = 'Clásico'
-                LEFT JOIN public.inventory i ON pv.id = i.variant_id
-                WHERE 1=1
-            `;
-            const queryParams: any[] = [];
-            
-            if (!showAll) {
-                query += ' AND p.is_active = 1';
+            try {
+                const rows = await CatalogService.getAllProducts(showAll, categoryId);
+                return NextResponse.json(rows);
+            } catch (err: any) {
+                logger.error('Error fetching catalog products', err);
+                return NextResponse.json({ error: err.message }, { status: 500 });
             }
-            if (categoryId) {
-                query += ' AND p.category_id = ?';
-                queryParams.push(parseInt(categoryId));
-            }
-            query += ' ORDER BY p.name ASC';
-            
-            const [rows] = await pool.query(query, queryParams);
-            return NextResponse.json(rows);
         }
 
         // 3. GET /api/catalog/products/:id
