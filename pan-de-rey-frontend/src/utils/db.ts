@@ -6,7 +6,7 @@ export const dbConfig = {
     user: process.env.DB_USER || process.env.POSTGRES_USER || 'postgres',
     password: process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD || '01l93pDapK',
     database: process.env.DB_NAME || process.env.POSTGRES_DATABASE || 'postgres',
-    port: parseInt(process.env.DB_PORT || process.env.POSTGRES_PORT || '5432'),
+    port: parseInt(process.env.DB_PORT || process.env.POSTGRES_PORT || '6543'),
     ssl: {
         rejectUnauthorized: false // Supabase connections require SSL
     }
@@ -60,6 +60,7 @@ export function mysqlToPostgresQuery(sql: string): string {
         .replace(/InventoryMovements/g, 'inventory_movements')
         .replace(/UserRoles/g, 'user_roles')
         .replace(/OrderItems/g, 'order_items')
+        .replace(/DeliveryDrivers/g, 'delivery_drivers')
         .replace(/DefontanaConfig/g, 'defontana_config')
         .replace(/DefontanaSyncLogs/g, 'defontana_sync_logs')
         .replace(/Users/g, 'profiles')
@@ -101,6 +102,8 @@ export function mysqlToPostgresQuery(sql: string): string {
         .replace(/UserId/g, 'user_id')
         .replace(/AddressId/g, 'address_id')
         .replace(/CouponId/g, 'coupon_id')
+        .replace(/DriverId/g, 'driver_id')
+        .replace(/DeliveryStatus/g, 'delivery_status')
         .replace(/ProductId/g, 'product_id')
         .replace(/CategoryId/g, 'category_id')
         .replace(/RoleId/g, 'role_id')
@@ -259,7 +262,7 @@ export const getDbPool = (): any => {
                     const cleanUrlString = connectionString.split('?')[0];
                     const parsed = new URL(cleanUrlString);
                     poolConfig.host = parsed.hostname;
-                    poolConfig.port = parseInt(parsed.port || '5432');
+                    poolConfig.port = parseInt(parsed.port || '6543');
                     poolConfig.user = decodeURIComponent(parsed.username);
                     poolConfig.password = decodeURIComponent(parsed.password);
                     poolConfig.database = decodeURIComponent(parsed.pathname.substring(1));

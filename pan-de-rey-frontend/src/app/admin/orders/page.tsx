@@ -73,6 +73,8 @@ type Order = {
   orderState?: 'Pendiente' | 'Aceptado';
   labelPrintedCount?: number;
   actualDeliveryTime?: string | null;
+  driverId?: string | null;
+  deliveryStatus?: string | null;
 };
 
 const getDisplayOrderId = (order: any): string => {
@@ -315,6 +317,7 @@ export default function OrdersDashboard() {
   const [activeTab, setActiveTab] = useState<'tracking' | 'kanban' | 'exceptions'>('tracking');
   const [pipelineFilter, setPipelineFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [drivers, setDrivers] = useState<any[]>([]);
   
   // KPI Click active filters: 'all', 'nuevo', 'preparando', 'listo', 'en_ruta', 'entregado', 'incompleto', 'cancelado'
   const [kpiFilter, setKpiFilter] = useState<string>('all');
@@ -340,6 +343,106 @@ export default function OrdersDashboard() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  const fetchDrivers = async () => {
+    try {
+      const res = await fetch(getApiUrl('/api/delivery-drivers'));
+      if (res.ok) {
+        const data = await res.json();
+        setDrivers(data);
+      } else {
+        throw new Error('API offline');
+      }
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_ENABLE_LOCAL_MOCKS === 'true') {
+        console.warn('Failed to load drivers list, using local fallback.');
+        setDrivers([
+          { id: 'driver-1', name: 'Juan Pérez (Mock)', phone: '+56987654321', vehicleType: 'moto' },
+          { id: 'driver-2', name: 'Pedro Gómez (Mock)', phone: '+56911112222', vehicleType: 'auto' },
+          { id: 'driver-3', name: 'Carlos Silva (Mock)', phone: '+56933334444', vehicleType: 'bicicleta' }
+        ]);
+      } else {
+        console.error('Failed to fetch official delivery drivers list:', err);
+        showToast('No se pudo cargar la lista de repartidores oficiales.', 'error');
+      }
+    }
+  };
+
+  const assignDriver = async (orderId: string, driverId: string | null) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const cleanDriverId = (driverId && driverId !== 'unassigned' && driverId !== 'null' && driverId !== '') ? driverId : null;
+
+    if (isLive) {
+      try {
+        const res = await fetch(getApiUrl('/api/orders/update-status'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: order.realId || order.id, driverId: cleanDriverId })
+        });
+        if (res.ok) {
+          showToast('Conductor asignado exitosamente.');
+          fetchOrders();
+        } else {
+          showToast('Error al asignar conductor.', 'error');
+        }
+      } catch (err) {
+        console.error('Error assigning driver:', err);
+        showToast('Error de red al asignar conductor.', 'error');
+      }
+    } else {
+      // Local offline simulation
+      setOrders(prev => prev.map(o => {
+        if (o.id === orderId) {
+          return {
+            ...o,
+            driverId: cleanDriverId,
+            deliveryStatus: cleanDriverId ? 'assigned' : 'unassigned'
+          };
+        }
+        return o;
+      }));
+      showToast('Conductor asignado (Simulación).');
+    }
+  };
+
+  const updateDeliveryStatus = async (orderId: string, deliveryStatus: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    if (isLive) {
+      try {
+        const res = await fetch(getApiUrl('/api/orders/update-status'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: order.realId || order.id, deliveryStatus })
+        });
+        if (res.ok) {
+          showToast(`Estado de despacho actualizado a: ${deliveryStatus}`);
+          fetchOrders();
+        } else {
+          showToast('Error al actualizar despacho.', 'error');
+        }
+      } catch (err) {
+        console.error('Error updating delivery status:', err);
+        showToast('Error de red al actualizar despacho.', 'error');
+      }
+    } else {
+      // Local offline simulation
+      setOrders(prev => prev.map(o => {
+        if (o.id === orderId) {
+          return {
+            ...o,
+            deliveryStatus,
+            status: deliveryStatus === 'delivered' ? 'Entregado' : deliveryStatus === 'in_transit' ? 'En Camino' : o.status
+          };
+        }
+        return o;
+      }));
+      showToast(`Despacho actualizado (Simulación): ${deliveryStatus}`);
+    }
+  };
+
   const fetchOrders = async () => {
     setLoading(true);
     try {
@@ -360,6 +463,7 @@ export default function OrdersDashboard() {
 
   useEffect(() => {
     fetchOrders();
+    fetchDrivers();
     setSettings(getLocalSettings());
   }, []);
 
@@ -1280,7 +1384,7 @@ export default function OrdersDashboard() {
                               </div>
                             </div>
                           </div>
-                          
+
                           {/* Footer Tarjeta */}
                           <div className="flex flex-col gap-3 pt-3 border-t border-charcoal-border/50">
                             
@@ -1303,6 +1407,42 @@ export default function OrdersDashboard() {
                                 {isDelivery ? 'Delivery' : 'Retiro'}
                               </span>
                             </div>
+
+                            {/* Repartidores & Despacho (Solo Delivery) */}
+                            {isDelivery && (
+                              <div className="space-y-2 mt-1 pb-1" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex gap-2 items-center justify-between">
+                                  <span className="text-[9px] text-gray-500 uppercase font-bold">Repartidor:</span>
+                                  <select
+                                    value={order.driverId || ''}
+                                    onChange={(e) => assignDriver(order.id, e.target.value)}
+                                    className="bg-black/60 text-white text-[10px] rounded border border-white/10 px-1 py-0.5 w-[140px] focus:outline-none focus:border-gold cursor-pointer"
+                                  >
+                                    <option value="">Sin Asignar</option>
+                                    {drivers.map(d => (
+                                      <option key={d.id} value={d.id}>{d.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                {order.driverId && (
+                                  <div className="flex gap-2 items-center justify-between">
+                                    <span className="text-[9px] text-gray-500 uppercase font-bold">Despacho:</span>
+                                    <select
+                                      value={order.deliveryStatus || 'unassigned'}
+                                      onChange={(e) => updateDeliveryStatus(order.id, e.target.value)}
+                                      className="bg-black/60 text-white text-[10px] rounded border border-white/10 px-1 py-0.5 w-[140px] focus:outline-none focus:border-gold cursor-pointer"
+                                    >
+                                      <option value="unassigned">Sin despachar</option>
+                                      <option value="assigned">Asignado</option>
+                                      <option value="in_transit">En Camino</option>
+                                      <option value="delivered">Entregado</option>
+                                      <option value="failed_attempt">Intento Fallido</option>
+                                      <option value="returned">Retornado</option>
+                                    </select>
+                                  </div>
+                                )}
+                              </div>
+                            )}
 
                             {/* Botones de Acción */}
                             <div className="flex gap-2 w-full" onClick={(e) => e.stopPropagation()}>

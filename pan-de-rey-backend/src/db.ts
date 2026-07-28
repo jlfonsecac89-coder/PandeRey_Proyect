@@ -9,7 +9,7 @@ export const dbConfig = {
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '01l93pDapK', // user can modify this in their local .env
     database: process.env.DB_NAME || 'postgres',
-    port: parseInt(process.env.DB_PORT || '5432'),
+    port: parseInt(process.env.DB_PORT || '6543'),
     ssl: {
         rejectUnauthorized: false // Supabase connections require SSL
     }
@@ -63,6 +63,7 @@ export function mysqlToPostgresQuery(sql: string): string {
         .replace(/InventoryMovements/g, 'inventory_movements')
         .replace(/UserRoles/g, 'user_roles')
         .replace(/OrderItems/g, 'order_items')
+        .replace(/DeliveryDrivers/g, 'delivery_drivers')
         .replace(/DefontanaConfig/g, 'defontana_config')
         .replace(/DefontanaSyncLogs/g, 'defontana_sync_logs')
         .replace(/Users/g, 'profiles')
@@ -102,6 +103,8 @@ export function mysqlToPostgresQuery(sql: string): string {
         .replace(/UserId/g, 'user_id')
         .replace(/AddressId/g, 'address_id')
         .replace(/CouponId/g, 'coupon_id')
+        .replace(/DriverId/g, 'driver_id')
+        .replace(/DeliveryStatus/g, 'delivery_status')
         .replace(/TotalAmount/g, 'total_amount')
         .replace(/ShippingMethod/g, 'shipping_method')
         .replace(/PickupTime/g, 'pickup_time')

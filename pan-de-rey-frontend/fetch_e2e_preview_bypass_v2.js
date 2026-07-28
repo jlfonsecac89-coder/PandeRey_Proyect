@@ -46,12 +46,14 @@ function requestUrl(targetUrl, headers = {}) {
 
 async function run() {
   try {
-    console.log(`📡 [Paso 1] Enviando petición GET inicial con bypass header...`);
+    console.log(`📡 [Paso 1] Enviando petición GET inicial con ambos bypass headers...`);
     const res1 = await requestUrl(url, {
-      'x-vercel-protection-bypass': bypassToken
+      'x-vercel-protection-bypass': bypassToken,
+      'x-vercel-set-bypass-cookie': 'true'
     });
     
     console.log(`Status 1: ${res1.statusCode}`);
+    console.log('Headers 1:', res1.headers);
     
     if (res1.statusCode === 302 || res1.statusCode === 307 || res1.statusCode === 308) {
       const redirectLocation = res1.headers.location;

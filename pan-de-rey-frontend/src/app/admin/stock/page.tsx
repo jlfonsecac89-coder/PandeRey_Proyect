@@ -61,7 +61,7 @@ export default function StockControl() {
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [quantityChangeInput, setQuantityChangeInput] = useState<number>(10);
   const [restockUser, setRestockUser] = useState<string>('Panadero Jefe');
-  const [restockReason, setRestockReason] = useState<string>('Reposición diaria de almacén');
+  const [restockReason, setRestockReason] = useState<string>('reposicion_almacen');
   const [isNegative, setIsNegative] = useState<boolean>(false); // for waste/loss vs restock
   
   // Toast Notification State
@@ -136,7 +136,7 @@ export default function StockControl() {
     setQuantityChangeInput(10);
     setIsNegative(false);
     setRestockUser('Panadero Jefe');
-    setRestockReason('Reposición diaria de almacén');
+    setRestockReason('reposicion_almacen');
     setIsRestockOpen(true);
   };
 
@@ -349,7 +349,18 @@ export default function StockControl() {
                     {mov.performedBy || mov.reason ? (
                       <div className="bg-charcoal-light/30 border-l border-gold/30 p-1.5 rounded text-[8px] font-mono text-gold-hover leading-normal space-y-0.5">
                         {mov.performedBy && <div><strong>Resp:</strong> {mov.performedBy}</div>}
-                        {mov.reason && <div><strong>Motivo:</strong> {mov.reason}</div>}
+                        {mov.reason && (
+                          <div>
+                            <strong>Motivo:</strong> {
+                              mov.reason === 'reposicion_almacen' ? 'Reposición de Almacén' :
+                              mov.reason === 'merma_vencimiento' ? 'Merma por Vencimiento' :
+                              mov.reason === 'merma_quiebre' ? 'Merma por Quiebre / Rotura' :
+                              mov.reason === 'ajuste_inventario' ? 'Ajuste de Inventario' :
+                              mov.reason === 'error_digitacion' ? 'Error de Digitación' :
+                              mov.reason
+                            }
+                          </div>
+                        )}
                       </div>
                     ) : mov.reference_id ? (
                       <div className="bg-charcoal-light/30 border-l border-gold/30 p-1.5 rounded text-[8px] font-mono text-gold-hover leading-relaxed">
@@ -439,14 +450,18 @@ export default function StockControl() {
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Motivo del Ajuste *</label>
-                <input 
-                  type="text"
-                  placeholder="Ej. Descarte por quemadura / Entrada lote mañana"
+                <select 
                   value={restockReason}
                   onChange={(e) => setRestockReason(e.target.value)}
-                  className="w-full bg-[#0d0d0d] border border-charcoal-border text-white text-xs px-3.5 py-2.5 rounded outline-none focus:border-gold/40"
+                  className="w-full bg-[#0d0d0d] border border-charcoal-border text-gray-300 text-xs px-3.5 py-2.5 rounded outline-none focus:border-gold/40"
                   required
-                />
+                >
+                  <option value="reposicion_almacen">Reposición de Almacén</option>
+                  <option value="merma_vencimiento">Merma por Vencimiento</option>
+                  <option value="merma_quiebre">Merma por Quiebre / Rotura</option>
+                  <option value="ajuste_inventario">Ajuste de Inventario</option>
+                  <option value="error_digitacion">Error de Digitación</option>
+                </select>
               </div>
 
               <div className="flex items-center justify-center gap-3 py-3 border-t border-b border-charcoal-border/50 text-xs text-gray-400">

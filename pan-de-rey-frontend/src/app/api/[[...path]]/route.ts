@@ -219,6 +219,27 @@ async function ensureDbSeeded(pool: any) {
     }
 }
 
+// Rate limiting map for /api/orders/track
+// Key: IP address, Value: Array of timestamps of attempts within the window
+const trackRateLimitMap = new Map<string, number[]>();
+
+function checkTrackRateLimit(ip: string): boolean {
+    const now = Date.now();
+    const windowMs = 15 * 60 * 1000; // 15 minutes
+    const maxAttempts = 10;
+
+    let attempts = trackRateLimitMap.get(ip) || [];
+    attempts = attempts.filter(timestamp => now - timestamp < windowMs);
+    
+    if (attempts.length >= maxAttempts) {
+        return false;
+    }
+    
+    attempts.push(now);
+    trackRateLimitMap.set(ip, attempts);
+    return true;
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ path?: string[] }> }) {
     const { path } = await params;
     const url = new URL(request.url);
@@ -786,6 +807,71 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         if (routeStr === 'coupons') {
             const [rows] = await pool.query('SELECT * FROM public.coupons ORDER BY code ASC');
             return NextResponse.json(rows);
+        }
+
+        // 7.4 GET /api/delivery-drivers
+        if (routeStr === 'delivery-drivers') {
+            const [rows] = await pool.query('SELECT * FROM public.delivery_drivers WHERE is_active = true ORDER BY name ASC');
+            return NextResponse.json(rows);
+        }
+
+        // 7.5 GET /api/orders/track
+        if (routeStr === 'orders/track') {
+            const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || '127.0.0.1';
+            if (!checkTrackRateLimit(ip)) {
+                return NextResponse.json({ error: 'Demasiados intentos de seguimiento. Por favor, intente de nuevo en 15 minutos.' }, { status: 429 });
+            }
+
+            const orderNumber = url.searchParams.get('orderNumber');
+            const email = url.searchParams.get('email');
+            
+            if (!orderNumber || !email) {
+                return NextResponse.json({ error: 'Order number and email are required' }, { status: 400 });
+            }
+            
+            const [orderRows]: any = await pool.query(`
+                SELECT o.Id, o.OrderNumber, o.Status, o.DeliveryStatus, o.ShippingMethod, o.CreatedAt, o.TotalAmount,
+                       u.Email, u.FirstName, u.LastName,
+                       d.Name as DriverName, d.Phone as DriverPhone, d.VehicleType as DriverVehicle
+                FROM Orders o
+                LEFT JOIN Users u ON o.UserId = u.Id
+                LEFT JOIN DeliveryDrivers d ON o.DriverId = d.Id
+                WHERE LOWER(o.OrderNumber) = LOWER(?) AND LOWER(u.Email) = LOWER(?)
+            `, [orderNumber.trim(), email.trim()]);
+            
+            if (orderRows.length === 0) {
+                return NextResponse.json({ error: 'Order not found or email mismatch' }, { status: 404 });
+            }
+            
+            const order = orderRows[0];
+            
+            const [itemRows]: any = await pool.query(`
+                SELECT oi.Quantity, pv.VariantName, p.Name as ProductName
+                FROM OrderItems oi
+                JOIN ProductVariants pv ON oi.VariantId = pv.Id
+                JOIN Products p ON pv.ProductId = p.Id
+                WHERE oi.OrderId = ?
+            `, [order.Id]);
+            
+            return NextResponse.json({
+                orderNumber: order.OrderNumber,
+                status: order.Status,
+                deliveryStatus: order.DeliveryStatus,
+                shippingMethod: order.ShippingMethod,
+                createdAt: order.CreatedAt,
+                totalAmount: order.TotalAmount,
+                customerName: `${order.FirstName} ${order.LastName}`,
+                driver: order.DriverName ? {
+                    name: order.DriverName,
+                    phone: order.DriverPhone,
+                    vehicle: order.DriverVehicle
+                } : null,
+                items: itemRows.map((i: any) => ({
+                    productName: i.ProductName,
+                    variantName: i.VariantName,
+                    quantity: i.Quantity
+                }))
+            });
         }
 
         // 8. GET /api/orders
@@ -1594,21 +1680,57 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         // 5. POST /api/orders/update-status
         if (routeStr === 'orders/update-status') {
-            const { orderId, newStatus } = body;
-            if (!orderId || !newStatus) {
-                return NextResponse.json({ error: 'Order ID and New Status are required' }, { status: 400 });
+            const { orderId, newStatus, driverId, deliveryStatus } = body;
+            if (!orderId) {
+                return NextResponse.json({ error: 'Order ID is required' }, { status: 400 });
             }
-            await pool.query('UPDATE Orders SET Status = ? WHERE Id = ?', [newStatus, orderId]);
-            const [orderRows]: any = await pool.query(
-                'SELECT o.TotalAmount, u.Email, u.Phone FROM Orders o LEFT JOIN Users u ON o.UserId = u.Id WHERE o.Id = ?',
-                [orderId]
-            );
-            if (orderRows.length > 0) {
-                const o = orderRows[0];
-                await sendStatusEmail(o.Email || 'panderey.cl@gmail.com', orderId, newStatus, o.TotalAmount);
-                await sendStatusWhatsApp(o.Phone || '+56912345678', orderId, newStatus);
+            
+            let statusChanged = false;
+            let finalStatus = newStatus;
+            
+            if (newStatus) {
+                await pool.query('UPDATE Orders SET Status = ? WHERE Id = ?', [newStatus, orderId]);
+                statusChanged = true;
             }
-            return NextResponse.json({ status: 'success', message: `Order status updated to '${newStatus}'` });
+            
+            if (driverId !== undefined) {
+                const cleanDriverId = (driverId && driverId !== 'unassigned' && driverId !== 'null') ? driverId : null;
+                await pool.query('UPDATE Orders SET DriverId = ? WHERE Id = ?', [cleanDriverId, orderId]);
+                
+                if (cleanDriverId && !deliveryStatus) {
+                    await pool.query("UPDATE Orders SET DeliveryStatus = 'assigned' WHERE Id = ? AND (DeliveryStatus = 'unassigned' OR DeliveryStatus IS NULL)", [orderId]);
+                }
+            }
+            
+            if (deliveryStatus) {
+                await pool.query('UPDATE Orders SET DeliveryStatus = ? WHERE Id = ?', [deliveryStatus, orderId]);
+                if (deliveryStatus === 'in_transit') {
+                    await pool.query("UPDATE Orders SET Status = 'En Camino' WHERE Id = ?", [orderId]);
+                    statusChanged = true;
+                    finalStatus = 'En Camino';
+                } else if (deliveryStatus === 'delivered') {
+                    await pool.query("UPDATE Orders SET Status = 'Entregado' WHERE Id = ?", [orderId]);
+                    statusChanged = true;
+                    finalStatus = 'Entregado';
+                }
+            }
+            
+            if (statusChanged || deliveryStatus) {
+                const [orderRows]: any = await pool.query(
+                    'SELECT o.TotalAmount, u.Email, u.Phone FROM Orders o LEFT JOIN Users u ON o.UserId = u.Id WHERE o.Id = ?',
+                    [orderId]
+                );
+                if (orderRows.length > 0) {
+                    const o = orderRows[0];
+                    const displayStatus = deliveryStatus 
+                        ? `Despacho: ${deliveryStatus === 'assigned' ? 'Conductor Asignado' : deliveryStatus === 'in_transit' ? 'En Camino' : deliveryStatus === 'delivered' ? 'Entregado' : deliveryStatus}` 
+                        : finalStatus;
+                    await sendStatusEmail(o.Email || 'panderey.cl@gmail.com', orderId, displayStatus, o.TotalAmount);
+                    await sendStatusWhatsApp(o.Phone || '+56912345678', orderId, displayStatus);
+                }
+            }
+            
+            return NextResponse.json({ status: 'success', message: 'Order updated successfully' });
         }
 
         return NextResponse.json({ error: 'Route not found' }, { status: 404 });

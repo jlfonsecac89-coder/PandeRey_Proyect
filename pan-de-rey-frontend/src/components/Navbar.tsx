@@ -24,6 +24,9 @@ export default function Navbar() {
               <Link href="/shop" className="text-[10px] font-bold tracking-[0.3em] hover:text-white text-gray-400 transition-colors uppercase">
                 TIENDA
               </Link>
+              <Link href="/track" className="text-[10px] font-bold tracking-[0.3em] hover:text-white text-gray-400 transition-colors uppercase">
+                SEGUIMIENTO
+              </Link>
               <Link href="/#storytelling" className="text-[10px] font-bold tracking-[0.3em] hover:text-white text-gray-400 transition-colors uppercase">
                 NOSOTROS
               </Link>
