@@ -664,7 +664,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             
             try {
                 const rows = await CatalogService.getAllProducts(showAll, categoryId);
-                return NextResponse.json(rows);
+                const mappedRows = rows.map((p: any) => ({
+                    id: p.id || p.Id,
+                    categoryId: p.categoryId || p.CategoryId,
+                    categoryName: p.categoryName || p.CategoryName,
+                    category: p.category || p.Category,
+                    name: p.name || p.Name,
+                    slug: p.slug || p.Slug,
+                    price: p.price !== undefined ? p.price : (p.Price !== undefined ? p.Price : 0),
+                    image: p.image || p.Image || null,
+                    description: p.description || p.Description || null,
+                    isActive: p.isActive !== undefined ? p.isActive : (p.IsActive !== undefined ? p.IsActive : true),
+                    variantId: p.variantId || p.VariantId || null,
+                    sku: p.sku || p.SKU || p.Sku || null,
+                    stock: p.stock !== undefined ? p.stock : (p.Stock !== undefined ? p.Stock : 0),
+                    attributes: p.attributes || p.Attributes || null
+                }));
+                return NextResponse.json(mappedRows);
             } catch (err: any) {
                 logger.error('Error fetching catalog products', err);
                 return NextResponse.json({ error: err.message }, { status: 500 });
@@ -679,18 +695,34 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 return NextResponse.json({ error: 'Product not found' }, { status: 404 });
             }
             const product = productRows[0];
+            const mappedProduct: any = {
+                id: product.id || product.Id,
+                categoryId: product.categoryId || product.CategoryId,
+                name: product.name || product.Name,
+                slug: product.slug || product.Slug,
+                price: product.base_price !== undefined ? product.base_price : (product.BasePrice !== undefined ? product.BasePrice : product.price),
+                image: product.image_url || product.ImageUrl || product.image || product.Image || null,
+                description: product.description || product.Description || null,
+                isActive: product.is_active !== undefined ? product.is_active : (product.IsActive !== undefined ? product.IsActive : true)
+            };
             const [variantsRows]: any = await pool.query(`
                 SELECT v.*, i.Quantity, i.SafetyBuffer 
                 FROM ProductVariants v
                 LEFT JOIN Inventory i ON v.Id = i.VariantId
                 WHERE v.ProductId = ? AND v.IsActive = 1
             `, [productId]);
-            product.variants = variantsRows.map((v: any) => ({
-                ...v,
-                isAvailable: v.Quantity > v.SafetyBuffer,
-                stockStatus: v.Quantity > v.SafetyBuffer ? 'Disponible' : 'Agotado'
+            mappedProduct.variants = variantsRows.map((v: any) => ({
+                id: v.Id || v.id,
+                productId: v.ProductId || v.product_id,
+                variantName: v.VariantName || v.variant_name,
+                priceAdjustment: v.PriceAdjustment !== undefined ? v.PriceAdjustment : v.price_adjustment,
+                sku: v.SKU || v.sku,
+                quantity: v.Quantity !== undefined ? v.Quantity : (v.quantity !== undefined ? v.quantity : 0),
+                safetyBuffer: v.SafetyBuffer !== undefined ? v.SafetyBuffer : (v.safety_buffer !== undefined ? v.safety_buffer : 0),
+                isAvailable: (v.Quantity !== undefined ? v.Quantity : (v.quantity || 0)) > (v.SafetyBuffer !== undefined ? v.SafetyBuffer : (v.safety_buffer || 0)),
+                stockStatus: (v.Quantity !== undefined ? v.Quantity : (v.quantity || 0)) > (v.SafetyBuffer !== undefined ? v.SafetyBuffer : (v.safety_buffer || 0)) ? 'Disponible' : 'Agotado'
             }));
-            return NextResponse.json(product);
+            return NextResponse.json(mappedProduct);
         }
 
         // 4. GET /api/stock
@@ -753,7 +785,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 WHERE p.is_active = 1
                 ORDER BY p.name ASC
             `);
-            return NextResponse.json(rows);
+            const mappedRows = rows.map((r: any) => ({
+                variantId: r.variantId || r.VariantId,
+                variantName: r.variantName || r.VariantName,
+                productName: r.productName || r.ProductName,
+                imageUrl: r.imageUrl || r.ImageUrl,
+                quantity: r.quantity !== undefined ? r.quantity : (r.Quantity !== undefined ? r.Quantity : 0),
+                safetyBuffer: r.safetyBuffer !== undefined ? r.safetyBuffer : (r.SafetyBuffer !== undefined ? r.SafetyBuffer : 2),
+                lastUpdated: r.lastUpdated || r.LastUpdated
+            }));
+            return NextResponse.json(mappedRows);
         }
 
         // 7.2 GET /api/inventory/movements
@@ -775,7 +816,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             }
             query += ' ORDER BY im.created_at DESC LIMIT 100';
             const [rows] = await pool.query(query, params);
-            return NextResponse.json(rows);
+            const mappedRows = rows.map((r: any) => ({
+                id: r.id || r.Id,
+                variantId: r.variant_id || r.VariantId || r.Variant_id,
+                type: r.type || r.Type,
+                quantity: r.quantity !== undefined ? r.quantity : r.Quantity,
+                previousQuantity: r.previous_quantity !== undefined ? r.previous_quantity : (r.Previous_quantity !== undefined ? r.Previous_quantity : r.PreviousQuantity),
+                newQuantity: r.new_quantity !== undefined ? r.new_quantity : (r.New_quantity !== undefined ? r.New_quantity : r.NewQuantity),
+                reason: r.reason || r.Reason,
+                reference: r.reference || r.Reference,
+                performedBy: r.performed_by || r.Performed_by || r.PerformedBy,
+                createdAt: r.created_at || r.Created_at || r.CreatedAt,
+                variantName: r.variantName || r.VariantName,
+                productName: r.productName || r.ProductName
+            }));
+            return NextResponse.json(mappedRows);
         }
 
         // 7.3 GET /api/coupons
@@ -867,9 +922,39 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                     JOIN Products p ON pv.ProductId = p.Id 
                     WHERE oi.OrderId = ?
                 `, [order.Id]);
+                const mappedItems = itemRows.map((i: any) => ({
+                    id: i.id || i.Id,
+                    orderId: i.order_id || i.OrderId || i.Order_id,
+                    variantId: i.variant_id || i.VariantId || i.Variant_id,
+                    quantity: i.quantity !== undefined ? i.quantity : i.Quantity,
+                    unitPrice: i.unit_price !== undefined ? i.unit_price : i.UnitPrice,
+                    subtotal: i.subtotal !== undefined ? i.subtotal : i.Subtotal,
+                    variantName: i.variantName || i.VariantName,
+                    productName: i.productName || i.ProductName,
+                    imageUrl: i.imageUrl || i.ImageUrl
+                }));
                 
-                order.items = itemRows;
-                orders.push(order);
+                const mappedOrder = {
+                    id: order.id || order.Id,
+                    userId: order.user_id || order.UserId || order.User_id,
+                    driverId: order.driver_id || order.DriverId || order.Driver_id,
+                    orderNumber: order.order_number || order.OrderNumber || order.Order_number,
+                    status: order.status || order.Status,
+                    deliveryStatus: order.delivery_status || order.DeliveryStatus || order.Delivery_status,
+                    shippingMethod: order.shipping_method || order.ShippingMethod || order.Shipping_method,
+                    totalAmount: order.total_amount !== undefined ? order.total_amount : order.TotalAmount,
+                    shippingCost: order.shipping_cost !== undefined ? order.shipping_cost : order.ShippingCost,
+                    notes: order.notes || order.Notes,
+                    boletaNumber: order.boleta_number || order.BoletaNumber || order.Boleta_number,
+                    boletaUrl: order.boleta_url || order.BoletaUrl || order.Boleta_url,
+                    createdAt: order.created_at || order.CreatedAt || order.Created_at,
+                    updatedAt: order.updated_at || order.UpdatedAt || order.Updated_at,
+                    firstName: order.FirstName || order.first_name,
+                    lastName: order.LastName || order.last_name,
+                    email: order.Email || order.email,
+                    items: mappedItems
+                };
+                orders.push(mappedOrder);
             }
             return NextResponse.json(orders);
         }
