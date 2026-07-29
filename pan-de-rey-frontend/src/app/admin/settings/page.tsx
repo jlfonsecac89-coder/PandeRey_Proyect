@@ -337,7 +337,7 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="text-center text-[10px] italic leading-relaxed pt-1 whitespace-pre-wrap">
-                      "{draft.ticketNotes}"
+                      &quot;{draft.ticketNotes}&quot;
                     </div>
 
                     <div className="text-center pt-2">

@@ -67,10 +67,10 @@ export default function StockControl() {
   // Toast Notification State
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
-    loadData();
-  }, []);
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -91,10 +91,10 @@ export default function StockControl() {
     }
   };
 
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+  useEffect(() => {
+    setMounted(true);
+    loadData();
+  }, []);
 
   const handleStatusFilterClick = (statusKey: string) => {
     if (statusFilter === statusKey) {

@@ -58,6 +58,7 @@ async function confirmOrderAndTriggerIntegrations(orderId: string): Promise<{ su
 
     let order;
     let assignedOrderNumber = null;
+    let itemsForIntegrations: any[] = [];
 
     try {
         const [orderRows]: any = await connection.query(
@@ -124,7 +125,7 @@ async function confirmOrderAndTriggerIntegrations(orderId: string): Promise<{ su
         connection.release();
 
         // Assign to outside variable for integrations below
-        var itemsForIntegrations = itemRows.map((item: any) => ({
+        itemsForIntegrations = itemRows.map((item: any) => ({
             variantId: item.variant_id,
             quantity: item.quantity,
             price: item.unit_price
@@ -138,8 +139,8 @@ async function confirmOrderAndTriggerIntegrations(orderId: string): Promise<{ su
 
     const items = itemsForIntegrations;
     
-    let boletaNumber: string | null = null;
-    let boletaUrl: string | null = null;
+    const boletaNumber: string | null = null;
+    const boletaUrl: string | null = null;
     // (Defontana integration removed as requested)
     
     try {
@@ -1331,7 +1332,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 
                 // Batch execution architecture (Chunks of 200 items max)
                 const chunkSize = 200;
-                let finalReport = {
+                const finalReport = {
                     totalRows: 0,
                     successCount: 0,
                     failCount: 0,
@@ -1534,6 +1535,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                         customerPhone = userRows[0].Phone || customerPhone;
                         customerFirstName = userRows[0].FirstName;
                         customerLastName = userRows[0].LastName;
+                        if (marketingOptIn) {
+                            const supabaseAdmin = getSupabaseAdmin();
+                            await supabaseAdmin.from('profiles').update({ marketing_opt_in: true }).eq('id', finalUserId);
+                        }
                     } else {
                         finalUserId = crypto.randomUUID();
                         const supabaseAdmin = getSupabaseAdmin();
@@ -1543,7 +1548,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                             first_name: customerFirstName,
                             last_name: customerLastName,
                             phone: customerPhone,
-                            is_guest: true
+                            is_guest: true,
+                            marketing_opt_in: marketingOptIn ? true : false
                         });
                         if (insertErr) {
                             console.error('[Supabase Guest Insertion Error]:', insertErr);
@@ -1561,6 +1567,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                         customerPhone = userRows[0].Phone || customerPhone;
                         customerFirstName = userRows[0].FirstName;
                         customerLastName = userRows[0].LastName;
+                    }
+                    if (marketingOptIn) {
+                        const supabaseAdmin = getSupabaseAdmin();
+                        await supabaseAdmin.from('profiles').update({ marketing_opt_in: true }).eq('id', finalUserId);
                     }
                 }
 
