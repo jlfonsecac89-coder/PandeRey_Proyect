@@ -191,10 +191,13 @@ export default function CatalogManager() {
           attributes: p.attributes || p.Attributes || []
         }));
         setProducts(mappedData);
+      } else {
+        const errorText = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errorText}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      showToast('Error al conectar con el catálogo de productos.', 'error');
+      showToast(`Error cargando productos: ${err.message}`, 'error');
     } finally {
       setLoadingProducts(false);
     }
