@@ -174,6 +174,8 @@ function mapRowKeys(row: any): any {
         else if (key === 'payment_method') newKey = 'PaymentMethod';
         else if (key === 'transaction_id') newKey = 'TransactionId';
         else if (key === 'role_id') newKey = 'RoleId';
+        else if (key === 'accept_terms') newKey = 'AcceptTerms';
+        else if (key === 'marketing_opt_in') newKey = 'MarketingOptIn';
         else {
             // Capitalize first letter
             newKey = key.charAt(0).toUpperCase() + key.slice(1);
@@ -286,6 +288,8 @@ export const getDbPool = (): any => {
                     await pgPool.query('ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS order_number VARCHAR(50) UNIQUE;');
                     await pgPool.query('ALTER TABLE public.inventory_movements ADD COLUMN IF NOT EXISTS performed_by VARCHAR(100) NULL;');
                     await pgPool.query('ALTER TABLE public.inventory_movements ADD COLUMN IF NOT EXISTS reason TEXT NULL;');
+                    await pgPool.query('ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS accept_terms BOOLEAN DEFAULT FALSE;');
+                    await pgPool.query('ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS marketing_opt_in BOOLEAN DEFAULT FALSE;');
                     console.log('[Database Setup]: sequence and custom columns checked/created successfully.');
                 } catch (err: any) {
                     console.warn('[Database Setup WARNING]: Could not create sequence or columns:', err.message);

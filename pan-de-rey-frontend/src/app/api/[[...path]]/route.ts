@@ -103,23 +103,40 @@ async function confirmOrderAndTriggerIntegrations(orderId: string): Promise<{ su
             [orderId]
         );
 
+        // Deduct inventory inside the transaction upon confirmation
+        const [itemRows]: any = await connection.query(
+            'SELECT variant_id, quantity, unit_price, subtotal FROM public.order_items WHERE order_id = ?',
+            [orderId]
+        );
+
+        for (const item of itemRows) {
+            await connection.query(
+                'UPDATE Inventory SET Quantity = Quantity - ? WHERE VariantId = ?',
+                [item.quantity, item.variant_id]
+            );
+            await connection.query(
+                'INSERT INTO InventoryMovements (Id, VariantId, QuantityChange, MovementType, ReferenceId) VALUES (gen_random_uuid(), ?, ?, \'Venta\', ?)',
+                [item.variant_id, -item.quantity, orderId]
+            );
+        }
+
         await connection.commit();
         connection.release();
+
+        // Assign to outside variable for integrations below
+        var itemsForIntegrations = itemRows.map((item: any) => ({
+            variantId: item.variant_id,
+            quantity: item.quantity,
+            price: item.unit_price
+        }));
+
     } catch (txErr) {
         await connection.rollback();
         connection.release();
         throw txErr;
     }
 
-    const [itemRows]: any = await pool.query(
-        'SELECT variant_id, quantity, unit_price, subtotal FROM public.order_items WHERE order_id = ?',
-        [orderId]
-    );
-    const items = itemRows.map((item: any) => ({
-        variantId: item.variant_id,
-        quantity: item.quantity,
-        price: item.unit_price
-    }));
+    const items = itemsForIntegrations;
     
     let boletaNumber: string | null = null;
     let boletaUrl: string | null = null;
@@ -1437,7 +1454,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         // 3. POST /api/orders/checkout
         if (routeStr === 'orders/checkout') {
             try {
-                const { userId, items, shippingMethod, paymentMethod, notes, email, firstName, lastName, phone, addressId, couponId, pickupTime } = body;
+                const { userId, items, shippingMethod, paymentMethod, notes, email, firstName, lastName, phone, addressId, couponId, pickupTime, acceptTerms, marketingOptIn, address } = body;
                 if (!items || items.length === 0 || !shippingMethod) {
                     return NextResponse.json({ error: 'Missing checkout fields' }, { status: 400 });
                 }
@@ -1605,8 +1622,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                                 }
                             });
 
-                            const isSandbox = process.env.MERCADOPAGO_SANDBOX !== 'false';
-                            initPoint = isSandbox ? response.sandbox_init_point : response.init_point;
+                            // Force production init_point as requested (disable sandbox bypass)
+                            initPoint = response.init_point;
                             gatewayToken = response.id || '';
                             paymentStatus = 'Pendiente';
                         } catch (mpErr: any) {
@@ -1629,24 +1646,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                         }
                     }
 
+                    let finalAddressId = addressId || null;
+                    if (!finalAddressId && address) {
+                        finalAddressId = crypto.randomUUID();
+                        await connection.query(
+                            `INSERT INTO Addresses (Id, UserId, Commune, Street, Number, Department, IsDefault) 
+                             VALUES (?, ?, ?, ?, ?, ?, 0)`,
+                            [finalAddressId, finalUserId || null, address.commune, address.street, address.number, address.depto || null]
+                        );
+                    }
+
                     await connection.query(
-                        `INSERT INTO Orders (Id, UserId, AddressId, CouponId, TotalAmount, Status, ShippingMethod, PickupTime, ShippingCost, Notes) 
-                         VALUES (?, ?, ?, ?, ?, 'Pendiente', ?, ?, ?, ?)`,
-                        [orderId, finalUserId || null, addressId || null, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null]
+                        `INSERT INTO Orders (Id, UserId, AddressId, CouponId, TotalAmount, Status, ShippingMethod, PickupTime, ShippingCost, Notes, AcceptTerms, MarketingOptIn) 
+                         VALUES (?, ?, ?, ?, ?, 'Pendiente', ?, ?, ?, ?, ?, ?)`,
+                        [orderId, finalUserId || null, finalAddressId, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null, acceptTerms ? 1 : 0, marketingOptIn ? 1 : 0]
                     );
 
                     for (const row of itemInserts) {
                         await connection.query(
                             'INSERT INTO OrderItems (Id, OrderId, VariantId, Quantity, UnitPrice, Subtotal) VALUES (?, ?, ?, ?, ?, ?)',
                             row
-                        );
-                        await connection.query(
-                            'UPDATE Inventory SET Quantity = Quantity - ? WHERE VariantId = ?',
-                            [row[3], row[2]]
-                        );
-                        await connection.query(
-                            'INSERT INTO InventoryMovements (Id, VariantId, QuantityChange, MovementType, ReferenceId) VALUES (gen_random_uuid(), ?, ?, \'Venta\', ?)',
-                            [row[2], -row[3], orderId]
                         );
                     }
 

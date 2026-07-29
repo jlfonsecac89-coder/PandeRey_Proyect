@@ -30,8 +30,13 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
     birthMonth: '',
     birthYear: '',
     acceptTerms: false,
+    marketingOptIn: false,
     deliveryMethod: 'store_pickup', // 'store_pickup' | 'own_delivery'
-    paymentMethod: 'mercadopago' // 'mercadopago' | 'transfer'
+    paymentMethod: 'mercadopago', // 'mercadopago' | 'transfer'
+    addressStreet: '',
+    addressNumber: '',
+    addressDepto: '',
+    addressCommune: ''
   });
 
   const [activeStep, setActiveStep] = useState(1);
@@ -56,7 +61,15 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
         email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName || 'Invitado',
-        phone: formData.phone
+        phone: formData.phone,
+        acceptTerms: formData.acceptTerms,
+        marketingOptIn: formData.marketingOptIn,
+        address: formData.deliveryMethod === 'own_delivery' ? {
+          street: formData.addressStreet,
+          number: formData.addressNumber,
+          depto: formData.addressDepto,
+          commune: formData.addressCommune
+        } : null
       };
 
       const response = await fetch(getApiUrl('/api/orders/checkout'), {
@@ -138,7 +151,7 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (authMode === 'register' && !formData.acceptTerms) {
+    if ((authMode === 'register' || authMode === 'guest') && !formData.acceptTerms) {
       alert('Debes aceptar los Términos y Condiciones para continuar.');
       return;
     }
@@ -287,6 +300,30 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
                       <input required name="firstName" value={formData.firstName} onChange={handleInputChange} placeholder="Nombre completo" className="w-full bg-[#161616] border border-white/10 p-3.5 rounded-xl text-white focus:border-gold outline-none transition-colors text-sm" />
                       <input required type="email" name="email" value={formData.email} onChange={handleInputChange} placeholder="Correo electrónico" className="w-full bg-[#161616] border border-white/10 p-3.5 rounded-xl text-white focus:border-gold outline-none transition-colors text-sm" />
                     </div>
+                    <div className="pt-4 pb-2 space-y-3">
+                      <label className="flex items-start gap-3 cursor-pointer group">
+                        <div className="relative flex items-center justify-center pt-0.5">
+                          <input type="checkbox" name="acceptTerms" checked={formData.acceptTerms} onChange={handleInputChange} className="peer sr-only" />
+                          <div className="w-5 h-5 rounded border border-white/30 bg-[#161616] peer-checked:bg-gold peer-checked:border-gold transition-colors flex items-center justify-center">
+                            <Check className="w-3.5 h-3.5 text-black opacity-0 peer-checked:opacity-100 transition-opacity" />
+                          </div>
+                        </div>
+                        <span className="text-[11px] text-gray-400 select-none pt-0.5 leading-tight">
+                          He leído y acepto los <button type="button" onClick={() => setIsTermsOpen(true)} className="text-gold hover:underline font-bold cursor-pointer">Términos, Condiciones y Políticas de Privacidad</button>.
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-3 cursor-pointer group">
+                        <div className="relative flex items-center justify-center pt-0.5">
+                          <input type="checkbox" name="marketingOptIn" checked={formData.marketingOptIn} onChange={handleInputChange} className="peer sr-only" />
+                          <div className="w-5 h-5 rounded border border-white/30 bg-[#161616] peer-checked:bg-gold peer-checked:border-gold transition-colors flex items-center justify-center">
+                            <Check className="w-3.5 h-3.5 text-black opacity-0 peer-checked:opacity-100 transition-opacity" />
+                          </div>
+                        </div>
+                        <span className="text-[11px] text-gray-400 select-none pt-0.5 leading-tight">
+                          Quiero recibir novedades y promociones exclusivas.
+                        </span>
+                      </label>
+                    </div>
                     <div className="flex justify-end pt-4">
                       <button type="submit" className="bg-gold hover:bg-gold-hover text-black px-8 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors w-full sm:w-auto cursor-pointer shadow-lg shadow-gold/5">
                         Continuar
@@ -359,7 +396,7 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
                       </div>
                     </div>
 
-                    <div className="pt-4 pb-2">
+                    <div className="pt-4 pb-2 space-y-3">
                       <label className="flex items-start gap-3 cursor-pointer group">
                         <div className="relative flex items-center justify-center pt-0.5">
                           <input 
@@ -375,6 +412,23 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
                         </div>
                         <span className="text-[11px] text-gray-400 select-none pt-0.5 leading-tight">
                           He leído y acepto los <button type="button" onClick={() => setIsTermsOpen(true)} className="text-gold hover:underline font-bold cursor-pointer">Términos, Condiciones y Políticas de Privacidad</button>.
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-3 cursor-pointer group">
+                        <div className="relative flex items-center justify-center pt-0.5">
+                          <input 
+                            type="checkbox" 
+                            name="marketingOptIn" 
+                            checked={formData.marketingOptIn} 
+                            onChange={handleInputChange} 
+                            className="peer sr-only"
+                          />
+                          <div className="w-5 h-5 rounded border border-white/30 bg-[#161616] peer-checked:bg-gold peer-checked:border-gold transition-colors flex items-center justify-center">
+                            <Check className="w-3.5 h-3.5 text-black opacity-0 peer-checked:opacity-100 transition-opacity" />
+                          </div>
+                        </div>
+                        <span className="text-[11px] text-gray-400 select-none pt-0.5 leading-tight">
+                          Quiero recibir novedades y promociones exclusivas.
                         </span>
                       </label>
                     </div>
@@ -417,6 +471,41 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
                   </button>
                 </div>
 
+                {formData.deliveryMethod === 'own_delivery' && (
+                  <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-2">
+                    <h3 className="text-white text-sm font-bold tracking-wide border-t border-white/10 pt-6">Dirección de Despacho</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5 block">Calle *</label>
+                        <input name="addressStreet" value={formData.addressStreet} onChange={handleInputChange} placeholder="Ej: Av. Providencia" className="w-full bg-[#161616] border border-white/10 p-3.5 rounded-xl text-white focus:border-gold outline-none transition-colors text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5 block">Número *</label>
+                        <input name="addressNumber" value={formData.addressNumber} onChange={handleInputChange} placeholder="Ej: 1234" className="w-full bg-[#161616] border border-white/10 p-3.5 rounded-xl text-white focus:border-gold outline-none transition-colors text-sm" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5 block">Depto / Casa (Opcional)</label>
+                        <input name="addressDepto" value={formData.addressDepto} onChange={handleInputChange} placeholder="Ej: Depto 402" className="w-full bg-[#161616] border border-white/10 p-3.5 rounded-xl text-white focus:border-gold outline-none transition-colors text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5 block">Comuna *</label>
+                        <select name="addressCommune" value={formData.addressCommune} onChange={handleInputChange} className="w-full bg-[#161616] border border-white/10 p-3.5 rounded-xl text-white focus:border-gold outline-none transition-colors text-sm appearance-none">
+                          <option value="">Selecciona una comuna</option>
+                          <option value="Providencia">Providencia</option>
+                          <option value="Ñuñoa">Ñuñoa</option>
+                          <option value="Santiago Centro">Santiago Centro</option>
+                          <option value="Las Condes">Las Condes</option>
+                          <option value="Vitacura">Vitacura</option>
+                          <option value="La Reina">La Reina</option>
+                          <option value="Macul">Macul</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center pt-8 border-t border-white/5 mt-8">
                   <button 
                     type="button"
@@ -426,7 +515,15 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
                     Atrás
                   </button>
                   <button 
-                    onClick={() => setActiveStep(3)} 
+                    onClick={() => {
+                      if (formData.deliveryMethod === 'own_delivery') {
+                        if (!formData.addressStreet || !formData.addressNumber || !formData.addressCommune) {
+                          alert('Por favor completa todos los campos obligatorios de la dirección (Calle, Número, Comuna).');
+                          return;
+                        }
+                      }
+                      setActiveStep(3);
+                    }} 
                     className="bg-gold text-black hover:bg-gold-hover px-6 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer shadow-lg shadow-gold/5"
                   >
                     Continuar
