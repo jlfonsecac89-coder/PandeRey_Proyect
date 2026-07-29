@@ -88,8 +88,9 @@ async function confirmOrderAndTriggerIntegrations(orderId: string): Promise<{ su
             };
         }
 
-        // Generate a new sequence number if order_number is not assigned yet
+        // Generate a new sequence number if order_number is not assigned yet (fallback for historical pending orders)
         if (!assignedOrderNumber) {
+            console.warn(`[Webhook Warning] Order ${orderId} missing order_number. Generating fallback.`);
             const [seqRows]: any = await connection.query("SELECT nextval('public.order_number_seq') as seq");
             const seqVal = seqRows[0]?.seq || 1000;
             assignedOrderNumber = `PDR-${String(seqVal).padStart(6, '0')}`;
@@ -1667,10 +1668,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                         );
                     }
 
+                    // Generate early order number (PDR-XXXXXX)
+                    const [seqRows]: any = await connection.query("SELECT nextval('public.order_number_seq') as seq");
+                    const seqVal = seqRows[0]?.seq || 1000;
+                    const assignedOrderNumber = `PDR-${String(seqVal).padStart(6, '0')}`;
+
                     await connection.query(
-                        `INSERT INTO Orders (Id, UserId, AddressId, CouponId, TotalAmount, Status, ShippingMethod, PickupTime, ShippingCost, Notes, AcceptTerms, MarketingOptIn) 
-                         VALUES (?, ?, ?, ?, ?, 'Pendiente', ?, ?, ?, ?, ?, ?)`,
-                        [orderId, finalUserId || null, finalAddressId, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null, !!acceptTerms, !!marketingOptIn]
+                        `INSERT INTO Orders (Id, UserId, AddressId, CouponId, TotalAmount, Status, ShippingMethod, PickupTime, ShippingCost, Notes, AcceptTerms, MarketingOptIn, OrderNumber) 
+                         VALUES (?, ?, ?, ?, ?, 'Pendiente', ?, ?, ?, ?, ?, ?, ?)`,
+                        [orderId, finalUserId || null, finalAddressId, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null, !!acceptTerms, !!marketingOptIn, assignedOrderNumber]
                     );
 
                     for (const row of itemInserts) {
