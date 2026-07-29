@@ -340,6 +340,30 @@ export default function CatalogManager() {
     }
   };
 
+  // Toggle Product Active Status
+  const handleToggleProductActive = async (product: Product) => {
+    const nextStatus = !product.isActive;
+    try {
+      const res = await fetch('/api/catalog/products/toggle-active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: product.id,
+          isActive: nextStatus
+        })
+      });
+      if (res.ok) {
+        showToast(`Producto ${nextStatus ? 'activado' : 'desactivado'} con éxito.`);
+        loadProducts();
+      } else {
+        const data = await res.json();
+        showToast(data.error || 'Error al cambiar estado.', 'error');
+      }
+    } catch (err) {
+      showToast('Error de red al cambiar estado.', 'error');
+    }
+  };
+
   // Handle Product Delete
   const handleProductDelete = async (id: string, name: string) => {
     if (confirm(`¿Estás seguro de que deseas desactivar el producto "${name}"?`)) {
@@ -1086,17 +1110,18 @@ export default function CatalogManager() {
                     <th className="px-6 py-4.5">Atributos Seleccionados</th>
                     <th className="px-6 py-4.5">Precio Base</th>
                     <th className="px-6 py-4.5">Stock</th>
+                    <th className="px-6 py-4.5 text-center">Estado</th>
                     <th className="px-6 py-4.5 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingProducts ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-20 text-gray-500">Cargando catálogo desde la base de datos...</td>
+                      <td colSpan={7} className="text-center py-20 text-gray-500">Cargando catálogo desde la base de datos...</td>
                     </tr>
                   ) : filteredProducts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-20 text-gray-500">No se encontraron productos.</td>
+                      <td colSpan={7} className="text-center py-20 text-gray-500">No se encontraron productos.</td>
                     </tr>
                   ) : (
                     filteredProducts.map((product) => (
@@ -1142,6 +1167,16 @@ export default function CatalogManager() {
                         </td>
                         <td className="px-6 py-5">
                           <span className={`font-bold ${product.stock === 0 ? 'text-red-500' : 'text-white'}`}>{product.stock} un.</span>
+                        </td>
+                        <td className="px-6 py-5 text-center">
+                          <button 
+                            onClick={() => handleToggleProductActive(product)}
+                            className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase transition-colors cursor-pointer ${
+                              product.isActive ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/10' : 'border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/10'
+                            }`}
+                          >
+                            {product.isActive ? 'Activo' : 'Inactivo'}
+                          </button>
                         </td>
                         <td className="px-6 py-5 text-right">
                           <div className="flex items-center justify-end gap-3.5">

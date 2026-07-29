@@ -1186,7 +1186,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             return NextResponse.json({ status: 'success' });
         }
 
-        // 1.8 POST /api/catalog/products/delete
+        // 1.8 POST /api/catalog/products/toggle-active
+        if (routeStr === 'catalog/products/toggle-active') {
+            const { id, isActive } = body;
+            if (!id || isActive === undefined) {
+                return NextResponse.json({ error: 'ID and isActive are required' }, { status: 400 });
+            }
+            const activeInt = isActive ? 1 : 0;
+            await pool.query('UPDATE public.products SET is_active = ? WHERE id = ?', [activeInt, id]);
+            await pool.query('UPDATE public.product_variants SET is_active = ? WHERE product_id = ?', [activeInt, id]);
+            return NextResponse.json({ status: 'success' });
+        }
+
+        // 1.9 POST /api/catalog/products/delete
         if (routeStr === 'catalog/products/delete') {
             const { id } = body;
             if (!id) {
