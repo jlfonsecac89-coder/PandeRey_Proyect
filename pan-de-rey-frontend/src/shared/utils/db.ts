@@ -127,7 +127,9 @@ export function mysqlToPostgresQuery(sql: string): string {
         .replace(/FirstName/g, 'first_name')
         .replace(/LastName/g, 'last_name')
         .replace(/CreatedAt/g, 'created_at')
-        .replace(/UpdatedAt/g, 'updated_at');
+        .replace(/UpdatedAt/g, 'updated_at')
+        .replace(/AcceptTerms/g, 'accept_terms')
+        .replace(/MarketingOptIn/g, 'marketing_opt_in');
         
     return formattedSql;
 }

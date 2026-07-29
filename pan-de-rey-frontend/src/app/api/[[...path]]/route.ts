@@ -1669,7 +1669,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                     await connection.query(
                         `INSERT INTO Orders (Id, UserId, AddressId, CouponId, TotalAmount, Status, ShippingMethod, PickupTime, ShippingCost, Notes, AcceptTerms, MarketingOptIn) 
                          VALUES (?, ?, ?, ?, ?, 'Pendiente', ?, ?, ?, ?, ?, ?)`,
-                        [orderId, finalUserId || null, finalAddressId, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null, acceptTerms ? 1 : 0, marketingOptIn ? 1 : 0]
+                        [orderId, finalUserId || null, finalAddressId, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null, !!acceptTerms, !!marketingOptIn]
                     );
 
                     for (const row of itemInserts) {
