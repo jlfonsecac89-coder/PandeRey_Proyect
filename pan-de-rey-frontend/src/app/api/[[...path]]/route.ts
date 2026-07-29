@@ -1612,6 +1612,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
                             // Notification URL: Webhook address for Mercado Pago to POST notifications
                             const notificationUrl = `${frontendUrl}/api/orders/webhook`;
+                            console.log('[MercadoPago Checkout] Configured notification_url:', notificationUrl);
 
                             const response = await preference.create({
                                 body: {
