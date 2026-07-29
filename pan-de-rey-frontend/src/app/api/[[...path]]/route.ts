@@ -1353,7 +1353,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             const [rows]: any = await pool.query('SELECT quantity FROM public.inventory WHERE variant_id = ?', [variantId]);
             let currentQuantity = 0;
             if (rows.length > 0) {
-                currentQuantity = rows[0].quantity;
+                currentQuantity = rows[0].quantity !== undefined ? rows[0].quantity : (rows[0].Quantity || 0);
             }
 
             const newQuantity = currentQuantity + parseInt(quantityChange);
