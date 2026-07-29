@@ -1605,7 +1605,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                                 }
                             });
 
-                            const isSandbox = process.env.MERCADOPAGO_SANDBOX === 'true';
+                            const isSandbox = process.env.MERCADOPAGO_SANDBOX !== 'false';
                             initPoint = isSandbox ? response.sandbox_init_point : response.init_point;
                             gatewayToken = response.id || '';
                             paymentStatus = 'Pendiente';
