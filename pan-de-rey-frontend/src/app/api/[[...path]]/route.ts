@@ -1248,7 +1248,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             // Update main variant price or stock
             const [variants]: any = await pool.query('SELECT id FROM public.product_variants WHERE product_id = ? AND variant_name = ?', [id, 'Clásico']);
             if (variants.length > 0) {
-                const variantId = variants[0].id;
+                const variantId = variants[0].id || variants[0].Id;
                 
                 // Update stock
                 await pool.query(
