@@ -743,7 +743,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             rows.forEach((r: any) => {
                 config[r.SettingKey] = r.SettingValue;
             });
-            config['mercadoPagoPublicKey'] = process.env.MERCADOPAGO_PUBLIC_KEY || 'APP_USR-6f4ded52-e3d9-4e3e-ac07-8bd4655a9df9';
+            config['mercadoPagoPublicKey'] = process.env.MERCADOPAGO_PUBLIC_KEY || 'APP_USR-eb522bd8-091f-4cde-a94a-6cdea915877f';
             config['mercadoPagoAccessToken'] = 'APP_USR-46172256••••••••••••••••••••••••••••';
             return NextResponse.json(config);
         }
@@ -965,7 +965,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             if (!paymentId) {
                 return NextResponse.json({ error: 'payment_id is required' }, { status: 400 });
             }
-            const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-4617225674364003-070212-ac94008f892a332dcbb5cd08dfe9a938-3512158955';
+            const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-1719720669056002-072410-257a750d06cff251cc8a7d468e3510b3-3467677258';
             const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
                 headers: { 'Authorization': `Bearer ${mpAccessToken}` }
             });
@@ -1558,7 +1558,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
                     if (finalPaymentMethod && finalPaymentMethod.toLowerCase() === 'mercadopago') {
                         try {
-                            const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-4617225674364003-070212-ac94008f892a332dcbb5cd08dfe9a938-3512158955';
+                            const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-1719720669056002-072410-257a750d06cff251cc8a7d468e3510b3-3467677258';
                             const client = new MercadoPagoConfig({ accessToken: mpAccessToken });
                             const preference = new Preference(client);
 
@@ -1697,7 +1697,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 const paymentId = data?.id || url.searchParams.get('id') || body.resource?.split('/').pop();
                 if (paymentId) {
                     try {
-                        const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-4617225674364003-070212-ac94008f892a332dcbb5cd08dfe9a938-3512158955';
+                        const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-1719720669056002-072410-257a750d06cff251cc8a7d468e3510b3-3467677258';
                         const client = new MercadoPagoConfig({ accessToken: mpAccessToken });
                         const payment = new Payment(client);
 

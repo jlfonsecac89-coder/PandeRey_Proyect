@@ -1044,8 +1044,8 @@ export const defaultSettings: SimSettings = {
   ticketNotes: "¡Gracias por preferir Pan de Rey! Conservar en lugar fresco y seco. Consumir preferentemente dentro de las 48 hrs.",
 
   mercadoPagoActive: true,
-  mercadoPagoPublicKey: process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || "APP_USR-6f4ded52-e3d9-4e3e-ac07-8bd4655a9df9",
-  mercadoPagoAccessToken: "APP_USR-46172256••••••••••••••••••••••••••••",
+  mercadoPagoPublicKey: process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || "APP_USR-eb522bd8-091f-4cde-a94a-6cdea915877f",
+  mercadoPagoAccessToken: "APP_USR-1719720669056002-072410-257a750d06cff251cc8a7d468e3510b3-3467677258",
   mercadoPagoSandbox: true,
   
   bankTransferActive: true,
@@ -1115,8 +1115,8 @@ export const getLocalSettings = (): SimSettings => {
     }
   }
   // Enforce secure settings keys from environment and mask secrets
-  settings.mercadoPagoPublicKey = process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || "APP_USR-6f4ded52-e3d9-4e3e-ac07-8bd4655a9df9";
-  settings.mercadoPagoAccessToken = "APP_USR-46172256••••••••••••••••••••••••••••";
+  settings.mercadoPagoPublicKey = process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || "APP_USR-eb522bd8-091f-4cde-a94a-6cdea915877f";
+  settings.mercadoPagoAccessToken = "APP_USR-1719720669056002-072410-257a750d06cff251cc8a7d468e3510b3-3467677258";
   return settings;
 };
 
