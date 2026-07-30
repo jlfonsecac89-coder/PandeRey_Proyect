@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import crypto from 'crypto';
 import { getDbPool } from '@/shared/utils/db';
 import { printFiscalTicket } from '@/domains/orders/services/fiscalPrinter';
@@ -1826,6 +1827,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                         : finalStatus;
                     await sendStatusEmail(o.Email || 'panderey.cl@gmail.com', orderId, displayStatus, o.TotalAmount);
                     await sendStatusWhatsApp(o.Phone || '+56912345678', orderId, displayStatus);
+                }
+                
+                // Bust Next.js aggressive cache to make sure UI stays synced
+                try {
+                    revalidatePath('/admin/driver/orders', 'page');
+                    revalidatePath('/track', 'page');
+                } catch (e) {
+                    logger.warn('Failed to revalidate paths', { error: e });
                 }
             }
             

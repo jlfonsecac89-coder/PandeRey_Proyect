@@ -1,6 +1,7 @@
 'use server';
 
 import { getSupabaseAdmin } from '@/shared/utils/supabase';
+import { getDbPool } from '@/shared/utils/db';
 
 export type DriverOrder = {
   id: string;
@@ -18,25 +19,16 @@ export type PinVerificationResult = {
 };
 
 export async function getDriverOrders(driverId: string): Promise<DriverOrder[]> {
-  const supabase = getSupabaseAdmin();
-  
-  // Note: driver_id checking might fail if driverId is not a valid UUID in DB, but we pass it anyway.
-  // In our DB, Orders table has `shipping_method` which could be 'Delivery' or 'Retiro'.
-  // We'll query orders that are in 'Preparación' or 'En Camino'
-  const { data, error } = await supabase
-    .from('orders')
-    .select('id, order_number, status, customer_name, customer_phone, delivery_address, total_amount')
-    // Temporarily commenting out driver_id filter so any pending delivery shows up for testing
-    // .eq('driver_id', driverId) 
-    .in('status', ['Preparación', 'En Camino'])
-    .order('created_at', { ascending: false });
+  const pool = getDbPool();
+  // Use direct DB pool to avoid case-sensitivity and RLS issues with Supabase SDK
+  const [rows]: any = await pool.query(`
+    SELECT Id as id, OrderNumber as order_number, Status as status, CustomerName as customer_name, CustomerPhone as customer_phone, DeliveryAddress as delivery_address, TotalAmount as total_amount
+    FROM public.Orders
+    WHERE Status IN ('Preparación', 'En Camino')
+    ORDER BY CreatedAt DESC
+  `);
 
-  if (error) {
-    console.error('Error fetching driver orders:', error);
-    return [];
-  }
-
-  return (data || []).map(order => ({
+  return (rows || []).map((order: any) => ({
     id: order.id,
     orderNumber: order.order_number,
     status: order.status as 'Preparación' | 'En Camino',
