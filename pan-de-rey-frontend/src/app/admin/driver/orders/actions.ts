@@ -26,7 +26,8 @@ export async function getDriverOrders(driverId: string): Promise<DriverOrder[]> 
   const { data, error } = await supabase
     .from('orders')
     .select('id, order_number, status, customer_name, customer_phone, delivery_address, total_amount')
-    .eq('driver_id', driverId)
+    // Temporarily commenting out driver_id filter so any pending delivery shows up for testing
+    // .eq('driver_id', driverId) 
     .in('status', ['Preparación', 'En Camino'])
     .order('created_at', { ascending: false });
 

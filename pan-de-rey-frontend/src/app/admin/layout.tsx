@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, PackageSearch, Kanban, Settings, LogOut, Palette, ClipboardList, Ticket, TrendingUp, Users } from 'lucide-react';
+import { LayoutDashboard, PackageSearch, Kanban, Settings, LogOut, Palette, ClipboardList, Ticket, TrendingUp, Users, Truck } from 'lucide-react';
 
 import Image from 'next/image';
 
@@ -14,6 +14,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       title: 'Seguimiento o Stock',
       items: [
         { name: 'Seguimiento Pedidos', href: '/admin/orders', icon: Kanban },
+        { name: 'App Repartidor', href: '/admin/driver/orders', icon: Truck },
         { name: 'Catálogo Productos', href: '/admin/products', icon: PackageSearch },
         { name: 'Control de Stock', href: '/admin/stock', icon: ClipboardList },
       ]
