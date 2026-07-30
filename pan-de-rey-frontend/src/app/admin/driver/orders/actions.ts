@@ -22,10 +22,19 @@ export async function getDriverOrders(driverId: string): Promise<DriverOrder[]> 
   const pool = getDbPool();
   // Use direct DB pool to avoid case-sensitivity and RLS issues with Supabase SDK
   const [rows]: any = await pool.query(`
-    SELECT Id as id, OrderNumber as order_number, Status as status, CustomerName as customer_name, CustomerPhone as customer_phone, DeliveryAddress as delivery_address, TotalAmount as total_amount
-    FROM public.Orders
-    WHERE Status IN ('Preparación', 'En Camino', 'En Ruta')
-    ORDER BY CreatedAt DESC
+    SELECT 
+      o.Id as id, 
+      o.OrderNumber as order_number, 
+      o.Status as status, 
+      u.FirstName || ' ' || u.LastName as customer_name, 
+      u.Phone as customer_phone, 
+      a.Street as delivery_address, 
+      o.TotalAmount as total_amount
+    FROM public.Orders o
+    LEFT JOIN public.Users u ON o.UserId = u.Id
+    LEFT JOIN public.Addresses a ON o.AddressId = a.Id
+    WHERE o.Status IN ('Preparación', 'En Camino', 'En Ruta')
+    ORDER BY o.CreatedAt DESC
   `);
 
   return (rows || []).map((order: any) => ({
