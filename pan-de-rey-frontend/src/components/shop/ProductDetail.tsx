@@ -8,6 +8,7 @@ import { formatPrice } from '@/utils/format';
 interface ProductDetailProps {
   product?: {
     id: string | number;
+    variantId?: string;
     name: string;
     price: number;
     description?: string;
@@ -27,6 +28,7 @@ export default function ProductDetail({ product, onClose }: ProductDetailProps) 
   const handleAddToCart = async () => {
     await addToCart({
       productId: product.id.toString(),
+      variantId: product.variantId || '',
       name: product.name,
       price: product.price,
       quantity,

@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 export type CartItem = {
   id: string;
   productId: string;
+  variantId?: string;
   name: string;
   price: number;
   quantity: number;
@@ -19,10 +20,10 @@ interface CartContextType {
   addToCart: (item: Omit<CartItem, 'id'>) => Promise<boolean>;
   removeFromCart: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
+  clearCart: () => void;
   total: number;
   isCartOpen: boolean;
   setIsCartOpen: (isOpen: boolean) => void;
-  clearCart: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);

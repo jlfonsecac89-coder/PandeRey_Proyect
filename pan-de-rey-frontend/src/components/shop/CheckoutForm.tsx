@@ -11,7 +11,7 @@ import GoogleAuthModal from '../profile/GoogleAuthModal';
 type AuthMode = 'selection' | 'guest' | 'login' | 'register';
 
 export default function CheckoutForm({ onComplete }: { onComplete: () => void }) {
-  const { items, total } = useCart();
+  const { items, total, clearCart } = useCart();
   
   const [authMode, setAuthMode] = useState<MockAuthMode>('selection');
   const [isTermsOpen, setIsTermsOpen] = useState(false);
@@ -107,6 +107,7 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
           return;
         }
 
+        clearCart();
         alert(`¡Pedido realizado con éxito!\nCódigo de Pedido: ${data.orderId.substring(0, 8)}`);
         onComplete();
       } else {

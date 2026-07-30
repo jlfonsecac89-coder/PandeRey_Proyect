@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import { CheckCircle2, ShoppingBag, ArrowRight, ShieldCheck, HelpCircle, FileText } from 'lucide-react';
 import { formatPrice } from '@/utils/format';
+import { useCart } from '@/context/CartContext';
 
 interface OrderDetails {
   orderId: string;
@@ -19,6 +20,7 @@ interface OrderDetails {
 
 function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
+  const { clearCart } = useCart();
   const [orderInfo, setOrderInfo] = useState<OrderDetails | null>(null);
   
   // Mercado Pago query parameters
@@ -64,6 +66,7 @@ function CheckoutSuccessContent() {
           const data = await res.json();
           if (data.status === 'success' || data.paymentStatus === 'approved') {
             setVerificationStatus('success');
+            clearCart();
             const updatedOrder = {
               ...localOrder,
               orderId: data.orderNumber || localOrder?.orderId || '',
@@ -84,6 +87,7 @@ function CheckoutSuccessContent() {
           // Si el servidor local está offline o inalcanzable, hacemos fallback amigable si status es approved
           if (paymentStatus === 'approved') {
             setVerificationStatus('success');
+            clearCart();
           } else {
             setVerificationStatus('failed');
             setVerificationError('No pudimos contactar al servidor para verificar el estado de su pago.');
@@ -94,8 +98,9 @@ function CheckoutSuccessContent() {
       checkPayment();
     } else {
       setVerificationStatus('success');
+      clearCart();
     }
-  }, [paymentId, paymentStatus]);
+  }, [paymentId, paymentStatus, clearCart]);
 
   const totalAmount = orderInfo?.total || 15000;
   const orderIdText = orderInfo?.orderId 
