@@ -879,7 +879,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             }
             
             const [orderRows]: any = await pool.query(`
-                SELECT o.Id, o.OrderNumber, o.Status, o.DeliveryStatus, o.ShippingMethod, o.CreatedAt, o.TotalAmount,
+                SELECT o.Id, o.OrderNumber, o.Status, o.DeliveryStatus, o.ShippingMethod, o.CreatedAt, o.TotalAmount, o.delivery_pin,
                        u.Email, u.FirstName, u.LastName,
                        d.Name as DriverName, d.Phone as DriverPhone, d.VehicleType as DriverVehicle
                 FROM Orders o
@@ -907,6 +907,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 status: order.Status,
                 deliveryStatus: order.DeliveryStatus,
                 shippingMethod: order.ShippingMethod,
+                deliveryPin: order.delivery_pin || order.Delivery_pin || order.DeliveryPin || null,
                 createdAt: order.CreatedAt,
                 totalAmount: order.TotalAmount,
                 customerName: `${order.FirstName} ${order.LastName}`,

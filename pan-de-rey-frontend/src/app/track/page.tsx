@@ -23,7 +23,10 @@ type TrackingData = {
     variantName: string;
     quantity: number;
   }[];
+  deliveryPin?: string | null;
 };
+
+import { DeliveryPinCard } from '@/components/shop/DeliveryPinCard';
 
 export default function TrackingPage() {
   const [orderNumber, setOrderNumber] = useState('');
@@ -301,6 +304,9 @@ export default function TrackingPage() {
                         </p>
                       </div>
                     </div>
+                  )}
+                  {order.shippingMethod === 'Delivery' && (
+                    <DeliveryPinCard pin={order.deliveryPin || null} status={order.status} />
                   )}
                 </div>
               </div>
