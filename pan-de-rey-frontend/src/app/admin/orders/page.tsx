@@ -455,7 +455,7 @@ export default function OrdersDashboard() {
         customerName: o.customerName || (o.FirstName ? `${o.FirstName} ${o.LastName || ''}`.trim() : 'Cliente'),
         email: o.email || o.Email,
         phone: o.phone || o.Phone,
-        total: o.total || o.TotalAmount || 0,
+        total: o.totalAmount || o.TotalAmount || o.total || 0,
         status: String(o.status || o.Status || 'Pendiente'),
         time: o.time || o.CreatedAt,
         createdAt: o.createdAt || o.CreatedAt,
@@ -471,7 +471,7 @@ export default function OrdersDashboard() {
           productName: it.productName || it.ProductName || '',
           variantName: it.variantName || it.VariantName || '',
           quantity: it.quantity || it.Quantity || 1,
-          price: it.price || it.Price || 0,
+          price: it.unitPrice || it.UnitPrice || it.price || it.Price || 0,
           subtotal: it.subtotal || it.Subtotal || 0
         })),
         items: (o.items || o.Items || []).map((it: any) => `${it.quantity || it.Quantity || 1}x ${it.productName || it.ProductName || ''} (${it.variantName || it.VariantName || ''})`)

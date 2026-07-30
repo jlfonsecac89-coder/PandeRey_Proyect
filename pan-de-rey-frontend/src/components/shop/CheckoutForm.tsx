@@ -46,7 +46,7 @@ export default function CheckoutForm({ onComplete }: { onComplete: () => void })
     setIsSubmitting(true);
     try {
       const checkoutItems = items.map(item => ({
-        variantId: item.id,
+        variantId: item.productId,
         quantity: item.quantity,
         name: item.name,
         price: item.price
