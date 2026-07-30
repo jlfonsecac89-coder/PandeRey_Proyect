@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useCart } from '@/context/CartContext';
 import { getApiUrl } from '@/utils/api';
+import Image from 'next/image';
 
 // MOCK DATA for MVP UI Demonstration
 const mockProduct = {
@@ -83,10 +84,12 @@ export default function ProductPageClient({ params }: { params: { id: string } }
           
           {/* Product Image */}
           <div className="relative aspect-square w-full rounded-sm overflow-hidden border border-charcoal-border">
-            <img 
+            <Image 
               src={product.imageUrl} 
               alt={product.name}
-              className="absolute inset-0 w-full h-full object-cover"
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
+              className="object-cover"
             />
           </div>
 

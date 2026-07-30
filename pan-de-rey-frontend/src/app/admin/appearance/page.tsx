@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { 
   Palette, 
   Save, 
@@ -181,7 +182,9 @@ export default function AppearanceCMSPage() {
                 }}
                 className="flex flex-col items-center p-1 border border-white/5 hover:border-gold rounded bg-black/40 hover:bg-black/80 transition-all text-left cursor-pointer"
               >
-                <img src={preset.url} alt={preset.label} className="w-full h-12 object-cover rounded-sm mb-1" />
+                <div className="relative w-full h-12 mb-1">
+                  <Image src={preset.url} alt={preset.label} fill sizes="100px" className="object-cover rounded-sm" />
+                </div>
                 <span className="text-[9px] text-gray-400 truncate w-full text-center">{preset.label}</span>
               </button>
             ))}

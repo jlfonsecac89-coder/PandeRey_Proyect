@@ -129,7 +129,12 @@ export function mysqlToPostgresQuery(sql: string): string {
         .replace(/CreatedAt/g, 'created_at')
         .replace(/UpdatedAt/g, 'updated_at')
         .replace(/AcceptTerms/g, 'accept_terms')
-        .replace(/MarketingOptIn/g, 'marketing_opt_in');
+        .replace(/MarketingOptIn/g, 'marketing_opt_in')
+        .replace(/OrderType/g, 'order_type')
+        .replace(/ScheduledDate/g, 'scheduled_date')
+        .replace(/ScheduledTimeSlot/g, 'scheduled_time_slot')
+        .replace(/CustomerPhoneSnapshot/g, 'customer_phone_snapshot')
+        .replace(/ShippingAddressSnapshot/g, 'shipping_address_snapshot');
         
     return formattedSql;
 }
@@ -143,6 +148,11 @@ function mapRowKeys(row: any): any {
         if (key === 'id') newKey = 'Id';
         else if (key === 'email') newKey = 'Email';
         else if (key === 'phone') newKey = 'Phone';
+        else if (key === 'order_type') newKey = 'OrderType';
+        else if (key === 'scheduled_date') newKey = 'ScheduledDate';
+        else if (key === 'scheduled_time_slot') newKey = 'ScheduledTimeSlot';
+        else if (key === 'customer_phone_snapshot') newKey = 'CustomerPhoneSnapshot';
+        else if (key === 'shipping_address_snapshot') newKey = 'ShippingAddressSnapshot';
         else if (key === 'first_name') newKey = 'FirstName';
         else if (key === 'last_name') newKey = 'LastName';
         else if (key === 'variant_name') newKey = 'VariantName';

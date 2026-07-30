@@ -1675,10 +1675,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                     const seqVal = seqRows[0]?.seq || 1000;
                     const assignedOrderNumber = `PDR-${String(seqVal).padStart(6, '0')}`;
 
+                    const orderType = shippingMethod === 'Delivery' ? 'DELIVERY' : 'PICKUP';
+                    const scheduledDateVal = body.scheduledDate || new Date().toISOString().split('T')[0];
+                    const scheduledTimeSlotVal = body.scheduledTimeSlot || (shippingMethod === 'Delivery' ? '12:00 - 15:00' : '10:00 - 18:00');
+                    const customerPhoneSnapshot = phone || '';
+                    const shippingAddressSnapshot = address ? `${address.street} ${address.number}, ${address.commune}` : '';
+
                     await connection.query(
-                        `INSERT INTO Orders (Id, UserId, AddressId, CouponId, TotalAmount, Status, ShippingMethod, PickupTime, ShippingCost, Notes, AcceptTerms, MarketingOptIn, OrderNumber) 
-                         VALUES (?, ?, ?, ?, ?, 'Pendiente', ?, ?, ?, ?, ?, ?, ?)`,
-                        [orderId, finalUserId || null, finalAddressId, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null, !!acceptTerms, !!marketingOptIn, assignedOrderNumber]
+                        `INSERT INTO Orders (Id, UserId, AddressId, CouponId, TotalAmount, Status, ShippingMethod, PickupTime, ShippingCost, Notes, AcceptTerms, MarketingOptIn, OrderNumber, OrderType, ScheduledDate, ScheduledTimeSlot, CustomerPhoneSnapshot, ShippingAddressSnapshot) 
+                         VALUES (?, ?, ?, ?, ?, 'Pendiente', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        [orderId, finalUserId || null, finalAddressId, couponId || null, totalAmount, shippingMethod, pickupTime || null, shippingCost, notes || null, !!acceptTerms, !!marketingOptIn, assignedOrderNumber, orderType, scheduledDateVal, scheduledTimeSlotVal, customerPhoneSnapshot, shippingAddressSnapshot]
                     );
 
                     for (const row of itemInserts) {
@@ -1833,6 +1839,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 try {
                     revalidatePath('/admin/driver/orders', 'page');
                     revalidatePath('/track', 'page');
+                    revalidatePath('/admin/orders', 'page');
+                    revalidatePath('/admin/kitchen', 'page');
                 } catch (e) {
                     logger.warn('Failed to revalidate paths', { error: e });
                 }

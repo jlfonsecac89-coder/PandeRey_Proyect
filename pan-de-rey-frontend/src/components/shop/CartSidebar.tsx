@@ -3,6 +3,7 @@
 import { useCart } from '@/context/CartContext';
 import { X, Plus, Minus, ShoppingBag, ArrowRight, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { formatPrice } from '@/utils/format';
 
 export default function CartSidebar() {
@@ -84,7 +85,7 @@ export default function CartSidebar() {
             items.map(item => (
               <div key={item.id} className="flex gap-4 group">
                 <div className="relative w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-charcoal-light">
-                  <img src={item.imageUrl} alt={item.name} className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-500" />
+                  <Image src={item.imageUrl} alt={item.name} fill sizes="96px" className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-500" />
                 </div>
                 <div className="flex-1 min-w-0 space-y-1">
                   <h3 className="font-serif text-lg text-white truncate">{item.name}</h3>

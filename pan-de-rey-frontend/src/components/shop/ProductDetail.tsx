@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ChevronRight, Plus, Minus, X } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { formatPrice } from '@/utils/format';
+import Image from 'next/image';
 
 interface ProductDetailProps {
   product?: {
@@ -42,11 +43,14 @@ export default function ProductDetail({ product, onClose }: ProductDetailProps) 
     <div className="w-full text-white flex flex-col lg:flex-row gap-12">
       {/* Left Side: Large Image */}
       <div className="w-full lg:w-1/2 h-[50vh] lg:h-[600px] relative rounded-lg overflow-hidden">
-        <img 
-          src={product.image} 
-          alt={product.name} 
-          className="w-full h-full object-cover"
-        />
+        {product.image && (
+          <Image 
+            src={product.image} 
+            alt={product.name} 
+            fill
+            className="object-cover"
+          />
+        )}
         {onClose && (
           <button 
             onClick={onClose}
