@@ -6,7 +6,7 @@ import { getDbPool } from '@/shared/utils/db';
 export type DriverOrder = {
   id: string;
   orderNumber: string;
-  status: 'Preparación' | 'En Camino';
+  status: 'Preparación' | 'En Camino' | 'En Ruta';
   customerName: string;
   customerPhone: string;
   deliveryAddress: string;
@@ -24,18 +24,18 @@ export async function getDriverOrders(driverId: string): Promise<DriverOrder[]> 
   const [rows]: any = await pool.query(`
     SELECT Id as id, OrderNumber as order_number, Status as status, CustomerName as customer_name, CustomerPhone as customer_phone, DeliveryAddress as delivery_address, TotalAmount as total_amount
     FROM public.Orders
-    WHERE Status IN ('Preparación', 'En Camino')
+    WHERE Status IN ('Preparación', 'En Camino', 'En Ruta')
     ORDER BY CreatedAt DESC
   `);
 
   return (rows || []).map((order: any) => ({
-    id: order.id,
-    orderNumber: order.order_number,
-    status: order.status as 'Preparación' | 'En Camino',
-    customerName: order.customer_name || 'Sin nombre',
-    customerPhone: order.customer_phone || '',
-    deliveryAddress: order.delivery_address || 'Dirección no especificada',
-    totalAmount: Number(order.total_amount)
+    id: order.Id || order.id,
+    orderNumber: order.OrderNumber || order.order_number,
+    status: (order.Status || order.status) as 'Preparación' | 'En Camino' | 'En Ruta',
+    customerName: order.CustomerName || order.customer_name || 'Sin nombre',
+    customerPhone: order.CustomerPhone || order.customer_phone || '',
+    deliveryAddress: order.DeliveryAddress || order.delivery_address || 'Dirección no especificada',
+    totalAmount: Number(order.TotalAmount || order.total_amount || 0)
   }));
 }
 

@@ -93,7 +93,7 @@ export default function DriverOrdersPage() {
           <div className="space-y-4">
             {orders.map(order => (
               <div key={order.id} className="bg-[#121212] border border-charcoal-border/70 rounded-xl overflow-hidden shadow-lg">
-                <div className={`px-4 py-2 text-xs font-bold uppercase tracking-wider flex justify-between items-center ${order.status === 'En Camino' ? 'bg-amber-900/40 text-amber-500 border-b border-amber-900/50' : 'bg-blue-900/20 text-blue-400 border-b border-blue-900/30'}`}>
+                <div className={`px-4 py-2 text-xs font-bold uppercase tracking-wider flex justify-between items-center ${(order.status === 'En Camino' || order.status === 'En Ruta') ? 'bg-amber-900/40 text-amber-500 border-b border-amber-900/50' : 'bg-blue-900/20 text-blue-400 border-b border-blue-900/30'}`}>
                   <span>{order.status}</span>
                   <span>#{order.orderNumber}</span>
                 </div>
@@ -118,9 +118,9 @@ export default function DriverOrdersPage() {
                     </a>
                     <button 
                       onClick={() => setSelectedOrderId(order.id)}
-                      disabled={order.status !== 'En Camino'}
+                      disabled={!(order.status === 'En Camino' || order.status === 'En Ruta')}
                       className={`flex-[2] text-xs font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors border ${
-                        order.status === 'En Camino' 
+                        (order.status === 'En Camino' || order.status === 'En Ruta')
                           ? 'bg-gold hover:bg-gold/90 text-black border-gold shadow-[0_0_15px_rgba(197,168,128,0.2)]'
                           : 'bg-white/5 text-gray-500 border-white/10 cursor-not-allowed'
                       }`}
