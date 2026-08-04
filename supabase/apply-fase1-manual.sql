@@ -1074,18 +1074,19 @@ create trigger profiles_protect_columns
 -- Supabase hace este grant automáticamente al crear tablas desde la UI; como estas
 -- tablas se crearon por SQL directo, hay que otorgarlo explícitamente. El control de
 -- acceso real sigue siendo 100% RLS (sección 10) — esto solo abre la puerta para que
--- las políticas puedan evaluarse.
-grant usage on schema public to anon, authenticated;
+-- las políticas puedan evaluarse. service_role también lo necesita: BYPASSRLS solo
+-- salta la evaluación de políticas, no el chequeo de privilegios base de la tabla.
+grant usage on schema public to anon, authenticated, service_role;
 
 grant select, insert, update, delete
   on all tables in schema public
-  to anon, authenticated;
+  to anon, authenticated, service_role;
 
 alter default privileges in schema public
-  grant select, insert, update, delete on tables to anon, authenticated;
+  grant select, insert, update, delete on tables to anon, authenticated, service_role;
 
-grant usage, select on all sequences in schema public to anon, authenticated;
+grant usage, select on all sequences in schema public to anon, authenticated, service_role;
 alter default privileges in schema public
-  grant usage, select on sequences to anon, authenticated;
+  grant usage, select on sequences to anon, authenticated, service_role;
 
 commit;
