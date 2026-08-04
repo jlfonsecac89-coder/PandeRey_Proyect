@@ -11,6 +11,20 @@ begin;
 create extension if not exists unaccent;
 create extension if not exists pgcrypto;
 
+-- unaccent() viene marcada STABLE (no IMMUTABLE) en Postgres, porque en teoría el
+-- diccionario podría cambiar en tiempo de ejecución — pero las columnas GENERATED
+-- ALWAYS AS exigen una expresión IMMUTABLE. Este wrapper fija el diccionario y le
+-- promete a Postgres que el resultado es determinístico (patrón estándar para este
+-- caso, el diccionario "unaccent" no cambia en producción).
+create or replace function public.immutable_unaccent(text)
+returns text
+language sql
+immutable
+parallel safe
+as $$
+  select unaccent('unaccent', $1)
+$$;
+
 -- ============================================================
 -- 20260804000200_stores.sql
 -- ============================================================
@@ -222,7 +236,7 @@ create table departments (
   id uuid primary key default gen_random_uuid(),
   code text not null unique,
   name text not null,
-  name_normalized text generated always as (lower(unaccent(name))) stored,
+  name_normalized text generated always as (lower(public.immutable_unaccent(name))) stored,
   slug text not null unique,
   sort_order int not null default 0,
   is_active boolean not null default true,
@@ -235,7 +249,7 @@ create table categories (
   parent_id uuid references categories(id) on delete set null,
   code text not null,
   name text not null,
-  name_normalized text generated always as (lower(unaccent(name))) stored,
+  name_normalized text generated always as (lower(public.immutable_unaccent(name))) stored,
   slug text not null unique,
   sort_order int not null default 0,
   is_active boolean not null default true,
@@ -246,7 +260,7 @@ create table categories (
 create table collections (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  name_normalized text generated always as (lower(unaccent(name))) stored,
+  name_normalized text generated always as (lower(public.immutable_unaccent(name))) stored,
   slug text not null unique,
   starts_at timestamptz,
   ends_at timestamptz,
@@ -259,7 +273,7 @@ create table products (
   id uuid primary key default gen_random_uuid(),
   category_id uuid not null references categories(id),
   name text not null,
-  name_normalized text generated always as (lower(unaccent(name))) stored,
+  name_normalized text generated always as (lower(public.immutable_unaccent(name))) stored,
   slug text not null unique,
   description text,
   price numeric(12,2) not null check (price >= 0),
