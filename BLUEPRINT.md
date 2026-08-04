@@ -73,7 +73,7 @@ Categorías observadas en la referencia: Panadería, Para Compartir, Descuentos,
 | Pagos | Mercado Pago SDK oficial (Node) — Checkout Pro + Customers/Cards API | Definido por el usuario. Chile (`MPC`, CLP). |
 | Rate limiting | Upstash Redis + `@upstash/ratelimit` en Edge Middleware | Serverless, compatible con Vercel Edge, sin infraestructura propia que mantener. |
 | Email transaccional | Resend | Integración simple con Next.js, buena entregabilidad, soporte de plantillas React (`react-email`). |
-| Geocodificación y rutas | Google Maps Platform (Geocoding API + Directions API) | Convierte la dirección del cliente en coordenadas y calcula la **distancia real de ruta** (no línea recta) hasta la panadería, para validar el radio máximo de entrega y tarifar el envío por tramos de kilometraje. |
+| Geocodificación y rutas | OpenRouteService (Geocoding + Directions, sobre datos OpenStreetMap) | Convierte la dirección del cliente en coordenadas y calcula la **distancia real de ruta** (no línea recta) hasta la panadería, para validar el radio máximo de entrega y tarifar el envío por tramos de kilometraje. Elegido sobre Google Maps Platform por tener un tier gratuito sin tarjeta de crédito (2000 requests/día, 40/min) suficiente para el volumen esperado; el módulo `lib/geo/` queda aislado detrás de una interfaz propia para poder migrar a Google Maps u otro proveedor sin tocar el resto del código si el volumen lo justifica más adelante. |
 | Facturación electrónica SII | Proveedor DTE de terceros (ver sección 12 y 20 — pendiente de elegir) | Implementar el protocolo SOAP del SII desde cero excede el alcance razonable de este blueprint; se integra vía API de un proveedor homologado. |
 | Estilos | Tailwind CSS | Estándar para velocidad de desarrollo en Next.js; se configura con los colores institucionales extraídos del sitio de referencia. |
 | Pago alternativo | WhatsApp Business API (Cloud API de Meta) | Único uso de WhatsApp en v1: iniciar y validar manualmente pagos por transferencia bancaria (sección 07) — no reemplaza el email como canal de notificaciones. |
@@ -150,7 +150,7 @@ addresses (
   ciudad text not null,
   region text not null,
   codigo_postal text,
-  lat numeric(9,6),                 -- geocodificado vía Google Maps al guardar la dirección
+  lat numeric(9,6),                 -- geocodificado vía OpenRouteService al guardar la dirección
   lng numeric(9,6),
   geocoded_at timestamptz,
   is_default boolean default false,
@@ -575,7 +575,7 @@ product_import_rows (      -- Detalle fila a fila, incluye las que quedan pendie
 - `store_products` desacopla el catálogo (global: nombre, precio, descripción en `products`) del stock (local: `stock_quantity` por sucursal) — la cocina/bodega de cada sucursal es independiente. `stock_quantity` es un **cache**: la fuente de verdad real es la suma de `product_batches.quantity` activos para ese producto+sucursal (sección 13).
 - `profiles.store_id` limita a qué sucursal pertenece un `operaciones`/`repartidor` (solo ven pedidos/stock de esa sucursal); `admin` y `marketing` no tienen `store_id` porque ven todas las sucursales por igual.
 - `orders.store_id` es la sucursal que el cliente eligió explícitamente (para retiro o despacho) — el radio de entrega, los `shipping_zones`, el `min_order_amount` y el `free_shipping_min_amount` se validan contra **esa** sucursal específica, no contra un origen global.
-- `addresses.lat/lng` se completan al geocodificar la dirección (Google Maps); para cada sucursal candidata se calcula la distancia real (Directions API) contra `stores.origin_lat/lng` y se compara contra `stores.max_delivery_radius_km` para saber si esa sucursal puede despachar ahí, y contra sus `shipping_zones` para tarifar el costo.
+- `addresses.lat/lng` se completan al geocodificar la dirección (OpenRouteService); para cada sucursal candidata se calcula la distancia real (Directions) contra `stores.origin_lat/lng` y se compara contra `stores.max_delivery_radius_km` para saber si esa sucursal puede despachar ahí, y contra sus `shipping_zones` para tarifar el costo.
 - `orders.delivery_distance_km` guarda la distancia calculada al momento del pedido (no se recalcula después, aunque cambie el radio máximo más adelante).
 - `orders.assigned_driver_id` → un pedido con `delivery_method = 'shipping'` puede asignarse a un `profile` con `role = 'repartidor'` **cuyo `store_id` coincida con `orders.store_id`** — un repartidor de una sucursal no puede recibir pedidos de otra.
 - `orders.delivery_confirmation_code` + `delivery_code_attempts` → el repartidor lo valida contra el código que le da el cliente; a los 5 intentos fallidos `delivery_code_locked = true` y requiere intervención de Operaciones/Admin.
@@ -648,7 +648,7 @@ product_import_rows (      -- Detalle fila a fila, incluye las que quedan pendie
 │   ├── auth/ (session.ts, rbac.ts)
 │   ├── crypto/ (encrypt-field.ts)      # cifrado de RUT/token de Instagram, sección 11
 │   ├── rate-limit/ (limiter.ts)
-│   ├── geo/ (geocode.ts, directions.ts)    # Google Maps
+│   ├── geo/ (geocode.ts, directions.ts)    # OpenRouteService
 │   └── audit/ (log-action.ts)
 ├── middleware.ts                       # Edge Middleware: sesión, rol, rate limit
 ├── vercel.json                         # configuración de Vercel Cron Jobs
@@ -663,14 +663,14 @@ product_import_rows (      -- Detalle fila a fila, incluye las que quedan pendie
 ### Selección de sucursal, radio de entrega y tarifa por distancia
 
 1. **Elección de sucursal:** el cliente elige explícitamente en qué `store` retira o desde cuál se despacha su pedido (no hay asignación automática por cercanía). La UI solo debe listar sucursales donde, para retiro, la sucursal esté activa; para envío, la dirección elegida esté dentro del `max_delivery_radius_km` de esa sucursal específica.
-2. **Geocodificación:** al guardar una dirección, el servidor llama a la **Google Maps Geocoding API** y guarda `addresses.lat`, `addresses.lng`, `geocoded_at`. Si la dirección no se puede geocodificar, se rechaza el guardado con un mensaje claro — nunca se permite una dirección sin coordenadas si el método de entrega va a ser `shipping`.
-3. **Cálculo de distancia:** al seleccionar "envío" y una sucursal, el servidor llama a la **Google Maps Directions API** para obtener la distancia real de ruta entre `stores.origin_lat/lng` **de esa sucursal** y la dirección del cliente.
+2. **Geocodificación:** al guardar una dirección, el servidor llama a la **API de geocodificación de OpenRouteService** (Pelias sobre OpenStreetMap) y guarda `addresses.lat`, `addresses.lng`, `geocoded_at`. Si la dirección no se puede geocodificar, se rechaza el guardado con un mensaje claro — nunca se permite una dirección sin coordenadas si el método de entrega va a ser `shipping`.
+3. **Cálculo de distancia:** al seleccionar "envío" y una sucursal, el servidor llama a la **API de Directions de OpenRouteService** para obtener la distancia real de ruta entre `stores.origin_lat/lng` **de esa sucursal** y la dirección del cliente.
 4. **Validación de radio:** si la distancia > `stores.max_delivery_radius_km` de la sucursal elegida, el sistema **rechaza el envío desde esa sucursal** — el cliente debe elegir otra sucursal dentro de rango, o "retiro en tienda". Este rechazo ocurre en la UI y, obligatoriamente, en el Server Action que crea la preferencia de MP (nunca confiar solo en la validación del cliente).
 5. **Validación de horario de reparto:** el `scheduled_at` elegido para envío debe caer dentro de `stores.delivery_schedule` de la sucursal — fuera de esos días/horas, el sistema rechaza la programación (configurable libremente por Admin, puede diferir del horario de atención al público).
 6. **Tarifa por tramo y envío gratis:** si la distancia está dentro del radio, el servidor busca en los `shipping_zones` de esa sucursal el tramo correspondiente y aplica ese `price`. Si el subtotal del carrito ≥ `stores.free_shipping_min_amount` de esa sucursal, el costo de envío se anula a 0 sin importar el tramo.
 7. **Monto mínimo de compra:** si el subtotal del carrito < `stores.min_order_amount` de la sucursal elegida, el checkout rechaza continuar hasta que el cliente agregue más productos.
 8. **Snapshot:** la distancia calculada y el costo de envío resultante quedan guardados en `orders.delivery_distance_km`/`orders.store_id` y en el `total` del pedido — un cambio posterior en el radio, los tramos, el envío gratis o el mínimo de compra **no afecta pedidos ya creados**, solo a los nuevos.
-9. **Costo de la API:** tanto Geocoding como Directions son APIs pagas de Google Cloud más allá de una cuota gratuita mensual — se cachea el resultado de geocodificación por dirección para minimizar llamadas repetidas.
+9. **Costo de la API:** OpenRouteService es gratuito hasta 2000 requests/día y 40/min (sin tarjeta de crédito) — igual se cachea el resultado de geocodificación por dirección para minimizar llamadas repetidas y no acercarse al límite diario.
 
 ### Ciclo de vida completo del pedido (Pipeline)
 
@@ -1033,7 +1033,7 @@ Implementado con Upstash Redis (`@upstash/ratelimit`, sliding window) en Edge Mi
 | `/api/admin/**` (cualquier mutación) | 60 requests | 1 min | user_id staff |
 | `/repartidor/**` (actualizar estado de entrega) | 30 requests | 1 min | user_id repartidor |
 | `POST /api/repartidor/confirmar-codigo` | 5 intentos | por pedido (no por ventana de tiempo) | order_id + user_id repartidor — al 5º intento fallido, `delivery_code_locked = true` (ver sección 07); no se libera con el tiempo, requiere Operaciones/Admin |
-| `POST /api/direcciones/geocodificar` | 10 requests | 1 min | user_id autenticado (evita abusar de la cuota paga de Google Maps) |
+| `POST /api/direcciones/geocodificar` | 10 requests | 1 min | user_id autenticado (evita abusar de la cuota gratuita diaria de OpenRouteService) |
 | `POST /api/newsletter/suscribir` | 5 requests | 1 hora | IP (evita spam de suscripciones/bombing de emails ajenos) |
 | `POST /api/webhooks/whatsapp` | Sin límite por IP (viene de Meta) | — | Se protege por validación de firma (`X-Hub-Signature-256`) + idempotencia por mensaje, no por rate limit |
 | `POST /api/checkout/create-bank-transfer` | 10 requests | 1 hora | user_id autenticado (evita spamear el envío de mensajes de WhatsApp) |
@@ -1072,7 +1072,7 @@ Cada fase incluye criterios de aceptación en formato EARS y un comando de verif
 - **Verificar:** test de integración llamando al Server Action de actualizar stock autenticado como `marketing`, confirma error 403; test de compras concurrentes de un producto de evento con cupo bajo confirma que nunca se supera `max_orders`.
 
 ### Fase 4 — Carrito, Envío y Checkout (Mercado Pago)
-- Carrito client-side, geocodificación de direcciones (Google Maps), validación de radio de entrega y tarifa por tramo (`shipping_zones`), creación de preferencia MP, redirect a Checkout Pro, webhook de confirmación, tarjetas guardadas.
+- Carrito client-side, geocodificación de direcciones (OpenRouteService), validación de radio de entrega y tarifa por tramo (`shipping_zones`), creación de preferencia MP, redirect a Checkout Pro, webhook de confirmación, tarjetas guardadas.
 - **Aceptación 1:** CUANDO el webhook de MP recibe un payload con firma inválida, EL SISTEMA DEBE responder 401 y no debe crear ni modificar ningún registro en `payments` u `orders`.
 - **Aceptación 2:** SI la distancia real de ruta entre `stores.origin_lat/lng` de la sucursal elegida y la dirección del cliente supera `max_delivery_radius_km` de esa sucursal, ENTONCES EL SISTEMA DEBE rechazar la creación de la preferencia de pago con `delivery_method = 'shipping'`, incluso si el request llega directo al Server Action sin pasar por la UI.
 - **Aceptación 4:** SI el subtotal del carrito es menor que `stores.min_order_amount` de la sucursal elegida, ENTONCES EL SISTEMA DEBE bloquear el checkout hasta que se alcance el mínimo; SI el subtotal alcanza `stores.free_shipping_min_amount`, ENTONCES el costo de envío DEBE quedar en 0 sin importar el tramo de distancia.
@@ -1164,7 +1164,7 @@ LOYALTY_POINTS_PER_CLP=0.001          # 1 punto por cada $1.000 CLP gastado en u
 LOYALTY_POINTS_TO_CLP_RATE=10         # 100 puntos = $1.000 CLP de descuento (10 CLP por punto)
 
 # Geocodificación y rutas (delivery)
-GOOGLE_MAPS_API_KEY=                  # server-side; usada para Geocoding API y Directions API
+ORS_API_KEY=                          # server-side; OpenRouteService — Geocoding (Pelias) + Directions, tier gratuito
 
 # Pipeline de pedidos (SLA)
 ORDER_PREP_SLA_MINUTES=30             # tiempo de preparación estándar, igual para todo el catálogo en v1
@@ -1209,7 +1209,7 @@ Todas viven en Vercel Environment Variables, con `SUPABASE_SERVICE_ROLE_KEY`, `M
 - [ ] Revisión de que ninguna clave sensible quedó commiteada en el repositorio (`git log -p | grep` de patrones de API key).
 - [ ] Validación de radio de entrega y tarifa por distancia probada tanto en el cliente como, de forma independiente, forzando un request directo al Server Action de checkout con una dirección fuera de rango (debe rechazarse igual).
 - [ ] Confirmación de entrega probada con código incorrecto 5 veces seguidas — el 6º intento debe estar bloqueado (`delivery_code_locked = true`) y no debe validar aunque el código sea correcto, hasta que Operaciones/Admin intervenga.
-- [ ] Cuota de Google Maps Platform (Geocoding + Directions) con alertas de facturación configuradas, dado que son APIs pagas más allá de la cuota gratuita.
+- [ ] Cuota gratuita diaria de OpenRouteService (2000 requests/día) monitoreada — si el volumen la supera, migrar a un tier pago o a Google Maps Platform vía la interfaz aislada de `lib/geo/`.
 - [ ] Job de renovación del token de Instagram probado antes de que el token real expire (~60 días) — con alerta a Admin si la renovación automática falla.
 - [ ] Edición de un pedido pagado (agregar/quitar/sustituir productos) probada con recálculo correcto de `total` y su cobro/reembolso asociado en Mercado Pago, verificando que quede en `audit_log` y `order_status_history`.
 - [ ] Cupo de productos de edición limitada (`max_orders`/`special_orders_count`) probado con compras concurrentes — no debe permitir vender más unidades que el cupo definido.

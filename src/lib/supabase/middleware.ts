@@ -4,7 +4,7 @@ import { noStoreFetch } from "./fetch";
 
 const STAFF_PREFIXES = ["/admin"];
 const REPARTIDOR_PREFIX = "/repartidor";
-const CUSTOMER_PREFIXES = ["/cuenta"];
+const CUSTOMER_PREFIXES = ["/cuenta", "/checkout"];
 const CHANGE_PASSWORD_PATH = "/auth/cambiar-password";
 
 export async function updateSession(request: NextRequest) {
