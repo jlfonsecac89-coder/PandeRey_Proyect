@@ -21,10 +21,10 @@ create policy "self_manage_addresses" on addresses
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create policy "admin_select_addresses" on addresses
-  for select using (current_role() = 'admin');
+  for select using (current_app_role() = 'admin');
 
 create policy "marketing_select_addresses" on addresses
-  for select using (current_role() = 'marketing');
+  for select using (current_app_role() = 'marketing');
   -- CRM: Marketing ve dirección exacta para segmentar campañas por zona (sección 09).
 
 -- La política de "operaciones ve la dirección de un pedido de su sucursal"
@@ -48,7 +48,7 @@ create policy "self_insert_terms_acceptances" on terms_acceptances
   for insert with check (auth.uid() = user_id);
 
 create policy "admin_select_terms_acceptances" on terms_acceptances
-  for select using (current_role() = 'admin');
+  for select using (current_app_role() = 'admin');
 
 create table cookie_consents (
   id uuid primary key default gen_random_uuid(),
@@ -65,4 +65,4 @@ create policy "self_manage_cookie_consents" on cookie_consents
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create policy "admin_select_cookie_consents" on cookie_consents
-  for select using (current_role() = 'admin');
+  for select using (current_app_role() = 'admin');

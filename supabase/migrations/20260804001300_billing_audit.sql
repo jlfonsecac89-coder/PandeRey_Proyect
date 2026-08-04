@@ -45,17 +45,17 @@ create policy "select_invoices_if_can_access_order" on invoices_dte
       where o.id = invoices_dte.order_id
         and (
           o.user_id = auth.uid()
-          or current_role() = 'admin'
-          or (current_role() = 'operaciones' and o.store_id = current_store_id())
+          or current_app_role() = 'admin'
+          or (current_app_role() = 'operaciones' and o.store_id = current_store_id())
         )
     )
   );
 
 -- Auditoría: exclusiva de Admin (sección 09) — ni siquiera Marketing/Operaciones la ven.
 create policy "admin_select_audit_log" on audit_log
-  for select using (current_role() = 'admin');
+  for select using (current_app_role() = 'admin');
 
 create policy "self_select_notifications_log" on notifications_log
   for select using (auth.uid() = user_id);
 create policy "admin_select_notifications_log" on notifications_log
-  for select using (current_role() = 'admin');
+  for select using (current_app_role() = 'admin');

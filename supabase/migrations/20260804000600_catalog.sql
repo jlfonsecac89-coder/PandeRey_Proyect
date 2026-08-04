@@ -117,33 +117,33 @@ create policy "public_select_product_option_values" on product_option_values for
 
 -- Departamentos/categorías: gestión exclusiva de Admin (cambia la organización operativa de fondo).
 create policy "admin_manage_departments" on departments for all
-  using (current_role() = 'admin') with check (current_role() = 'admin');
+  using (current_app_role() = 'admin') with check (current_app_role() = 'admin');
 create policy "admin_manage_categories" on categories for all
-  using (current_role() = 'admin') with check (current_role() = 'admin');
+  using (current_app_role() = 'admin') with check (current_app_role() = 'admin');
 
 -- Productos/imágenes/variantes: Admin y Operaciones (módulo "Gestión de productos y Stock").
 -- Nota: la restricción de Marketing a "solo puede tocar points_cost" es de columna, no de fila —
 -- se aplica en el Server Action (Capa 2, sección 10); acá se le da el UPDATE de fila necesario.
 create policy "staff_manage_products" on products for all
-  using (current_role() in ('admin', 'operaciones'))
-  with check (current_role() in ('admin', 'operaciones'));
+  using (current_app_role() in ('admin', 'operaciones'))
+  with check (current_app_role() in ('admin', 'operaciones'));
 create policy "marketing_update_products_points_cost" on products for update
-  using (current_role() = 'marketing')
-  with check (current_role() = 'marketing');
+  using (current_app_role() = 'marketing')
+  with check (current_app_role() = 'marketing');
 create policy "staff_manage_product_images" on product_images for all
-  using (current_role() in ('admin', 'operaciones'))
-  with check (current_role() in ('admin', 'operaciones'));
+  using (current_app_role() in ('admin', 'operaciones'))
+  with check (current_app_role() in ('admin', 'operaciones'));
 create policy "staff_manage_product_options" on product_option_groups for all
-  using (current_role() in ('admin', 'operaciones'))
-  with check (current_role() in ('admin', 'operaciones'));
+  using (current_app_role() in ('admin', 'operaciones'))
+  with check (current_app_role() in ('admin', 'operaciones'));
 create policy "staff_manage_product_option_values" on product_option_values for all
-  using (current_role() in ('admin', 'operaciones'))
-  with check (current_role() in ('admin', 'operaciones'));
+  using (current_app_role() in ('admin', 'operaciones'))
+  with check (current_app_role() in ('admin', 'operaciones'));
 
 -- Colecciones y qué producto entra en cada una: Admin y Marketing (sección 13).
 create policy "staff_manage_collections" on collections for all
-  using (current_role() in ('admin', 'marketing'))
-  with check (current_role() in ('admin', 'marketing'));
+  using (current_app_role() in ('admin', 'marketing'))
+  with check (current_app_role() in ('admin', 'marketing'));
 create policy "staff_manage_product_collections" on product_collections for all
-  using (current_role() in ('admin', 'marketing'))
-  with check (current_role() in ('admin', 'marketing'));
+  using (current_app_role() in ('admin', 'marketing'))
+  with check (current_app_role() in ('admin', 'marketing'));

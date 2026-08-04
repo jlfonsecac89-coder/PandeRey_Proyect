@@ -38,8 +38,8 @@ alter table instagram_integration enable row level security;
 create policy "public_select_active_banners" on banners
   for select using (is_active = true and now() between coalesce(starts_at, now()) and coalesce(ends_at, now()));
 create policy "staff_manage_banners" on banners for all
-  using (current_role() in ('admin', 'marketing'))
-  with check (current_role() in ('admin', 'marketing'));
+  using (current_app_role() in ('admin', 'marketing'))
+  with check (current_app_role() in ('admin', 'marketing'));
 
 -- Newsletter: cualquier visitante puede suscribirse (formulario público, opt-in explícito);
 -- la baja (unsubscribe) se hace vía Route Handler con service_role validando un link firmado,
@@ -47,7 +47,7 @@ create policy "staff_manage_banners" on banners for all
 create policy "public_insert_newsletter_subscription" on newsletter_subscribers
   for insert with check (true);
 create policy "staff_select_newsletter_subscribers" on newsletter_subscribers
-  for select using (current_role() in ('admin', 'marketing'));
+  for select using (current_app_role() in ('admin', 'marketing'));
 
 create policy "admin_manage_instagram_integration" on instagram_integration for all
-  using (current_role() = 'admin') with check (current_role() = 'admin');
+  using (current_app_role() = 'admin') with check (current_app_role() = 'admin');

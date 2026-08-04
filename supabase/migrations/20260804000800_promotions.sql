@@ -29,5 +29,5 @@ create policy "public_select_automatic_promotions" on promotions
   );
 
 create policy "staff_manage_promotions" on promotions for all
-  using (current_role() in ('admin', 'marketing'))
-  with check (current_role() in ('admin', 'marketing'));
+  using (current_app_role() in ('admin', 'marketing'))
+  with check (current_app_role() in ('admin', 'marketing'));

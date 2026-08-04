@@ -66,25 +66,25 @@ create policy "public_select_active_shipping_zones" on shipping_zones for select
 
 -- Lotes/vencimientos: dato operativo interno, no público.
 create policy "admin_manage_product_batches" on product_batches for all
-  using (current_role() = 'admin') with check (current_role() = 'admin');
+  using (current_app_role() = 'admin') with check (current_app_role() = 'admin');
 create policy "operaciones_manage_product_batches_in_scope" on product_batches for all
-  using (current_role() = 'operaciones' and store_id = current_store_id())
-  with check (current_role() = 'operaciones' and store_id = current_store_id());
+  using (current_app_role() = 'operaciones' and store_id = current_store_id())
+  with check (current_app_role() = 'operaciones' and store_id = current_store_id());
 
 create policy "admin_manage_store_products" on store_products for all
-  using (current_role() = 'admin') with check (current_role() = 'admin');
+  using (current_app_role() = 'admin') with check (current_app_role() = 'admin');
 create policy "operaciones_manage_store_products_in_scope" on store_products for all
-  using (current_role() = 'operaciones' and store_id = current_store_id())
-  with check (current_role() = 'operaciones' and store_id = current_store_id());
+  using (current_app_role() = 'operaciones' and store_id = current_store_id())
+  with check (current_app_role() = 'operaciones' and store_id = current_store_id());
 
 create policy "admin_manage_shipping_zones" on shipping_zones for all
-  using (current_role() = 'admin') with check (current_role() = 'admin');
+  using (current_app_role() = 'admin') with check (current_app_role() = 'admin');
   -- radio/tramos de envío: solo Admin, vive en "Configuración del sistema" (sección 09).
 
 -- Carga masiva: Admin y Operaciones (afecta el catálogo global, sin scoping por sucursal).
 create policy "staff_manage_product_imports" on product_imports for all
-  using (current_role() in ('admin', 'operaciones'))
-  with check (current_role() in ('admin', 'operaciones'));
+  using (current_app_role() in ('admin', 'operaciones'))
+  with check (current_app_role() in ('admin', 'operaciones'));
 create policy "staff_manage_product_import_rows" on product_import_rows for all
-  using (current_role() in ('admin', 'operaciones'))
-  with check (current_role() in ('admin', 'operaciones'));
+  using (current_app_role() in ('admin', 'operaciones'))
+  with check (current_app_role() in ('admin', 'operaciones'));

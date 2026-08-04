@@ -1,7 +1,7 @@
 -- Funciones auxiliares para políticas RLS. SECURITY DEFINER porque necesitan leer
 -- `profiles` (con RLS habilitado) sin recursión infinita de políticas; cada una
 -- está atada a auth.uid(), así que nunca exponen datos de otro usuario.
-create or replace function public.current_role()
+create or replace function public.current_app_role()
 returns text
 language sql stable security definer set search_path = public
 as $$
@@ -43,19 +43,19 @@ begin
 end;
 $$;
 
--- --- Políticas de `profiles` que dependen de current_role()/current_store_id() ---
+-- --- Políticas de `profiles` que dependen de current_app_role()/current_store_id() ---
 
 create policy "admin_select_all_profiles" on profiles
-  for select using (current_role() = 'admin');
+  for select using (current_app_role() = 'admin');
 
 create policy "admin_update_non_admin_profiles" on profiles
-  for update using (current_role() = 'admin' and role <> 'admin')
+  for update using (current_app_role() = 'admin' and role <> 'admin')
   with check (role in ('customer', 'marketing', 'operaciones', 'repartidor'));
   -- el with check hace imposible, incluso vía RLS, transformar una fila en role='admin':
   -- una cuenta Admin solo se crea manualmente en Supabase con service_role (sección 08).
 
 create policy "marketing_select_customer_profiles" on profiles
-  for select using (current_role() = 'marketing' and role = 'customer');
+  for select using (current_app_role() = 'marketing' and role = 'customer');
   -- CRM: Marketing ve clientes de todas las sucursales (sección 09), nunca otro staff.
 
 -- Las políticas de "operaciones" y "repartidor" sobre `profiles` (ver un cliente solo

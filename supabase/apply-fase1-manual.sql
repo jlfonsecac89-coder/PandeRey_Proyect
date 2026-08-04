@@ -81,7 +81,7 @@ create policy "self_update_profile" on profiles
 -- Funciones auxiliares para políticas RLS. SECURITY DEFINER porque necesitan leer
 -- `profiles` (con RLS habilitado) sin recursión infinita de políticas; cada una
 -- está atada a auth.uid(), así que nunca exponen datos de otro usuario.
-create or replace function public.current_role()
+create or replace function public.current_app_role()
 returns text
 language sql stable security definer set search_path = public
 as $$
@@ -123,19 +123,19 @@ begin
 end;
 $$;
 
--- --- Políticas de `profiles` que dependen de current_role()/current_store_id() ---
+-- --- Políticas de `profiles` que dependen de current_app_role()/current_store_id() ---
 
 create policy "admin_select_all_profiles" on profiles
-  for select using (current_role() = 'admin');
+  for select using (current_app_role() = 'admin');
 
 create policy "admin_update_non_admin_profiles" on profiles
-  for update using (current_role() = 'admin' and role <> 'admin')
+  for update using (current_app_role() = 'admin' and role <> 'admin')
   with check (role in ('customer', 'marketing', 'operaciones', 'repartidor'));
   -- el with check hace imposible, incluso vía RLS, transformar una fila en role='admin':
   -- una cuenta Admin solo se crea manualmente en Supabase con service_role (sección 08).
 
 create policy "marketing_select_customer_profiles" on profiles
-  for select using (current_role() = 'marketing' and role = 'customer');
+  for select using (current_app_role() = 'marketing' and role = 'customer');
   -- CRM: Marketing ve clientes de todas las sucursales (sección 09), nunca otro staff.
 
 -- Las políticas de "operaciones" y "repartidor" sobre `profiles` (ver un cliente solo
@@ -168,10 +168,10 @@ create policy "self_manage_addresses" on addresses
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create policy "admin_select_addresses" on addresses
-  for select using (current_role() = 'admin');
+  for select using (current_app_role() = 'admin');
 
 create policy "marketing_select_addresses" on addresses
-  for select using (current_role() = 'marketing');
+  for select using (current_app_role() = 'marketing');
   -- CRM: Marketing ve dirección exacta para segmentar campañas por zona (sección 09).
 
 -- La política de "operaciones ve la dirección de un pedido de su sucursal"
@@ -195,7 +195,7 @@ create policy "self_insert_terms_acceptances" on terms_acceptances
   for insert with check (auth.uid() = user_id);
 
 create policy "admin_select_terms_acceptances" on terms_acceptances
-  for select using (current_role() = 'admin');
+  for select using (current_app_role() = 'admin');
 
 create table cookie_consents (
   id uuid primary key default gen_random_uuid(),
@@ -212,7 +212,7 @@ create policy "self_manage_cookie_consents" on cookie_consents
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create policy "admin_select_cookie_consents" on cookie_consents
-  for select using (current_role() = 'admin');
+  for select using (current_app_role() = 'admin');
 
 -- ============================================================
 -- 20260804000600_catalog.sql
@@ -336,36 +336,36 @@ create policy "public_select_product_option_values" on product_option_values for
 
 -- Departamentos/categorías: gestión exclusiva de Admin (cambia la organización operativa de fondo).
 create policy "admin_manage_departments" on departments for all
-  using (current_role() = 'admin') with check (current_role() = 'admin');
+  using (current_app_role() = 'admin') with check (current_app_role() = 'admin');
 create policy "admin_manage_categories" on categories for all
-  using (current_role() = 'admin') with check (current_role() = 'admin');
+  using (current_app_role() = 'admin') with check (current_app_role() = 'admin');
 
 -- Productos/imágenes/variantes: Admin y Operaciones (módulo "Gestión de productos y Stock").
 -- Nota: la restricción de Marketing a "solo puede tocar points_cost" es de columna, no de fila —
 -- se aplica en el Server Action (Capa 2, sección 10); acá se le da el UPDATE de fila necesario.
 create policy "staff_manage_products" on products for all
-  using (current_role() in ('admin', 'operaciones'))
-  with check (current_role() in ('admin', 'operaciones'));
+  using (current_app_role() in ('admin', 'operaciones'))
+  with check (current_app_role() in ('admin', 'operaciones'));
 create policy "marketing_update_products_points_cost" on products for update
-  using (current_role() = 'marketing')
-  with check (current_role() = 'marketing');
+  using (current_app_role() = 'marketing')
+  with check (current_app_role() = 'marketing');
 create policy "staff_manage_product_images" on product_images for all
-  using (current_role() in ('admin', 'operaciones'))
-  with check (current_role() in ('admin', 'operaciones'));
+  using (current_app_role() in ('admin', 'operaciones'))
+  with check (current_app_role() in ('admin', 'operaciones'));
 create policy "staff_manage_product_options" on product_option_groups for all
-  using (current_role() in ('admin', 'operaciones'))
-  with check (current_role() in ('admin', 'operaciones'));
+  using (current_app_role() in ('admin', 'operaciones'))
+  with check (current_app_role() in ('admin', 'operaciones'));
 create policy "staff_manage_product_option_values" on product_option_values for all
-  using (current_role() in ('admin', 'operaciones'))
-  with check (current_role() in ('admin', 'operaciones'));
+  using (current_app_role() in ('admin', 'operaciones'))
+  with check (current_app_role() in ('admin', 'operaciones'));
 
 -- Colecciones y qué producto entra en cada una: Admin y Marketing (sección 13).
 create policy "staff_manage_collections" on collections for all
-  using (current_role() in ('admin', 'marketing'))
-  with check (current_role() in ('admin', 'marketing'));
+  using (current_app_role() in ('admin', 'marketing'))
+  with check (current_app_role() in ('admin', 'marketing'));
 create policy "staff_manage_product_collections" on product_collections for all
-  using (current_role() in ('admin', 'marketing'))
-  with check (current_role() in ('admin', 'marketing'));
+  using (current_app_role() in ('admin', 'marketing'))
+  with check (current_app_role() in ('admin', 'marketing'));
 
 -- ============================================================
 -- 20260804000700_inventory.sql
@@ -438,28 +438,28 @@ create policy "public_select_active_shipping_zones" on shipping_zones for select
 
 -- Lotes/vencimientos: dato operativo interno, no público.
 create policy "admin_manage_product_batches" on product_batches for all
-  using (current_role() = 'admin') with check (current_role() = 'admin');
+  using (current_app_role() = 'admin') with check (current_app_role() = 'admin');
 create policy "operaciones_manage_product_batches_in_scope" on product_batches for all
-  using (current_role() = 'operaciones' and store_id = current_store_id())
-  with check (current_role() = 'operaciones' and store_id = current_store_id());
+  using (current_app_role() = 'operaciones' and store_id = current_store_id())
+  with check (current_app_role() = 'operaciones' and store_id = current_store_id());
 
 create policy "admin_manage_store_products" on store_products for all
-  using (current_role() = 'admin') with check (current_role() = 'admin');
+  using (current_app_role() = 'admin') with check (current_app_role() = 'admin');
 create policy "operaciones_manage_store_products_in_scope" on store_products for all
-  using (current_role() = 'operaciones' and store_id = current_store_id())
-  with check (current_role() = 'operaciones' and store_id = current_store_id());
+  using (current_app_role() = 'operaciones' and store_id = current_store_id())
+  with check (current_app_role() = 'operaciones' and store_id = current_store_id());
 
 create policy "admin_manage_shipping_zones" on shipping_zones for all
-  using (current_role() = 'admin') with check (current_role() = 'admin');
+  using (current_app_role() = 'admin') with check (current_app_role() = 'admin');
   -- radio/tramos de envío: solo Admin, vive en "Configuración del sistema" (sección 09).
 
 -- Carga masiva: Admin y Operaciones (afecta el catálogo global, sin scoping por sucursal).
 create policy "staff_manage_product_imports" on product_imports for all
-  using (current_role() in ('admin', 'operaciones'))
-  with check (current_role() in ('admin', 'operaciones'));
+  using (current_app_role() in ('admin', 'operaciones'))
+  with check (current_app_role() in ('admin', 'operaciones'));
 create policy "staff_manage_product_import_rows" on product_import_rows for all
-  using (current_role() in ('admin', 'operaciones'))
-  with check (current_role() in ('admin', 'operaciones'));
+  using (current_app_role() in ('admin', 'operaciones'))
+  with check (current_app_role() in ('admin', 'operaciones'));
 
 -- ============================================================
 -- 20260804000800_promotions.sql
@@ -495,8 +495,8 @@ create policy "public_select_automatic_promotions" on promotions
   );
 
 create policy "staff_manage_promotions" on promotions for all
-  using (current_role() in ('admin', 'marketing'))
-  with check (current_role() in ('admin', 'marketing'));
+  using (current_app_role() in ('admin', 'marketing'))
+  with check (current_app_role() in ('admin', 'marketing'));
 
 -- ============================================================
 -- 20260804000900_orders.sql
@@ -581,44 +581,44 @@ create policy "customer_insert_own_orders" on orders
   for insert with check (auth.uid() = user_id);
 
 create policy "admin_manage_orders" on orders for all
-  using (current_role() = 'admin') with check (current_role() = 'admin');
+  using (current_app_role() = 'admin') with check (current_app_role() = 'admin');
 
 create policy "marketing_select_orders" on orders
-  for select using (current_role() = 'marketing');
+  for select using (current_app_role() = 'marketing');
   -- solo lectura, para Análisis de Ofertas y Performance de Clientes (RFM) — sección 09.
 
 create policy "operaciones_manage_orders_in_scope" on orders for all
-  using (current_role() = 'operaciones' and store_id = current_store_id())
-  with check (current_role() = 'operaciones' and store_id = current_store_id());
+  using (current_app_role() = 'operaciones' and store_id = current_store_id())
+  with check (current_app_role() = 'operaciones' and store_id = current_store_id());
 
 create policy "repartidor_manage_assigned_orders" on orders for all
-  using (current_role() = 'repartidor' and assigned_driver_id = auth.uid())
-  with check (current_role() = 'repartidor' and assigned_driver_id = auth.uid());
+  using (current_app_role() = 'repartidor' and assigned_driver_id = auth.uid())
+  with check (current_app_role() = 'repartidor' and assigned_driver_id = auth.uid());
 
 -- Políticas diferidas de la migración 0003/0004/0005 (necesitaban `orders`, ver notas ahí).
 create policy "operaciones_select_customer_in_scope" on profiles
   for select using (
-    current_role() = 'operaciones'
+    current_app_role() = 'operaciones'
     and role = 'customer'
     and exists (select 1 from orders o where o.user_id = profiles.id and o.store_id = current_store_id())
   );
 
 create policy "repartidor_select_customer_for_assigned_order" on profiles
   for select using (
-    current_role() = 'repartidor'
+    current_app_role() = 'repartidor'
     and role = 'customer'
     and exists (select 1 from orders o where o.user_id = profiles.id and o.assigned_driver_id = auth.uid())
   );
 
 create policy "operaciones_select_addresses_in_scope" on addresses
   for select using (
-    current_role() = 'operaciones'
+    current_app_role() = 'operaciones'
     and exists (select 1 from orders o where o.address_id = addresses.id and o.store_id = current_store_id())
   );
 
 create policy "repartidor_select_addresses_for_assigned_order" on addresses
   for select using (
-    current_role() = 'repartidor'
+    current_app_role() = 'repartidor'
     and exists (select 1 from orders o where o.address_id = addresses.id and o.assigned_driver_id = auth.uid())
   );
 
@@ -632,16 +632,16 @@ create policy "select_order_status_history_if_can_see_order" on order_status_his
       where o.id = order_status_history.order_id
         and (
           o.user_id = auth.uid()
-          or current_role() = 'admin'
-          or current_role() = 'marketing'
-          or (current_role() = 'operaciones' and o.store_id = current_store_id())
-          or (current_role() = 'repartidor' and o.assigned_driver_id = auth.uid())
+          or current_app_role() = 'admin'
+          or current_app_role() = 'marketing'
+          or (current_app_role() = 'operaciones' and o.store_id = current_store_id())
+          or (current_app_role() = 'repartidor' and o.assigned_driver_id = auth.uid())
         )
     )
   );
 
 create policy "staff_insert_order_status_history" on order_status_history
-  for insert with check (current_role() in ('admin', 'operaciones', 'repartidor'));
+  for insert with check (current_app_role() in ('admin', 'operaciones', 'repartidor'));
 
 -- --- RLS: order_items / order_item_options (misma visibilidad que la orden dueña) ---
 alter table order_items enable row level security;
@@ -654,10 +654,10 @@ create policy "access_order_items_if_can_access_order" on order_items for all
       where o.id = order_items.order_id
         and (
           o.user_id = auth.uid()
-          or current_role() = 'admin'
-          or current_role() = 'marketing'
-          or (current_role() = 'operaciones' and o.store_id = current_store_id())
-          or (current_role() = 'repartidor' and o.assigned_driver_id = auth.uid())
+          or current_app_role() = 'admin'
+          or current_app_role() = 'marketing'
+          or (current_app_role() = 'operaciones' and o.store_id = current_store_id())
+          or (current_app_role() = 'repartidor' and o.assigned_driver_id = auth.uid())
         )
     )
   )
@@ -667,8 +667,8 @@ create policy "access_order_items_if_can_access_order" on order_items for all
       where o.id = order_items.order_id
         and (
           o.user_id = auth.uid()
-          or current_role() = 'admin'
-          or (current_role() = 'operaciones' and o.store_id = current_store_id())
+          or current_app_role() = 'admin'
+          or (current_app_role() = 'operaciones' and o.store_id = current_store_id())
         )
     )
   );
@@ -684,7 +684,7 @@ create policy "access_order_item_options_if_can_access_item" on order_item_optio
       select 1 from order_items oi
       join orders o on o.id = oi.order_id
       where oi.id = order_item_options.order_item_id
-        and (o.user_id = auth.uid() or current_role() in ('admin', 'operaciones'))
+        and (o.user_id = auth.uid() or current_app_role() in ('admin', 'operaciones'))
     )
   );
 
@@ -753,7 +753,7 @@ alter table coupon_redemptions enable row level security;
 create policy "self_manage_payment_methods" on payment_methods
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "admin_select_payment_methods" on payment_methods
-  for select using (current_role() = 'admin');
+  for select using (current_app_role() = 'admin');
 
 -- Pagos de Mercado Pago: dueño del pedido (solo lectura) + staff con visibilidad de la orden.
 create policy "select_payments_if_can_access_order" on payments
@@ -763,15 +763,15 @@ create policy "select_payments_if_can_access_order" on payments
       where o.id = payments.order_id
         and (
           o.user_id = auth.uid()
-          or current_role() = 'admin'
-          or (current_role() = 'operaciones' and o.store_id = current_store_id())
+          or current_app_role() = 'admin'
+          or (current_app_role() = 'operaciones' and o.store_id = current_store_id())
         )
     )
   );
 
 -- Credencial de WhatsApp: exclusiva de Admin (es un secreto de integración, sección 11).
 create policy "admin_manage_whatsapp_integration" on whatsapp_integration for all
-  using (current_role() = 'admin') with check (current_role() = 'admin');
+  using (current_app_role() = 'admin') with check (current_app_role() = 'admin');
 
 -- Transferencia bancaria: dueño del pedido ve su estado; Operaciones/Admin revisan y aprueban.
 create policy "select_bank_transfer_if_can_access_order" on bank_transfer_payments
@@ -781,22 +781,22 @@ create policy "select_bank_transfer_if_can_access_order" on bank_transfer_paymen
       where o.id = bank_transfer_payments.order_id
         and (
           o.user_id = auth.uid()
-          or current_role() = 'admin'
-          or (current_role() = 'operaciones' and o.store_id = current_store_id())
+          or current_app_role() = 'admin'
+          or (current_app_role() = 'operaciones' and o.store_id = current_store_id())
         )
     )
   );
 create policy "staff_review_bank_transfer" on bank_transfer_payments for update
   using (
-    current_role() = 'admin'
-    or (current_role() = 'operaciones' and exists (
+    current_app_role() = 'admin'
+    or (current_app_role() = 'operaciones' and exists (
       select 1 from orders o where o.id = bank_transfer_payments.order_id and o.store_id = current_store_id()
     ))
   );
 
 -- Canjes de cupón: dueño del pedido + Admin/Marketing (Análisis de Ofertas, sección 14).
 create policy "select_own_coupon_redemptions" on coupon_redemptions
-  for select using (auth.uid() = user_id or current_role() in ('admin', 'marketing'));
+  for select using (auth.uid() = user_id or current_app_role() in ('admin', 'marketing'));
 create policy "customer_insert_own_coupon_redemption" on coupon_redemptions
   for insert with check (auth.uid() = user_id);
 
@@ -838,11 +838,11 @@ alter table customer_rfm_snapshot enable row level security;
 create policy "self_select_points_ledger" on points_ledger
   for select using (auth.uid() = user_id);
 create policy "staff_select_points_ledger" on points_ledger
-  for select using (current_role() in ('admin', 'marketing'));
+  for select using (current_app_role() in ('admin', 'marketing'));
 
 -- RFM: herramienta interna de Admin/Marketing, no expuesta al cliente (sección 14).
 create policy "staff_select_customer_rfm_snapshot" on customer_rfm_snapshot
-  for select using (current_role() in ('admin', 'marketing'));
+  for select using (current_app_role() in ('admin', 'marketing'));
 
 -- ============================================================
 -- 20260804001200_marketing_content.sql
@@ -887,8 +887,8 @@ alter table instagram_integration enable row level security;
 create policy "public_select_active_banners" on banners
   for select using (is_active = true and now() between coalesce(starts_at, now()) and coalesce(ends_at, now()));
 create policy "staff_manage_banners" on banners for all
-  using (current_role() in ('admin', 'marketing'))
-  with check (current_role() in ('admin', 'marketing'));
+  using (current_app_role() in ('admin', 'marketing'))
+  with check (current_app_role() in ('admin', 'marketing'));
 
 -- Newsletter: cualquier visitante puede suscribirse (formulario público, opt-in explícito);
 -- la baja (unsubscribe) se hace vía Route Handler con service_role validando un link firmado,
@@ -896,10 +896,10 @@ create policy "staff_manage_banners" on banners for all
 create policy "public_insert_newsletter_subscription" on newsletter_subscribers
   for insert with check (true);
 create policy "staff_select_newsletter_subscribers" on newsletter_subscribers
-  for select using (current_role() in ('admin', 'marketing'));
+  for select using (current_app_role() in ('admin', 'marketing'));
 
 create policy "admin_manage_instagram_integration" on instagram_integration for all
-  using (current_role() = 'admin') with check (current_role() = 'admin');
+  using (current_app_role() = 'admin') with check (current_app_role() = 'admin');
 
 -- ============================================================
 -- 20260804001300_billing_audit.sql
@@ -951,20 +951,20 @@ create policy "select_invoices_if_can_access_order" on invoices_dte
       where o.id = invoices_dte.order_id
         and (
           o.user_id = auth.uid()
-          or current_role() = 'admin'
-          or (current_role() = 'operaciones' and o.store_id = current_store_id())
+          or current_app_role() = 'admin'
+          or (current_app_role() = 'operaciones' and o.store_id = current_store_id())
         )
     )
   );
 
 -- Auditoría: exclusiva de Admin (sección 09) — ni siquiera Marketing/Operaciones la ven.
 create policy "admin_select_audit_log" on audit_log
-  for select using (current_role() = 'admin');
+  for select using (current_app_role() = 'admin');
 
 create policy "self_select_notifications_log" on notifications_log
   for select using (auth.uid() = user_id);
 create policy "admin_select_notifications_log" on notifications_log
-  for select using (current_role() = 'admin');
+  for select using (current_app_role() = 'admin');
 
 -- ============================================================
 -- 20260804001400_business_triggers.sql
@@ -1024,14 +1024,14 @@ create trigger product_batches_sync_stock
 -- fila en `profiles` a través de la política self_update_profile — RLS por sí sola
 -- protege la FILA, no columnas específicas, así que esto es defensa adicional a nivel
 -- de columna. Las conexiones con service_role (Server Actions de sistema, triggers
--- internos) no tienen auth.uid(), por lo que current_role() da NULL y este chequeo
+-- internos) no tienen auth.uid(), por lo que current_app_role() da NULL y este chequeo
 -- se salta naturalmente para esos flujos de confianza.
 create or replace function public.protect_profile_columns()
 returns trigger
 language plpgsql security definer set search_path = public
 as $$
 begin
-  if current_role() <> 'admin' then
+  if current_app_role() <> 'admin' then
     if new.role is distinct from old.role
       or new.points_balance is distinct from old.points_balance
       or new.rut_encrypted is distinct from old.rut_encrypted

@@ -33,8 +33,8 @@ alter table customer_rfm_snapshot enable row level security;
 create policy "self_select_points_ledger" on points_ledger
   for select using (auth.uid() = user_id);
 create policy "staff_select_points_ledger" on points_ledger
-  for select using (current_role() in ('admin', 'marketing'));
+  for select using (current_app_role() in ('admin', 'marketing'));
 
 -- RFM: herramienta interna de Admin/Marketing, no expuesta al cliente (sección 14).
 create policy "staff_select_customer_rfm_snapshot" on customer_rfm_snapshot
-  for select using (current_role() in ('admin', 'marketing'));
+  for select using (current_app_role() in ('admin', 'marketing'));

@@ -53,14 +53,14 @@ create trigger product_batches_sync_stock
 -- fila en `profiles` a través de la política self_update_profile — RLS por sí sola
 -- protege la FILA, no columnas específicas, así que esto es defensa adicional a nivel
 -- de columna. Las conexiones con service_role (Server Actions de sistema, triggers
--- internos) no tienen auth.uid(), por lo que current_role() da NULL y este chequeo
+-- internos) no tienen auth.uid(), por lo que current_app_role() da NULL y este chequeo
 -- se salta naturalmente para esos flujos de confianza.
 create or replace function public.protect_profile_columns()
 returns trigger
 language plpgsql security definer set search_path = public
 as $$
 begin
-  if current_role() <> 'admin' then
+  if current_app_role() <> 'admin' then
     if new.role is distinct from old.role
       or new.points_balance is distinct from old.points_balance
       or new.rut_encrypted is distinct from old.rut_encrypted
