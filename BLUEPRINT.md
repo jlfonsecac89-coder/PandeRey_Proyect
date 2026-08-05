@@ -1170,6 +1170,9 @@ ORS_API_KEY=                          # server-side; OpenRouteService — Geocod
 ORDER_PREP_SLA_MINUTES=30             # tiempo de preparación estándar, igual para todo el catálogo en v1
 MAX_DELIVERY_ISSUE_WAIT_MINUTES=10    # minutos de espera antes de permitir "regresando a tienda"
 
+# Cron jobs
+CRON_SECRET=                          # Vercel Cron lo manda como Authorization: Bearer <valor> — rechaza cualquier otro caller
+
 # Inventario y analítica
 CLEARANCE_ALERT_DAYS_BEFORE_EXPIRY=3  # ventana en días para que un lote aparezca como candidato a liquidación
 RFM_ANALYSIS_WINDOW_DAYS=365           # ventana de historial que considera el cálculo de frequency/monetary

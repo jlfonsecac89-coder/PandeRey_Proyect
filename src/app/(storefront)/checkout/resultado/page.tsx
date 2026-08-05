@@ -28,13 +28,18 @@ export default async function CheckoutResultadoPage({
     }
   }
 
+  // El reenvío pagado tras `returned_to_store` (lib/checkout/actions.ts,
+  // payResendShipping) usa "<order_id>:resend" como external_reference —
+  // acá solo interesa el id real del pedido para mostrar su estado.
+  const cleanOrderId = orderId?.split(":")[0];
+
   let order: { id: string; status: string; total: number } | null = null;
-  if (orderId) {
+  if (cleanOrderId) {
     const supabase = await createClient();
     const { data } = await supabase
       .from("orders")
       .select("id, status, total")
-      .eq("id", orderId)
+      .eq("id", cleanOrderId)
       .maybeSingle();
     order = data;
   }

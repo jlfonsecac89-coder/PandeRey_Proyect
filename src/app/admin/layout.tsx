@@ -8,6 +8,7 @@ import type { Profile } from "@/lib/auth/session";
 // verificar el rol por su cuenta (defensa en profundidad).
 const NAV_ITEMS: { href: string; label: string; roles: Profile["role"][] }[] = [
   { href: "/admin", label: "Dashboard", roles: ["admin", "marketing", "operaciones"] },
+  { href: "/admin/pedidos", label: "Pedidos", roles: ["admin", "operaciones"] },
   { href: "/admin/productos", label: "Productos", roles: ["admin", "operaciones"] },
   { href: "/admin/departamentos", label: "Departamentos", roles: ["admin"] },
   { href: "/admin/categorias", label: "Categorías", roles: ["admin"] },

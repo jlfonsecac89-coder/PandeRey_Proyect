@@ -2,10 +2,15 @@ import "server-only";
 import { Payment } from "mercadopago";
 import { getMercadoPagoClient } from "./client";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendNotification, getUserEmail } from "@/lib/notifications/send";
+import { purchaseConfirmedTemplate } from "@/lib/notifications/templates";
+import { orderPrepSlaMinutes } from "@/lib/orders/status";
 
 export type ConfirmPaymentResult =
   | { ok: true; alreadyProcessed: boolean; status?: string }
   | { ok: false; reason: string };
+
+const RESEND_SUFFIX = ":resend";
 
 // Punto único que aplica los side-effects de un pago aprobado: usado tanto
 // por el webhook (POST /api/webhooks/mercadopago) como por la página de
@@ -23,8 +28,8 @@ export async function confirmPayment(mpPaymentId: string): Promise<ConfirmPaymen
     return { ok: false, reason: "no se pudo consultar el pago en Mercado Pago" };
   }
 
-  const orderId = data.external_reference;
-  if (!orderId) return { ok: false, reason: "el pago no trae external_reference" };
+  const rawReference = data.external_reference;
+  if (!rawReference) return { ok: false, reason: "el pago no trae external_reference" };
 
   const supabase = createAdminClient();
 
@@ -38,6 +43,12 @@ export async function confirmPayment(mpPaymentId: string): Promise<ConfirmPaymen
   if (data.status !== "approved") {
     return { ok: true, alreadyProcessed: false, status: data.status };
   }
+
+  // El pago del reenvío tras `returned_to_store` (sección 07) reusa este
+  // mismo webhook con external_reference = "<order_id>:resend" para no
+  // duplicar toda la lógica de validación de firma/idempotencia.
+  const isResend = rawReference.endsWith(RESEND_SUFFIX);
+  const orderId = isResend ? rawReference.slice(0, -RESEND_SUFFIX.length) : rawReference;
 
   const { error: paymentError } = await supabase.from("payments").insert({
     order_id: orderId,
@@ -53,17 +64,72 @@ export async function confirmPayment(mpPaymentId: string): Promise<ConfirmPaymen
   });
   if (paymentError) return { ok: false, reason: "no se pudo registrar el pago" };
 
+  if (isResend) {
+    await supabase
+      .from("orders")
+      .update({ status: "driver_assigned" })
+      .eq("id", orderId)
+      .eq("status", "returned_to_store");
+    await supabase.from("order_status_history").insert({
+      order_id: orderId,
+      status: "driver_assigned",
+      note: "Reenvío pagado por el cliente tras devolución a tienda",
+    });
+    return { ok: true, alreadyProcessed: false, status: data.status };
+  }
+
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, user_id, scheduled_at, total, delivery_confirmation_code, delivery_method")
+    .eq("id", orderId)
+    .eq("status", "pending_payment")
+    .maybeSingle();
+
+  if (!order) {
+    // Ya procesado por otra vía, o el pedido no existe — no hay nada más que hacer.
+    return { ok: true, alreadyProcessed: false, status: data.status };
+  }
+
+  // Sin scheduled_at pasa a 'preparing' de inmediato; con scheduled_at se
+  // queda en 'paid' hasta que el cron de SLA lo transicione (sección 07).
+  const nextStatus = order.scheduled_at ? "paid" : "preparing";
+  const slaDeadline = order.scheduled_at
+    ? order.scheduled_at
+    : new Date(Date.now() + orderPrepSlaMinutes() * 60000).toISOString();
+
   await supabase
     .from("orders")
-    .update({ status: "paid", mp_payment_id: String(data.id) })
+    .update({
+      status: nextStatus,
+      mp_payment_id: String(data.id),
+      sla_deadline: slaDeadline,
+    })
     .eq("id", orderId)
     .eq("status", "pending_payment");
 
   await supabase.from("order_status_history").insert({
     order_id: orderId,
-    status: "paid",
+    status: nextStatus,
     note: "Confirmado por Mercado Pago",
   });
+
+  const email = await getUserEmail(order.user_id);
+  if (email) {
+    const { subject, html } = purchaseConfirmedTemplate({
+      orderId: order.id,
+      total: order.total,
+      deliveryConfirmationCode: order.delivery_confirmation_code ?? "",
+      deliveryMethod: order.delivery_method as "pickup" | "shipping",
+    });
+    await sendNotification({
+      userId: order.user_id,
+      orderId: order.id,
+      to: email,
+      template: "purchase_confirmed",
+      subject,
+      html,
+    });
+  }
 
   return { ok: true, alreadyProcessed: false, status: data.status };
 }

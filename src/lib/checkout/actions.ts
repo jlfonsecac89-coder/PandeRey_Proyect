@@ -9,6 +9,7 @@ import { geocodeAddress } from "@/lib/geo/geocode";
 import { computeShipping } from "./shipping";
 import { createOrderPreference } from "@/lib/mercadopago/preference";
 import { formatCLP } from "@/lib/format";
+import { generateDeliveryCode } from "@/lib/orders/status";
 import type { CartItem } from "@/lib/cart/types";
 
 export type CheckoutState = { error?: string; success?: string; addressId?: string } | null;
@@ -282,6 +283,7 @@ export async function createCheckoutPreference(
       address_id: deliveryMethod === "shipping" ? address!.id : null,
       scheduled_at: scheduledAtIso,
       delivery_distance_km: quote.distanceKm,
+      delivery_confirmation_code: generateDeliveryCode(),
       subtotal,
       total,
     })
@@ -357,6 +359,48 @@ export async function createCheckoutPreference(
     .from("orders")
     .update({ mp_preference_id: preferenceResult.id })
     .eq("id", order.id);
+
+  redirect(redirectUrl);
+}
+
+// ---------- Reenvío pagado tras devolución a tienda ----------
+
+// Cuando un pedido vuelve a la tienda (`returned_to_store`, sección 07), el
+// cliente puede pagar el envío de nuevo para que se reintente — cobra el
+// mismo costo de envío que ya se había calculado para el pedido original
+// (total - subtotal), sin recalcular distancia/tramo de nuevo.
+export async function payResendShipping(orderId: string): Promise<CheckoutState> {
+  const profile = await getCurrentProfile();
+  if (!profile) redirect("/auth/login?next=/pedido/" + orderId);
+
+  const supabase = await createClient();
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, user_id, status, subtotal, total")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (!order || order.user_id !== profile.id) return { error: "Pedido no encontrado." };
+  if (order.status !== "returned_to_store") {
+    return { error: "Este pedido no está disponible para reenvío." };
+  }
+
+  const extraShippingCost = order.total - order.subtotal;
+  if (extraShippingCost <= 0) return { error: "No hay costo de envío para cobrar." };
+
+  let preferenceResult;
+  try {
+    preferenceResult = await createOrderPreference({
+      orderId: `${orderId}${":resend"}`,
+      items: [{ id: "reenvio", title: "Reenvío de pedido", quantity: 1, unit_price: extraShippingCost }],
+      shippingCost: 0,
+    });
+  } catch {
+    return { error: "No se pudo iniciar el pago con Mercado Pago." };
+  }
+
+  const redirectUrl = preferenceResult.init_point || preferenceResult.sandbox_init_point;
+  if (!redirectUrl) return { error: "Mercado Pago no devolvió una URL de pago." };
 
   redirect(redirectUrl);
 }
