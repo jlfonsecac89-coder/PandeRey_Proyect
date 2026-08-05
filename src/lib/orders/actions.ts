@@ -364,3 +364,76 @@ export async function choosePickupFree(orderId: string): Promise<OrderActionStat
   revalidatePath(`/pedido/${orderId}`);
   return { success: "Listo, podés retirarlo en tienda sin costo adicional." };
 }
+
+// ---------- Repetir pedido (Fase 10) ----------
+
+export type ReorderItem = {
+  productId: string;
+  name: string;
+  slug: string;
+  price: number;
+  imagePath: string | null;
+  quantity: number;
+};
+
+export type ReorderResult = { available: ReorderItem[]; unavailable: string[] };
+
+// Aceptación 1 de la Fase 10: si un producto del pedido original ya no está
+// disponible, se informa pero NO bloquea el resto del repedido. Devuelve
+// datos (no un form state) porque el resultado lo consume un client
+// component para armar el carrito local, no un <form>.
+//
+// Nota de alcance: `order_item_options` guarda un snapshot de texto (nombre
+// del grupo/valor), no el id vivo de `product_option_values` — no hay forma
+// de reconstruir con certeza cuál era la variante exacta. "Repetir pedido"
+// vuelve a agregar el producto base, sin las variantes originales; precio y
+// disponibilidad siempre se recalculan contra el catálogo actual.
+export async function getReorderItems(orderId: string): Promise<ReorderResult> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { available: [], unavailable: [] };
+
+  const supabase = await createClient();
+
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, user_id")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (!order || order.user_id !== profile.id) return { available: [], unavailable: [] };
+
+  const { data: items } = await supabase
+    .from("order_items")
+    .select("product_id, product_name_snapshot, quantity")
+    .eq("order_id", orderId);
+
+  const productIds = [...new Set((items ?? []).map((i) => i.product_id))];
+  const { data: products } = productIds.length
+    ? await supabase
+        .from("products")
+        .select("id, name, slug, price, is_active, images:product_images(storage_path, sort_order)")
+        .in("id", productIds)
+    : { data: [] as { id: string; name: string; slug: string; price: number; is_active: boolean; images: { storage_path: string; sort_order: number }[] }[] };
+  const productMap = new Map((products ?? []).map((p) => [p.id, p]));
+
+  const available: ReorderItem[] = [];
+  const unavailable: string[] = [];
+
+  for (const item of items ?? []) {
+    const product = productMap.get(item.product_id);
+    if (!product || !product.is_active) {
+      unavailable.push(item.product_name_snapshot);
+      continue;
+    }
+    const firstImage = [...product.images].sort((a, b) => a.sort_order - b.sort_order)[0];
+    available.push({
+      productId: product.id,
+      name: product.name,
+      slug: product.slug,
+      price: product.price,
+      imagePath: firstImage?.storage_path ?? null,
+      quantity: item.quantity,
+    });
+  }
+
+  return { available, unavailable };
+}
