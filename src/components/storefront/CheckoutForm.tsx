@@ -30,9 +30,21 @@ type Store = {
   free_shipping_min_amount: number | null;
 };
 
-export function CheckoutForm({ addresses, stores }: { addresses: Address[]; stores: Store[] }) {
+export function CheckoutForm({
+  addresses,
+  stores,
+  pointsBalance,
+  pointsToClpRate,
+}: {
+  addresses: Address[];
+  stores: Store[];
+  pointsBalance: number;
+  pointsToClpRate: number;
+}) {
   const router = useRouter();
   const { items, hydrated, subtotal } = useCart();
+  const [couponCode, setCouponCode] = useState("");
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
   useEffect(() => {
     if (hydrated && items.length === 0) router.replace("/carrito");
@@ -87,7 +99,11 @@ export function CheckoutForm({ addresses, stores }: { addresses: Address[]; stor
   const selectedStore = stores.find((s) => s.id === storeId) ?? null;
   const shippingQuote = shippingState && "ok" in shippingState ? shippingState : null;
   const shippingCost = shippingQuote?.shippingCost ?? 0;
-  const total = subtotal + (deliveryMethod === "shipping" ? shippingCost : 0);
+  const totalBeforeDiscounts = subtotal + (deliveryMethod === "shipping" ? shippingCost : 0);
+  // Estimación solo para mostrar en pantalla — el servidor recalcula todo de
+  // nuevo (saldo real, cupón real) antes de crear el pedido.
+  const estimatedPointsDiscount = Math.floor(pointsToRedeem * pointsToClpRate);
+  const total = Math.max(totalBeforeDiscounts - estimatedPointsDiscount, 0);
 
   if (!hydrated || items.length === 0) return null;
 
@@ -312,6 +328,44 @@ export function CheckoutForm({ addresses, stores }: { addresses: Address[]; stor
         </form>
       )}
 
+      {/* Cupón y puntos */}
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/50">
+          Cupón y puntos
+        </h2>
+        <div className="mt-2 space-y-3">
+          <input
+            value={couponCode}
+            onChange={(e) => setCouponCode(e.target.value)}
+            placeholder="Código de cupón (opcional)"
+            className="w-full rounded-md border border-charcoal-border bg-charcoal-light px-3 py-1.5 text-sm uppercase"
+          />
+          {pointsBalance > 0 && (
+            <div>
+              <label className="text-xs text-foreground/60">
+                Tenés {pointsBalance} puntos disponibles ({formatCLP(pointsBalance * pointsToClpRate)})
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={pointsBalance}
+                value={pointsToRedeem || ""}
+                onChange={(e) =>
+                  setPointsToRedeem(Math.min(pointsBalance, Math.max(0, Number(e.target.value) || 0)))
+                }
+                placeholder="Puntos a canjear"
+                className="mt-1 w-full rounded-md border border-charcoal-border bg-charcoal-light px-3 py-1.5 text-sm"
+              />
+              {pointsToRedeem > 0 && (
+                <p className="mt-1 text-xs text-foreground/50">
+                  Descuento estimado: {formatCLP(estimatedPointsDiscount)}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Total y confirmación */}
       <section className="border-t border-charcoal-border pt-4">
         <div className="flex justify-between text-lg font-semibold">
@@ -334,6 +388,8 @@ export function CheckoutForm({ addresses, stores }: { addresses: Address[]; stor
             name="scheduled_at"
             value={scheduledAt ? new Date(scheduledAt).toISOString() : ""}
           />
+          <input type="hidden" name="coupon_code" value={couponCode} />
+          <input type="hidden" name="points_to_redeem" value={pointsToRedeem} />
           {checkoutState?.error && <p className="mb-2 text-sm text-red-400">{checkoutState.error}</p>}
           <button
             type="submit"

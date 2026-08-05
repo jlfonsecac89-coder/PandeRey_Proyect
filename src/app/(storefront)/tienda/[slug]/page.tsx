@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/auth/session";
 import { formatCLP } from "@/lib/format";
 import { AddToCartForm } from "@/components/storefront/AddToCartForm";
+import { RedeemPointsButton } from "@/components/storefront/RedeemPointsButton";
 
 export default async function ProductoDetallePage({
   params,
@@ -14,7 +16,7 @@ export default async function ProductoDetallePage({
   const { data: product } = await supabase
     .from("products")
     .select(
-      "id, name, slug, description, price, is_gluten_free, images:product_images(storage_path, sort_order)",
+      "id, name, slug, description, price, points_cost, is_gluten_free, images:product_images(storage_path, sort_order)",
     )
     .eq("slug", slug)
     .eq("is_active", true)
@@ -35,6 +37,21 @@ export default async function ProductoDetallePage({
 
   const publicBaseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images`;
   const images = [...product.images].sort((a, b) => a.sort_order - b.sort_order);
+
+  let redeemInfo: { pointsBalance: number; storeId: string } | null = null;
+  if (product.points_cost) {
+    const profile = await getCurrentProfile();
+    const { data: store } = await supabase
+      .from("stores")
+      .select("id")
+      .eq("is_active", true)
+      .order("name")
+      .limit(1)
+      .maybeSingle();
+    if (profile && store) {
+      redeemInfo = { pointsBalance: profile.points_balance, storeId: store.id };
+    }
+  }
 
   return (
     <div className="mx-auto grid max-w-4xl grid-cols-1 gap-8 px-6 py-8 sm:grid-cols-2">
@@ -73,6 +90,26 @@ export default async function ProductoDetallePage({
             optionGroups={optionGroups}
           />
         </div>
+
+        {product.points_cost != null && (
+          <div className="mt-4 rounded-lg border border-charcoal-border bg-charcoal-light p-3">
+            <p className="text-sm text-foreground/80">
+              Canjeable por <span className="text-gold">{product.points_cost} puntos</span>
+            </p>
+            {redeemInfo ? (
+              <RedeemPointsButton
+                productId={product.id}
+                storeId={redeemInfo.storeId}
+                pointsCost={product.points_cost}
+                pointsBalance={redeemInfo.pointsBalance}
+              />
+            ) : (
+              <p className="mt-1 text-xs text-foreground/50">
+                Iniciá sesión para canjear este producto con tus puntos.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

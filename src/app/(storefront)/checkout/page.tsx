@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { loyaltyPointsToClpRate } from "@/lib/loyalty/points";
 import { CheckoutForm } from "@/components/storefront/CheckoutForm";
 
 export default async function CheckoutPage() {
@@ -25,7 +26,12 @@ export default async function CheckoutPage() {
     <div className="mx-auto max-w-2xl px-6 py-8">
       <h1 className="text-xl font-semibold text-gold">Checkout</h1>
       <div className="mt-6">
-        <CheckoutForm addresses={addresses ?? []} stores={stores ?? []} />
+        <CheckoutForm
+          addresses={addresses ?? []}
+          stores={stores ?? []}
+          pointsBalance={profile.points_balance}
+          pointsToClpRate={loyaltyPointsToClpRate()}
+        />
       </div>
     </div>
   );

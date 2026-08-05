@@ -10,6 +10,7 @@ import { computeShipping } from "./shipping";
 import { createOrderPreference } from "@/lib/mercadopago/preference";
 import { formatCLP } from "@/lib/format";
 import { generateDeliveryCode } from "@/lib/orders/status";
+import { validateCoupon, validatePointsRedemption } from "@/lib/promotions/discount";
 import type { CartItem } from "@/lib/cart/types";
 
 export type CheckoutState = { error?: string; success?: string; addressId?: string } | null;
@@ -264,7 +265,55 @@ export async function createCheckoutPreference(
   const quote = await computeShipping({ supabase, store, deliveryMethod, address, subtotal });
   if (!quote.ok) return { error: quote.error };
 
-  const total = subtotal + quote.shippingCost;
+  const totalBeforeDiscounts = subtotal + quote.shippingCost;
+
+  // --- Cupón (opcional) ---
+  const couponCode = String(formData.get("coupon_code") || "").trim();
+  let promotionId: string | null = null;
+  let couponDiscount = 0;
+  if (couponCode) {
+    // `promotions` solo tiene policy pública de lectura para promociones SIN
+    // código (automáticas) — un cupón con código es intencionalmente
+    // invisible para la sesión del cliente, así no se pueden enumerar
+    // códigos válidos con una consulta directa a la tabla (comentario
+    // original en la migración de promotions). La validación se hace acá
+    // con el cliente admin, precisamente para eso.
+    const couponResult = await validateCoupon({
+      supabase: createAdminClient(),
+      code: couponCode,
+      userId: profile.id,
+      subtotal,
+      cartItems: orderItemsToInsert.map((i) => ({
+        productId: i.product_id,
+        quantity: i.quantity,
+        unitPrice: i.unit_price,
+      })),
+    });
+    if (!couponResult.ok) return { error: couponResult.error };
+    promotionId = couponResult.promotionId;
+    couponDiscount = couponResult.discountClp;
+  }
+
+  // --- Canje de puntos por descuento (opcional) — Aceptación 3 de la Fase 7 ---
+  const pointsToRedeemRaw = String(formData.get("points_to_redeem") || "0");
+  const pointsToRedeem = Number(pointsToRedeemRaw) || 0;
+  let pointsDiscount = 0;
+  if (pointsToRedeem > 0) {
+    const pointsResult = await validatePointsRedemption({
+      supabase,
+      userId: profile.id,
+      pointsToRedeem,
+      maxDiscountAllowed: totalBeforeDiscounts - couponDiscount,
+    });
+    if (!pointsResult.ok) return { error: pointsResult.error };
+    pointsDiscount = pointsResult.discountClp;
+  }
+
+  const discountTotal = couponDiscount + pointsDiscount;
+  const total = totalBeforeDiscounts - discountTotal;
+  if (total <= 0) {
+    return { error: "El descuento aplicado supera el total del pedido — reducí el cupón o los puntos usados." };
+  }
 
   let scheduledAtIso: string | null = null;
   if (scheduledAtRaw) {
@@ -285,12 +334,51 @@ export async function createCheckoutPreference(
       delivery_distance_km: quote.distanceKm,
       delivery_confirmation_code: generateDeliveryCode(),
       subtotal,
+      discount_total: discountTotal,
+      promotion_id: promotionId,
       total,
     })
     .select("id")
     .single();
 
   if (orderError || !order) return { error: "No se pudo crear el pedido." };
+
+  // El descuento ya se validó arriba (cupón vigente, saldo de puntos
+  // suficiente) — acá solo se registra el consumo, atómico con la creación
+  // del pedido en la medida de lo posible (sección 14: "nunca se descuenta
+  // el saldo sin que quede el registro correspondiente en el ledger").
+  if (promotionId) {
+    await supabase.from("coupon_redemptions").insert({
+      promotion_id: promotionId,
+      user_id: profile.id,
+      order_id: order.id,
+    });
+    // `promotions` no tiene policy de UPDATE para customer (solo
+    // staff_manage_promotions) — el contador de usos es bookkeeping del
+    // propio checkout, se escribe con el cliente admin.
+    const adminForUsage = createAdminClient();
+    const { data: currentPromo } = await adminForUsage
+      .from("promotions")
+      .select("usage_count")
+      .eq("id", promotionId)
+      .single();
+    if (currentPromo) {
+      await adminForUsage
+        .from("promotions")
+        .update({ usage_count: currentPromo.usage_count + 1 })
+        .eq("id", promotionId);
+    }
+  }
+  if (pointsToRedeem > 0) {
+    const adminSupabaseForPoints = createAdminClient();
+    await adminSupabaseForPoints.from("points_ledger").insert({
+      user_id: profile.id,
+      order_id: order.id,
+      type: "redeem_discount",
+      points: -pointsToRedeem,
+      description: `Descuento aplicado en pedido #${order.id.slice(0, 8)}`,
+    });
+  }
 
   // INSERT multi-fila con RETURNING preserva el orden de los VALUES en Postgres
   // (sin ORDER BY ni agregación de por medio) — se usa ese orden para asociar
@@ -336,6 +424,7 @@ export async function createCheckoutPreference(
         unit_price: i.unit_price,
       })),
       shippingCost: quote.shippingCost,
+      discountTotal,
     });
   } catch {
     return { error: "No se pudo iniciar el pago con Mercado Pago." };

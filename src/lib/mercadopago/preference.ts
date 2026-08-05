@@ -13,6 +13,7 @@ export async function createOrderPreference(params: {
   orderId: string;
   items: PreferenceItemInput[];
   shippingCost: number;
+  discountTotal?: number;
   payerEmail?: string;
 }) {
   const client = getMercadoPagoClient();
@@ -22,6 +23,17 @@ export async function createOrderPreference(params: {
   const items = [...params.items];
   if (params.shippingCost > 0) {
     items.push({ id: "envio", title: "Costo de envío", quantity: 1, unit_price: params.shippingCost });
+  }
+  // Cupón/puntos canjeados (sección 14) — se representan como un ítem de
+  // precio negativo para que el total cobrado por MP coincida exactamente
+  // con `orders.total` (que ya sale descontado).
+  if (params.discountTotal && params.discountTotal > 0) {
+    items.push({
+      id: "descuento",
+      title: "Descuento (cupón/puntos)",
+      quantity: 1,
+      unit_price: -params.discountTotal,
+    });
   }
 
   const resultUrl = `${siteUrl}/checkout/resultado?order=${params.orderId}`;

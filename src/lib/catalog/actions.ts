@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/rbac";
+import { logAction } from "@/lib/audit/log-action";
 import { normalizeName, slugify } from "./normalize";
 import { generateUniqueSku } from "./sku";
 
@@ -255,7 +256,7 @@ export async function updateProduct(
   _prev: CatalogActionState,
   formData: FormData,
 ): Promise<CatalogActionState> {
-  await requireRole(["admin", "operaciones"]);
+  const profile = await requireRole(["admin", "operaciones"]);
 
   const name = String(formData.get("name") || "").trim();
   const description = String(formData.get("description") || "").trim() || null;
@@ -269,6 +270,12 @@ export async function updateProduct(
 
   const supabase = await createClient();
 
+  const { data: before } = await supabase
+    .from("products")
+    .select("price")
+    .eq("id", productId)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("products")
     .update({ name, description, price, is_gluten_free: isGlutenFree, is_active: isActive })
@@ -277,6 +284,20 @@ export async function updateProduct(
   if (error) {
     if (isUniqueViolation(error)) return { error: "Ya existe otro producto con ese nombre." };
     return { error: "No se pudo actualizar el producto." };
+  }
+
+  // Aceptación 1 de la Fase 7: solo se audita cuando el precio realmente
+  // cambia, y solo ese campo — before_data/after_data no llevan la fila
+  // completa (sección 15: "sin exponer campos redactados de más").
+  if (before && before.price !== price) {
+    await logAction({
+      actor: profile,
+      action: "product_price_changed",
+      entityType: "product",
+      entityId: productId,
+      before: { price: before.price },
+      after: { price },
+    });
   }
 
   revalidatePath(`/admin/productos/${productId}`);

@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNotification, getUserEmail } from "@/lib/notifications/send";
 import { purchaseConfirmedTemplate } from "@/lib/notifications/templates";
 import { orderPrepSlaMinutes } from "@/lib/orders/status";
+import { computeEarnedPoints } from "@/lib/loyalty/points";
 
 export type ConfirmPaymentResult =
   | { ok: true; alreadyProcessed: boolean; status?: string }
@@ -112,6 +113,21 @@ export async function confirmPayment(mpPaymentId: string): Promise<ConfirmPaymen
     status: nextStatus,
     note: "Confirmado por Mercado Pago",
   });
+
+  // Aceptación 2 de la Fase 7: acreditación automática al confirmarse el
+  // pago (mismo evento que el resto de este bloque) — profiles.points_balance
+  // se mantiene consistente solo, vía el trigger sync_points_balance
+  // (sección 05) que recalcula la suma del ledger en cada insert.
+  const earnedPoints = computeEarnedPoints(order.total);
+  if (earnedPoints > 0) {
+    await supabase.from("points_ledger").insert({
+      user_id: order.user_id,
+      order_id: order.id,
+      type: "earn_purchase",
+      points: earnedPoints,
+      description: `Compra pedido #${order.id.slice(0, 8)}`,
+    });
+  }
 
   const email = await getUserEmail(order.user_id);
   if (email) {
