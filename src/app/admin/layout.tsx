@@ -15,6 +15,7 @@ const NAV_ITEMS: { href: string; label: string; roles: Profile["role"][] }[] = [
   { href: "/admin/colecciones", label: "Colecciones", roles: ["admin", "marketing"] },
   { href: "/admin/canje-de-puntos", label: "Canje de puntos", roles: ["admin", "marketing"] },
   { href: "/admin/configuracion/usuarios", label: "Usuarios", roles: ["admin"] },
+  { href: "/admin/configuracion/sucursales", label: "Sucursales", roles: ["admin"] },
 ];
 
 // Capa 2 (sección 10): vuelve a verificar el rol acá, además de lo que ya
