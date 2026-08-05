@@ -7,11 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/rbac";
 import { logAction } from "@/lib/audit/log-action";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit/limiter";
-
-// Versión vigente de los Términos y Condiciones — cambiarla obliga a los
-// clientes nuevos a aceptar la versión nueva; no reescribe lo ya aceptado
-// (terms_acceptances es histórico, sección 11 del blueprint).
-const TERMS_VERSION = "2026-08-04-v1";
+import { TERMS_VERSION } from "@/lib/legal/terms";
 
 export type ActionState = { error?: string; success?: string } | null;
 
