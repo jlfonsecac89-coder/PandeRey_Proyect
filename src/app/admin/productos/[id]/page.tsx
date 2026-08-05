@@ -46,7 +46,7 @@ export default async function ProductoDetallePage({
     supabase.from("stores").select("id, name").eq("is_active", true).order("name"),
     supabase
       .from("product_batches")
-      .select("id, quantity, expiration_date, is_clearance, store:stores(name)")
+      .select("id, quantity, expiration_date, is_clearance, clearance_discount_percent, store:stores(name)")
       .eq("product_id", id)
       .order("expiration_date", { ascending: true, nullsFirst: false }),
   ]);
@@ -70,7 +70,12 @@ export default async function ProductoDetallePage({
         allCollections={collections ?? []}
         selectedIds={(productCollections ?? []).map((pc) => pc.collection_id)}
       />
-      <StockSection productId={id} stores={stores ?? []} batches={batches ?? []} />
+      <StockSection
+        productId={id}
+        stores={stores ?? []}
+        batches={batches ?? []}
+        clearanceAlertDays={Number(process.env.CLEARANCE_ALERT_DAYS_BEFORE_EXPIRY ?? 3)}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/format";
+import { getClearanceDiscounts, getClearanceProductIds, applyClearanceDiscount } from "@/lib/catalog/clearance";
 
 type ProductImage = { storage_path: string; sort_order: number };
 type ProductRow = {
@@ -76,6 +77,15 @@ export default async function TiendaPage({
   const { departamento, categoria, filtro } = await searchParams;
   const supabase = await createClient();
 
+  const { data: activeStore } = await supabase
+    .from("stores")
+    .select("id")
+    .eq("is_active", true)
+    .order("name")
+    .limit(1)
+    .maybeSingle();
+  const storeId = activeStore?.id ?? null;
+
   const { data: departments } = await supabase
     .from("departments")
     .select("id, name, slug")
@@ -120,13 +130,25 @@ export default async function TiendaPage({
 
   let offeredIds: Set<string> | null = null;
   if (filtro === "ofertas") {
-    offeredIds = await resolveOfferedProductIds(supabase);
+    const [promoIds, clearanceIds] = await Promise.all([
+      resolveOfferedProductIds(supabase),
+      getClearanceProductIds(supabase, storeId),
+    ]);
+    // null = "todo el catálogo tiene alguna oferta aplicable" (cupón cart-wide);
+    // igual se unen los productos en liquidación por si el cupón no cubriera todo.
+    offeredIds = promoIds === null ? null : new Set([...promoIds, ...clearanceIds]);
     if (offeredIds) {
       query = query.in("id", offeredIds.size ? [...offeredIds] : ["00000000-0000-0000-0000-000000000000"]);
     }
   }
 
   const { data: products } = await query;
+
+  const clearanceDiscounts = await getClearanceDiscounts(
+    supabase,
+    storeId ?? "",
+    (products ?? []).map((p) => p.id),
+  );
 
   const publicBaseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images`;
 
@@ -214,6 +236,8 @@ export default async function TiendaPage({
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {(products as ProductRow[] | null ?? []).map((product) => {
           const imagePath = firstImagePath(product.images);
+          const clearancePct = clearanceDiscounts.get(product.id);
+          const discountedPrice = applyClearanceDiscount(product.price, clearancePct);
           return (
             <Link
               key={product.id}
@@ -232,8 +256,22 @@ export default async function TiendaPage({
               </div>
               <p className="mt-2 text-sm text-foreground/90">{product.name}</p>
               <div className="mt-1 flex items-center justify-between">
-                <p className="text-sm font-semibold text-gold">{formatCLP(product.price)}</p>
+                {clearancePct ? (
+                  <p className="text-sm font-semibold text-gold">
+                    {formatCLP(discountedPrice)}{" "}
+                    <span className="text-xs font-normal text-foreground/40 line-through">
+                      {formatCLP(product.price)}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="text-sm font-semibold text-gold">{formatCLP(product.price)}</p>
+                )}
                 <div className="flex gap-1">
+                  {clearancePct && (
+                    <span className="rounded-full border border-red-500/60 px-2 py-0.5 text-[10px] text-red-400">
+                      Liquidación -{clearancePct}%
+                    </span>
+                  )}
                   {product.is_special_event && (
                     <span className="rounded-full border border-gold-dark px-2 py-0.5 text-[10px] text-gold-hover">
                       Edición limitada

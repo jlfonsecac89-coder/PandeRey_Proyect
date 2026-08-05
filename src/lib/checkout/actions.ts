@@ -12,6 +12,7 @@ import { formatCLP } from "@/lib/format";
 import { generateDeliveryCode } from "@/lib/orders/status";
 import { validateCoupon, validatePointsRedemption } from "@/lib/promotions/discount";
 import { checkRateLimit } from "@/lib/rate-limit/limiter";
+import { getClearanceDiscounts, applyClearanceDiscount } from "@/lib/catalog/clearance";
 import type { CartItem } from "@/lib/cart/types";
 
 export type CheckoutState = { error?: string; success?: string; addressId?: string } | null;
@@ -188,6 +189,12 @@ export async function createCheckoutPreference(
     .in("id", productIds);
   const productMap = new Map((dbProducts ?? []).map((p) => [p.id, p]));
 
+  // Sección 13: si hay un lote en liquidación con stock para un producto en
+  // esta sucursal, su precio de venta se recalcula acá — nunca se confía en
+  // lo que haya mostrado la tienda al cliente, mismo principio que el resto
+  // del checkout.
+  const clearanceDiscounts = await getClearanceDiscounts(supabase, storeId, productIds);
+
   const optionValueIds = [...new Set(cartItems.flatMap((i) => i.options.map((o) => o.optionValueId)))];
   const { data: dbOptionValues } = optionValueIds.length
     ? await supabase.from("product_option_values").select("id, name, price_delta, is_active").in("id", optionValueIds)
@@ -217,7 +224,7 @@ export async function createCheckoutPreference(
       return { error: "Cantidad inválida en el carrito." };
     }
 
-    let unitPrice = product.price;
+    let unitPrice = applyClearanceDiscount(product.price, clearanceDiscounts.get(product.id));
     const options: (typeof orderItemsToInsert)[number]["options"] = [];
     for (const opt of item.options) {
       const value = optionValueMap.get(opt.optionValueId);
@@ -341,6 +348,7 @@ export async function createCheckoutPreference(
   // razón. Suma por product_id porque el mismo producto puede aparecer en
   // más de un ítem del carrito (variantes distintas).
   const specialEventQuantities = new Map<string, number>();
+  const productQuantities = new Map<string, number>();
   for (const item of orderItemsToInsert) {
     const product = productMap.get(item.product_id);
     if (product?.is_special_event) {
@@ -349,15 +357,20 @@ export async function createCheckoutPreference(
         (specialEventQuantities.get(item.product_id) ?? 0) + item.quantity,
       );
     }
+    productQuantities.set(item.product_id, (productQuantities.get(item.product_id) ?? 0) + item.quantity);
   }
 
   const reservedProductIds: string[] = [];
+  const consumedBatches: { productId: string; consumed: unknown }[] = [];
   async function releaseReservedStock() {
     for (const doneId of reservedProductIds) {
       await supabase.rpc("release_special_event_stock", {
         p_product_id: doneId,
         p_quantity: specialEventQuantities.get(doneId)!,
       });
+    }
+    for (const entry of consumedBatches) {
+      await supabase.rpc("restore_batch_stock", { p_consumed: entry.consumed });
     }
   }
 
@@ -374,6 +387,30 @@ export async function createCheckoutPreference(
     reservedProductIds.push(productId);
   }
 
+  // Sección 13: consumo real de stock, FIFO por vencimiento. Solo se exige
+  // para productos que efectivamente tienen lotes cargados en esta sucursal
+  // — un producto sin ningún lote se trata como no trackeado por lotes
+  // (ver comentario de diseño en la migración 20260808000100).
+  for (const [productId, quantity] of productQuantities) {
+    const { data: tracked } = await supabase.rpc("has_tracked_batches", {
+      p_store_id: store.id,
+      p_product_id: productId,
+    });
+    if (!tracked) continue;
+
+    const { data: consumed } = await supabase.rpc("consume_batch_stock_fifo", {
+      p_store_id: store.id,
+      p_product_id: productId,
+      p_quantity: quantity,
+    });
+    if (!consumed) {
+      await releaseReservedStock();
+      const productName = productMap.get(productId)?.name ?? "un producto";
+      return { error: `"${productName}" no tiene stock suficiente.` };
+    }
+    consumedBatches.push({ productId, consumed });
+  }
+
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .insert({
@@ -387,6 +424,8 @@ export async function createCheckoutPreference(
       delivery_confirmation_code: generateDeliveryCode(),
       subtotal,
       discount_total: discountTotal,
+      coupon_discount_clp: couponDiscount,
+      points_discount_clp: pointsDiscount,
       promotion_id: promotionId,
       total,
     })

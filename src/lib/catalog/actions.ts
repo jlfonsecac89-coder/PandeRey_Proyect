@@ -473,3 +473,39 @@ export async function addStockBatch(
   revalidatePath(`/admin/productos/${productId}`);
   return { success: "Lote de stock cargado." };
 }
+
+// Liquidación por lote (sección 13): nunca sobre el producto completo, solo
+// sobre las unidades del lote marcado — así el descuento no arriesga vender
+// con rebaja unidades de un lote más nuevo que todavía tiene vida útil.
+export async function setBatchClearance(
+  batchId: string,
+  productId: string,
+  _prev: CatalogActionState,
+  formData: FormData,
+): Promise<CatalogActionState> {
+  await requireRole(["admin", "operaciones"]);
+
+  const isClearance = formData.get("is_clearance") === "on";
+  const discountRaw = String(formData.get("clearance_discount_percent") || "");
+  const discount = discountRaw ? Number(discountRaw) : null;
+
+  if (isClearance && (discount === null || Number.isNaN(discount) || discount <= 0 || discount > 90)) {
+    return { error: "Ingresá un porcentaje de descuento válido (1-90) para poner el lote en liquidación." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("product_batches")
+    .update({
+      is_clearance: isClearance,
+      clearance_discount_percent: isClearance ? discount : null,
+    })
+    .eq("id", batchId);
+
+  // RLS bloquea a Operaciones de otra sucursal — mismo comentario que
+  // addStockBatch.
+  if (error) return { error: "No se pudo actualizar la liquidación del lote." };
+
+  revalidatePath(`/admin/productos/${productId}`);
+  return { success: isClearance ? "Lote marcado en liquidación." : "Liquidación desactivada." };
+}

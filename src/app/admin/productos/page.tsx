@@ -21,11 +21,19 @@ export default async function ProductosPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold text-gold">Productos</h1>
-        <p className="mt-1 text-sm text-foreground/60">
-          El SKU se genera automáticamente — nunca se escribe a mano.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-gold">Productos</h1>
+          <p className="mt-1 text-sm text-foreground/60">
+            El SKU se genera automáticamente — nunca se escribe a mano.
+          </p>
+        </div>
+        <Link
+          href="/admin/productos/importar"
+          className="rounded-md border border-charcoal-border px-3 py-1.5 text-sm text-foreground/70 hover:border-gold-dark hover:text-gold"
+        >
+          Carga masiva
+        </Link>
       </div>
 
       <ProductoForm categories={categories ?? []} collections={collections ?? []} />

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { formatCLP } from "@/lib/format";
+import { getClearanceDiscounts, applyClearanceDiscount } from "@/lib/catalog/clearance";
 import { AddToCartForm } from "@/components/storefront/AddToCartForm";
 import { RedeemPointsButton } from "@/components/storefront/RedeemPointsButton";
 
@@ -38,20 +39,27 @@ export default async function ProductoDetallePage({
   const publicBaseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images`;
   const images = [...product.images].sort((a, b) => a.sort_order - b.sort_order);
 
+  const { data: store } = await supabase
+    .from("stores")
+    .select("id")
+    .eq("is_active", true)
+    .order("name")
+    .limit(1)
+    .maybeSingle();
+
   let redeemInfo: { pointsBalance: number; storeId: string } | null = null;
   if (product.points_cost) {
     const profile = await getCurrentProfile();
-    const { data: store } = await supabase
-      .from("stores")
-      .select("id")
-      .eq("is_active", true)
-      .order("name")
-      .limit(1)
-      .maybeSingle();
     if (profile && store) {
       redeemInfo = { pointsBalance: profile.points_balance, storeId: store.id };
     }
   }
+
+  const clearanceDiscounts = store
+    ? await getClearanceDiscounts(supabase, store.id, [product.id])
+    : new Map<string, number>();
+  const clearancePct = clearanceDiscounts.get(product.id);
+  const discountedPrice = applyClearanceDiscount(product.price, clearancePct);
 
   return (
     <div className="mx-auto grid max-w-4xl grid-cols-1 gap-8 px-6 py-8 sm:grid-cols-2">
@@ -68,12 +76,28 @@ export default async function ProductoDetallePage({
 
       <div>
         <h1 className="text-2xl font-semibold text-gold">{product.name}</h1>
-        <p className="mt-1 text-lg text-foreground/90">{formatCLP(product.price)}</p>
-        {product.is_gluten_free && (
-          <span className="mt-2 inline-block rounded-full border border-charcoal-border px-2 py-0.5 text-[10px] text-foreground/60">
-            Sin gluten
-          </span>
+        {clearancePct ? (
+          <p className="mt-1 text-lg text-foreground/90">
+            {formatCLP(discountedPrice)}{" "}
+            <span className="text-sm font-normal text-foreground/40 line-through">
+              {formatCLP(product.price)}
+            </span>
+          </p>
+        ) : (
+          <p className="mt-1 text-lg text-foreground/90">{formatCLP(product.price)}</p>
         )}
+        <div className="mt-2 flex flex-wrap gap-2">
+          {clearancePct && (
+            <span className="inline-block rounded-full border border-red-500/60 px-2 py-0.5 text-[10px] text-red-400">
+              Liquidación -{clearancePct}%
+            </span>
+          )}
+          {product.is_gluten_free && (
+            <span className="inline-block rounded-full border border-charcoal-border px-2 py-0.5 text-[10px] text-foreground/60">
+              Sin gluten
+            </span>
+          )}
+        </div>
         {product.description && (
           <p className="mt-4 text-sm text-foreground/70">{product.description}</p>
         )}
@@ -84,7 +108,7 @@ export default async function ProductoDetallePage({
               id: product.id,
               name: product.name,
               slug: product.slug,
-              price: product.price,
+              price: discountedPrice,
               imagePath: images[0]?.storage_path ?? null,
             }}
             optionGroups={optionGroups}

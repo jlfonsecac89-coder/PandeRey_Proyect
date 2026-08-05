@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { addStockBatch } from "@/lib/catalog/actions";
+import { addStockBatch, setBatchClearance, type CatalogActionState } from "@/lib/catalog/actions";
 import { FormMessage } from "@/components/auth/AuthCard";
 
 type Store = { id: string; name: string };
@@ -10,17 +10,60 @@ type Batch = {
   quantity: number;
   expiration_date: string | null;
   is_clearance: boolean;
+  clearance_discount_percent: number | null;
   store: { name: string } | { name: string }[];
 };
+
+function isExpiringSoon(expirationDate: string | null, alertDays: number): boolean {
+  if (!expirationDate) return false;
+  const daysLeft = (new Date(expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+  return daysLeft <= alertDays;
+}
+
+function BatchClearanceForm({ batch, productId }: { batch: Batch; productId: string }) {
+  const boundAction = setBatchClearance.bind(null, batch.id, productId) as (
+    state: CatalogActionState,
+    formData: FormData,
+  ) => Promise<CatalogActionState>;
+  const [state, formAction, pending] = useActionState(boundAction, null);
+
+  return (
+    <form action={formAction} className="flex flex-wrap items-center gap-2">
+      <label className="flex items-center gap-1 text-xs text-foreground/70">
+        <input type="checkbox" name="is_clearance" defaultChecked={batch.is_clearance} className="accent-gold" />
+        Liquidación
+      </label>
+      <input
+        type="number"
+        name="clearance_discount_percent"
+        min="1"
+        max="90"
+        placeholder="% desc."
+        defaultValue={batch.clearance_discount_percent ?? ""}
+        className="w-20 rounded-md border border-charcoal-border bg-background px-2 py-1 text-xs outline-none focus:border-gold"
+      />
+      <button
+        type="submit"
+        disabled={pending}
+        className="rounded-md border border-charcoal-border px-2 py-1 text-xs text-foreground/70 hover:border-gold-dark hover:text-gold disabled:opacity-50"
+      >
+        {pending ? "..." : "Guardar"}
+      </button>
+      {state?.error && <span className="text-xs text-red-400">{state.error}</span>}
+    </form>
+  );
+}
 
 export function StockSection({
   productId,
   stores,
   batches,
+  clearanceAlertDays,
 }: {
   productId: string;
   stores: Store[];
   batches: Batch[];
+  clearanceAlertDays: number;
 }) {
   const [state, formAction, pending] = useActionState(addStockBatch, null);
 
@@ -41,7 +84,7 @@ export function StockSection({
         </p>
       ) : (
         <>
-          <table className="mt-3 w-full max-w-xl text-sm">
+          <table className="mt-3 w-full max-w-2xl text-sm">
             <thead>
               <tr className="border-b border-charcoal-border text-left text-foreground/50">
                 <th className="py-1.5 font-normal">Sucursal</th>
@@ -53,17 +96,23 @@ export function StockSection({
             <tbody>
               {batches.map((b) => {
                 const store = Array.isArray(b.store) ? b.store[0] : b.store;
+                const expiring = isExpiringSoon(b.expiration_date, clearanceAlertDays);
                 return (
-                  <tr key={b.id} className="border-b border-charcoal-border/50">
-                    <td className="py-1.5">{store?.name}</td>
-                    <td className="py-1.5">{b.quantity}</td>
-                    <td className="py-1.5 text-foreground/60">
+                  <tr key={b.id} className="border-b border-charcoal-border/50 align-top">
+                    <td className="py-2">{store?.name}</td>
+                    <td className="py-2">{b.quantity}</td>
+                    <td className="py-2 text-foreground/60">
                       {b.expiration_date
                         ? new Date(b.expiration_date).toLocaleDateString("es-CL")
                         : "—"}
+                      {expiring && !b.is_clearance && (
+                        <span className="ml-2 rounded-full border border-amber-500/60 px-1.5 py-0.5 text-[10px] text-amber-400">
+                          Candidato a liquidación
+                        </span>
+                      )}
                     </td>
-                    <td className="py-1.5 text-foreground/60">
-                      {b.is_clearance ? "Sí" : "No"}
+                    <td className="py-2">
+                      <BatchClearanceForm batch={b} productId={productId} />
                     </td>
                   </tr>
                 );
