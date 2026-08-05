@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/rbac";
+import { logAction } from "@/lib/audit/log-action";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit/limiter";
 
 // Versión vigente de los Términos y Condiciones — cambiarla obliga a los
 // clientes nuevos a aceptar la versión nueva; no reescribe lo ya aceptado
@@ -41,6 +43,13 @@ export async function signUp(
   const passwordError = validatePassword(password);
   if (passwordError) return { error: passwordError };
 
+  // Sección 16: 10 intentos/hora por IP.
+  const ip = await getClientIp();
+  const { allowed } = await checkRateLimit("registro", ip, 10, 60 * 60);
+  if (!allowed) {
+    return { error: "Demasiados intentos de registro. Probá de nuevo más tarde." };
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -72,7 +81,15 @@ export async function signIn(
 
   if (!email || !password) return { error: "Completa todos los campos." };
 
-  // TODO Fase 9: rate limiting de 5 intentos/15min por email+IP (sección 16).
+  // Sección 16: 5 intentos/15min por IP+email combinados — se rechaza ANTES
+  // de llamar a Supabase Auth, para no gastar esa validación en fuerza
+  // bruta. El mensaje es genérico a propósito: no revela si el email existe.
+  const ip = await getClientIp();
+  const { allowed } = await checkRateLimit("login", `${ip}:${email}`, 5, 15 * 60);
+  if (!allowed) {
+    return { error: "Demasiados intentos. Esperá unos minutos antes de volver a intentar." };
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -115,6 +132,17 @@ export async function requestPasswordReset(
 ): Promise<ActionState> {
   const email = String(formData.get("email") || "").trim().toLowerCase();
   if (!email) return { error: "Ingresa tu email." };
+
+  // Sección 16: 3 intentos/hora por email — igual devolvemos el mismo
+  // mensaje genérico de siempre, para no revelar por otra vía que se
+  // alcanzó el límite (que también delataría si el email existe).
+  const { allowed } = await checkRateLimit("recuperar-password", email, 3, 60 * 60);
+  if (!allowed) {
+    return {
+      success:
+        "Si el email existe en nuestro sistema, vas a recibir un link para recuperar tu contraseña.",
+    };
+  }
 
   const supabase = await createClient();
   await supabase.auth.resetPasswordForEmail(email, {
@@ -194,7 +222,7 @@ export async function createStaffUser(
   _prevState: (ActionState & { tempPassword?: string }) | null,
   formData: FormData,
 ): Promise<ActionState & { tempPassword?: string }> {
-  await requireRole(["admin"]);
+  const actor = await requireRole(["admin"]);
 
   const fullName = String(formData.get("full_name") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
@@ -245,6 +273,17 @@ export async function createStaffUser(
       error: "La cuenta se creó pero no se pudo configurar el rol. Contacta a soporte.",
     };
   }
+
+  // Sección 15: creación de cuentas de staff es una de las acciones
+  // sensibles que siempre queda en audit_log — nunca se registra la
+  // contraseña temporal, solo qué cuenta se creó y con qué rol.
+  await logAction({
+    actor,
+    action: "staff_account_created",
+    entityType: "profile",
+    entityId: created.user.id,
+    after: { email, role, store_id: storeId },
+  });
 
   revalidatePath("/admin/configuracion/usuarios");
   return { success: `Cuenta creada para ${email}.`, tempPassword };

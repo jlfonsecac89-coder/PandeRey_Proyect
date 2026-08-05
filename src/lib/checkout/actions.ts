@@ -11,6 +11,7 @@ import { createOrderPreference } from "@/lib/mercadopago/preference";
 import { formatCLP } from "@/lib/format";
 import { generateDeliveryCode } from "@/lib/orders/status";
 import { validateCoupon, validatePointsRedemption } from "@/lib/promotions/discount";
+import { checkRateLimit } from "@/lib/rate-limit/limiter";
 import type { CartItem } from "@/lib/cart/types";
 
 export type CheckoutState = { error?: string; success?: string; addressId?: string } | null;
@@ -40,6 +41,11 @@ export async function saveAddress(
   if (!calle || !numero || !comuna || !ciudad || !region) {
     return { error: "Completa calle, número, comuna, ciudad y región." };
   }
+
+  // Sección 16: 10 requests/min por usuario — evita abusar de la cuota
+  // gratuita diaria de OpenRouteService.
+  const { allowed } = await checkRateLimit("geocodificar", profile.id, 10, 60);
+  if (!allowed) return { error: "Demasiados intentos. Esperá un minuto e intentá de nuevo." };
 
   // OpenRouteService/Pelias geocodifica mucho mejor a nivel de número exacto
   // con "calle número, comuna, Chile" — agregar ciudad/región duplica la
@@ -144,6 +150,10 @@ export async function createCheckoutPreference(
   const profile = await getCurrentProfile();
   if (!profile) redirect("/auth/login?next=/checkout");
 
+  // Sección 16: 20 requests/min por usuario autenticado.
+  const { allowed } = await checkRateLimit("checkout", profile.id, 20, 60);
+  if (!allowed) return { error: "Demasiados intentos de pago. Esperá un minuto e intentá de nuevo." };
+
   const cartItemsRaw = String(formData.get("cart_items") || "[]");
   const deliveryMethod = String(formData.get("delivery_method") || "");
   const storeId = String(formData.get("store_id") || "");
@@ -174,7 +184,7 @@ export async function createCheckoutPreference(
   const productIds = [...new Set(cartItems.map((i) => i.productId))];
   const { data: dbProducts } = await supabase
     .from("products")
-    .select("id, name, price, is_active")
+    .select("id, name, price, is_active, is_special_event")
     .in("id", productIds);
   const productMap = new Map((dbProducts ?? []).map((p) => [p.id, p]));
 
@@ -322,6 +332,48 @@ export async function createCheckoutPreference(
     scheduledAtIso = parsed.toISOString();
   }
 
+  // Aceptación 2 de la Fase 3 (nunca conectada al checkout real hasta esta
+  // pasada de hardening, Fase 9): un producto is_special_event no puede
+  // vender más de max_orders unidades, ni con compras concurrentes. Va acá,
+  // como el último paso antes de crear el pedido — recién cuando ya pasaron
+  // todas las demás validaciones (sucursal, envío, cupón, puntos) para no
+  // reservar cupo de un intento que de todas formas iba a fallar por otra
+  // razón. Suma por product_id porque el mismo producto puede aparecer en
+  // más de un ítem del carrito (variantes distintas).
+  const specialEventQuantities = new Map<string, number>();
+  for (const item of orderItemsToInsert) {
+    const product = productMap.get(item.product_id);
+    if (product?.is_special_event) {
+      specialEventQuantities.set(
+        item.product_id,
+        (specialEventQuantities.get(item.product_id) ?? 0) + item.quantity,
+      );
+    }
+  }
+
+  const reservedProductIds: string[] = [];
+  async function releaseReservedStock() {
+    for (const doneId of reservedProductIds) {
+      await supabase.rpc("release_special_event_stock", {
+        p_product_id: doneId,
+        p_quantity: specialEventQuantities.get(doneId)!,
+      });
+    }
+  }
+
+  for (const [productId, quantity] of specialEventQuantities) {
+    const { data: reserved } = await supabase.rpc("reserve_special_event_stock", {
+      p_product_id: productId,
+      p_quantity: quantity,
+    });
+    if (!reserved) {
+      await releaseReservedStock();
+      const productName = productMap.get(productId)?.name ?? "un producto de edición limitada";
+      return { error: `"${productName}" ya no tiene cupo disponible.` };
+    }
+    reservedProductIds.push(productId);
+  }
+
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .insert({
@@ -341,7 +393,10 @@ export async function createCheckoutPreference(
     .select("id")
     .single();
 
-  if (orderError || !order) return { error: "No se pudo crear el pedido." };
+  if (orderError || !order) {
+    await releaseReservedStock();
+    return { error: "No se pudo crear el pedido." };
+  }
 
   // El descuento ya se validó arriba (cupón vigente, saldo de puntos
   // suficiente) — acá solo se registra el consumo, atómico con la creación
