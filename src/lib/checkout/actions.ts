@@ -170,6 +170,8 @@ export async function createCheckoutPreference(
   const storeId = String(formData.get("store_id") || "");
   const addressId = String(formData.get("address_id") || "") || null;
   const scheduledAtRaw = String(formData.get("scheduled_at") || "") || null;
+  const paymentMethodRaw = String(formData.get("payment_method") || "mercadopago");
+  const paymentMethod = paymentMethodRaw === "bank_transfer" ? "bank_transfer" : "mercadopago";
 
   if (deliveryMethod !== "pickup" && deliveryMethod !== "shipping") {
     return { error: "Elegí un método de entrega." };
@@ -264,11 +266,17 @@ export async function createCheckoutPreference(
 
   const { data: store } = await supabase
     .from("stores")
-    .select("id, name, origin_lat, origin_lng, max_delivery_radius_km, min_order_amount, free_shipping_min_amount")
+    .select(
+      "id, name, origin_lat, origin_lng, max_delivery_radius_km, min_order_amount, free_shipping_min_amount, social_links",
+    )
     .eq("id", storeId)
     .eq("is_active", true)
     .maybeSingle();
   if (!store) return { error: "Sucursal inválida." };
+
+  if (paymentMethod === "bank_transfer" && !store.social_links?.whatsapp) {
+    return { error: "Esta sucursal todavía no tiene WhatsApp configurado para pagos por transferencia." };
+  }
 
   // Aceptación 4: mínimo de compra.
   if (store.min_order_amount !== null && subtotal < store.min_order_amount) {
@@ -426,7 +434,7 @@ export async function createCheckoutPreference(
     .insert({
       user_id: profile.id,
       delivery_method: deliveryMethod,
-      payment_method: "mercadopago",
+      payment_method: paymentMethod,
       store_id: store.id,
       address_id: deliveryMethod === "shipping" ? address!.id : null,
       scheduled_at: scheduledAtIso,
@@ -515,6 +523,17 @@ export async function createCheckoutPreference(
   );
   if (optionsToInsert.length > 0) {
     await supabase.from("order_item_options").insert(optionsToInsert);
+  }
+
+  // Transferencia: no hay pasarela — el pedido queda "pending_payment" hasta
+  // que el equipo confirme el depósito a mano (confirmBankTransferPayment,
+  // lib/orders/actions.ts) y al cliente se lo manda directo a WhatsApp con
+  // el pedido y el monto ya escritos, para que no tenga que explicarlo de cero.
+  if (paymentMethod === "bank_transfer") {
+    const whatsappBase = store.social_links!.whatsapp as string;
+    const message = `Hola! Quiero pagar por transferencia mi pedido #${order.id.slice(0, 8).toUpperCase()} por ${formatCLP(total)}.`;
+    const separator = whatsappBase.includes("?") ? "&" : "?";
+    redirect(`${whatsappBase}${separator}text=${encodeURIComponent(message)}`);
   }
 
   let preferenceResult;

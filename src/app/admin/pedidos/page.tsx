@@ -49,14 +49,18 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
   let query = supabase
     .from("orders")
     .select(
-      "id, status, delivery_method, total, created_at, store_id, user_id, assigned_driver_id, sla_deadline, delivered_at",
+      "id, status, payment_method, delivery_method, total, created_at, store_id, user_id, assigned_driver_id, sla_deadline, delivered_at",
     )
-    .neq("status", "pending_payment")
     .order("created_at", { ascending: false })
     .limit(150);
 
   if (since) query = query.gte("created_at", since);
+  // pending_payment queda afuera de la vista por defecto (carritos de Mercado
+  // Pago abandonados a mitad de pago) salvo que se entre explícitamente al
+  // grupo "Pago pendiente" — ahí es donde vive lo que sí necesita acción:
+  // las transferencias por confirmar.
   if (activeGroup) query = query.in("status", PIPELINE_GROUPS[activeGroup].statuses);
+  else query = query.neq("status", "pending_payment");
   if (entrega === "pickup" || entrega === "shipping") query = query.eq("delivery_method", entrega);
 
   const { data: orders } = await query;

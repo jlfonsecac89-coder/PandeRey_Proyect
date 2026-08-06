@@ -16,7 +16,7 @@ export default async function CuentaLayout({ children }: { children: React.React
         <header className="border-b border-charcoal-border bg-background/90 backdrop-blur">
           <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
             <Link href="/">
-              <Logo iconClassName="h-7 w-7 object-contain" />
+              <Logo iconClassName="h-11 w-11" />
             </Link>
             <div className="flex items-center gap-4">
               <p className="text-sm text-foreground-muted">Hola, {profile.full_name}</p>

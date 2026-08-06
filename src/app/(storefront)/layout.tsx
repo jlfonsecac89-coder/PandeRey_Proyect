@@ -24,9 +24,9 @@ export default async function StorefrontLayout({ children }: { children: React.R
     <CartProvider>
       <div className="flex min-h-full flex-col">
         <header className="sticky top-0 z-40 border-b border-charcoal-border bg-background/90 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-2.5">
             <Link href="/" className="text-foreground hover:text-gold">
-              <Logo />
+              <Logo iconClassName="h-14 w-14" />
             </Link>
             <nav className="flex items-center gap-1">
               <Link

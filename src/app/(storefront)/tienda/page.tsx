@@ -4,6 +4,7 @@ import { formatCLP } from "@/lib/format";
 import { getClearanceDiscounts, getClearanceProductIds, applyClearanceDiscount } from "@/lib/catalog/clearance";
 import { DepartmentIcon } from "@/components/storefront/DepartmentIcon";
 import { SortSelect } from "@/components/storefront/SortSelect";
+import { TiendaSidebarLayout } from "@/components/storefront/TiendaSidebarLayout";
 
 type ProductImage = { storage_path: string; sort_order: number };
 type ProductRow = {
@@ -210,8 +211,8 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Catálogo</p>
       <h1 className="mt-1 font-display text-3xl font-medium text-foreground">Tienda</h1>
 
-      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[240px_1fr]">
-        {/* Filtros laterales */}
+      <TiendaSidebarLayout
+        sidebar={
         <aside className="space-y-6 rounded-2xl border border-charcoal-border bg-background-elevated p-5 shadow-card lg:sticky lg:top-24 lg:self-start">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Filtros</p>
@@ -355,7 +356,8 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
             </Link>
           </div>
         </aside>
-
+        }
+      >
         {/* Resultados */}
         <div>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -443,7 +445,7 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
             )}
           </div>
         </div>
-      </div>
+      </TiendaSidebarLayout>
     </div>
   );
 }

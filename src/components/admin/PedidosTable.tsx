@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminOrderRow, type AdminOrder } from "./AdminOrderRow";
-import { markOrderReady, confirmPickup, confirmReturnedToStore } from "@/lib/orders/actions";
+import { markOrderReady, confirmPickup, confirmReturnedToStore, confirmBankTransferPayment } from "@/lib/orders/actions";
 
 type Person = { id: string; full_name: string; phone: string | null; store_id?: string | null };
 type OrderItemRow = { order_id: string; product_name_snapshot: string; quantity: number };
@@ -12,6 +12,7 @@ type OrderItemRow = { order_id: string; product_name_snapshot: string; quantity:
 // pedidos seleccionados comparten el mismo estado, porque cada transición
 // tiene sus propias reglas (SLA, notificaciones) y no tiene sentido mezclarlas.
 const BULK_ACTIONS: Record<string, { label: string; run: (id: string) => Promise<unknown> }> = {
+  pending_payment: { label: "Confirmar pago (transferencia) de todos", run: confirmBankTransferPayment },
   preparing: { label: "Marcar todos como preparados", run: markOrderReady },
   ready_for_pickup: { label: "Confirmar retiro de todos", run: confirmPickup },
   returning_to_store: { label: "Confirmar devolución de todos", run: confirmReturnedToStore },
@@ -80,7 +81,12 @@ export function PedidosTable({
   const selectedOrders = filtered.filter((o) => selected.has(o.id));
   const statusesSelected = new Set(selectedOrders.map((o) => o.status));
   const commonStatus = statusesSelected.size === 1 ? [...statusesSelected][0] : null;
-  const bulkAction = commonStatus ? BULK_ACTIONS[commonStatus] : undefined;
+  // pending_payment mezcla Mercado Pago (nada que hacer, se resuelve solo o
+  // se abandona) con transferencia (necesita confirmación manual) — el bulk
+  // solo tiene sentido si la selección es 100% transferencia.
+  const allBankTransfer = selectedOrders.every((o) => o.payment_method === "bank_transfer");
+  const bulkAction =
+    commonStatus && (commonStatus !== "pending_payment" || allBankTransfer) ? BULK_ACTIONS[commonStatus] : undefined;
 
   async function runBulk() {
     if (!bulkAction) return;

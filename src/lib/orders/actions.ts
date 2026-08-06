@@ -12,8 +12,10 @@ import {
   deliveredTemplate,
   deliveryIssueTemplate,
   returnedToStoreTemplate,
+  purchaseConfirmedTemplate,
 } from "@/lib/notifications/templates";
-import { maxDeliveryIssueWaitMinutes } from "./status";
+import { maxDeliveryIssueWaitMinutes, orderPrepSlaMinutes } from "./status";
+import { computeEarnedPoints } from "@/lib/loyalty/points";
 
 export type OrderActionState = { error?: string; success?: string } | null;
 
@@ -39,6 +41,68 @@ async function notifyOwner(
   if (!email) return;
   const { subject, html } = build();
   await sendNotification({ userId, orderId, to: email, template, subject, html });
+}
+
+// ---------- Operaciones/Admin: pago manual (transferencia) ----------
+
+// A diferencia de Mercado Pago (webhook automático), un pedido pagado por
+// transferencia lo confirma el equipo a mano después de ver el depósito —
+// replica los mismos side-effects que confirmPayment() de Mercado Pago
+// (puntos, email, sla_deadline) porque para el resto del sistema un pedido
+// "paid" tiene que verse igual sin importar el medio de pago.
+export async function confirmBankTransferPayment(orderId: string): Promise<OrderActionState> {
+  const profile = await requireRole(["admin", "operaciones"]);
+  const supabase = await createClient();
+
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, user_id, scheduled_at, total, delivery_confirmation_code, delivery_method, payment_method")
+    .eq("id", orderId)
+    .eq("status", "pending_payment")
+    .maybeSingle();
+
+  if (!order) return { error: "Pedido no encontrado o ya no está pendiente de pago." };
+  if (order.payment_method !== "bank_transfer") {
+    return { error: "Este pedido no es por transferencia." };
+  }
+
+  const nextStatus = order.scheduled_at ? "paid" : "preparing";
+  const slaDeadline = order.scheduled_at
+    ? order.scheduled_at
+    : new Date(Date.now() + orderPrepSlaMinutes() * 60000).toISOString();
+
+  const { error } = await supabase
+    .from("orders")
+    .update({ status: nextStatus, sla_deadline: slaDeadline })
+    .eq("id", orderId)
+    .eq("status", "pending_payment");
+  if (error) return { error: "No se pudo confirmar el pago." };
+
+  await insertHistory(supabase, orderId, nextStatus, profile.id, "Transferencia confirmada manualmente");
+  revalidatePath("/admin/pedidos");
+
+  const earnedPoints = computeEarnedPoints(order.total);
+  if (earnedPoints > 0) {
+    const admin = createAdminClient();
+    await admin.from("points_ledger").insert({
+      user_id: order.user_id,
+      order_id: order.id,
+      type: "earn_purchase",
+      points: earnedPoints,
+      description: `Compra pedido #${order.id.slice(0, 8)}`,
+    });
+  }
+
+  await notifyOwner(orderId, order.user_id, "purchase_confirmed", () =>
+    purchaseConfirmedTemplate({
+      orderId: order.id,
+      total: order.total,
+      deliveryConfirmationCode: order.delivery_confirmation_code ?? "",
+      deliveryMethod: order.delivery_method as "pickup" | "shipping",
+    }),
+  );
+
+  return { success: "Pago confirmado." };
 }
 
 // ---------- Operaciones/Admin: preparación y retiro ----------

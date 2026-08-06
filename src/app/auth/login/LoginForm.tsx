@@ -55,6 +55,7 @@ export function LoginForm({ next, oauthError }: { next?: string; oauthError?: st
         <div className="h-px flex-1 bg-charcoal-border" />o<div className="h-px flex-1 bg-charcoal-border" />
       </div>
       <form action={signInWithGoogle}>
+        <input type="hidden" name="next" value={next ?? ""} />
         <button
           type="submit"
           className="w-full rounded-md border border-charcoal-border px-3 py-2 text-sm font-medium hover:border-gold"

@@ -153,12 +153,18 @@ export async function signIn(
   redirect("/");
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(formData: FormData) {
+  const next = String(formData.get("next") || "");
+  const safeNext = safeNextPath(next);
+
   const supabase = await createClient();
   const siteUrl = await getSiteUrl();
+  const callbackUrl = new URL(`${siteUrl}/auth/callback`);
+  if (safeNext) callbackUrl.searchParams.set("next", safeNext);
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: `${siteUrl}/auth/callback` },
+    options: { redirectTo: callbackUrl.toString() },
   });
 
   if (error || !data.url) redirect("/auth/login?error=google");

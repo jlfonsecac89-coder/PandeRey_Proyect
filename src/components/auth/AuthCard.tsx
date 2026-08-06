@@ -2,10 +2,12 @@ import Link from "next/link";
 import { Logo } from "@/components/storefront/Logo";
 
 export function AuthCard({
+  eyebrow,
   title,
   subtitle,
   children,
 }: {
+  eyebrow?: string;
   title: string;
   subtitle?: string;
   children: React.ReactNode;
@@ -23,6 +25,11 @@ export function AuthCard({
         <Link href="/" className="mb-6 flex justify-center">
           <Logo />
         </Link>
+        {eyebrow && (
+          <p className="mb-1.5 text-center text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">
+            {eyebrow}
+          </p>
+        )}
         <h1 className="text-center font-display text-2xl font-medium text-foreground mb-1">{title}</h1>
         {subtitle && (
           <p className="text-center text-sm text-foreground-muted mb-6">{subtitle}</p>

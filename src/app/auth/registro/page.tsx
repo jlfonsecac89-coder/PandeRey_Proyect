@@ -11,6 +11,7 @@ export default async function RegistroPage({
 
   return (
     <AuthCard
+      eyebrow={next === "/checkout" ? "Paso 1 de 4 — Checkout" : undefined}
       title="Crear cuenta"
       subtitle={next === "/checkout" ? "Creá tu cuenta para continuar tu compra" : "Sumate a Pan de Rey"}
     >

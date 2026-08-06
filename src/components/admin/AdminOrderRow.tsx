@@ -9,12 +9,14 @@ import {
   confirmPickup,
   assignDriver,
   confirmReturnedToStore,
+  confirmBankTransferPayment,
   type OrderActionState,
 } from "@/lib/orders/actions";
 
 export type AdminOrder = {
   id: string;
   status: string;
+  payment_method: "mercadopago" | "bank_transfer";
   delivery_method: "pickup" | "shipping";
   total: number;
   created_at: string;
@@ -61,6 +63,10 @@ export function AdminOrderRow({
     (_prev, formData) => assignDriver(order.id, String(formData.get("driver_id") || "")),
     null,
   );
+  const [transferState, transferAction, transferPending] = useActionState<OrderActionState, FormData>(
+    () => confirmBankTransferPayment(order.id),
+    null,
+  );
   const [showItems, setShowItems] = useState(false);
 
   const router = useRouter();
@@ -70,10 +76,10 @@ export function AdminOrderRow({
   // que en CheckoutForm: revalidatePath() no empuja los props nuevos a un
   // client component ya montado, hace falta pedirlo explícitamente).
   useEffect(() => {
-    if (readyState?.success || pickupState?.success || returnState?.success || assignState?.success) {
+    if (readyState?.success || pickupState?.success || returnState?.success || assignState?.success || transferState?.success) {
       router.refresh();
     }
-  }, [readyState, pickupState, returnState, assignState, router]);
+  }, [readyState, pickupState, returnState, assignState, transferState, router]);
 
   const isOnTime =
     order.status === "delivered" && order.delivered_at && order.sla_deadline
@@ -132,6 +138,21 @@ export function AdminOrderRow({
           {new Date(order.created_at).toLocaleString("es-CL")}
         </td>
         <td className="py-2 space-y-1">
+          {order.status === "pending_payment" && order.payment_method === "bank_transfer" && (
+            <form action={transferAction}>
+              {transferState?.error && <p className="text-xs text-red-400">{transferState.error}</p>}
+              <button
+                type="submit"
+                disabled={transferPending}
+                className="rounded-md bg-gold px-2 py-1 text-xs font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
+              >
+                {transferPending ? "Confirmando..." : "Confirmar pago"}
+              </button>
+            </form>
+          )}
+          {order.status === "pending_payment" && order.payment_method === "mercadopago" && (
+            <span className="text-xs text-foreground/40">Esperando pago</span>
+          )}
           {order.status === "preparing" && (
             <form action={readyAction}>
               {readyState?.error && <p className="text-xs text-red-400">{readyState.error}</p>}
