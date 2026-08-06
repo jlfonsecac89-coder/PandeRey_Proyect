@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fraunces, Work_Sans, Geist_Mono } from "next/font/google";
 import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
 import "./globals.css";
+import { cn } from "@/lib/utils";
 
 // Fraunces (títulos, con carácter de escudo/heráldica) + Work Sans (texto,
 // legible y cálido sin caer en el Inter genérico de cualquier dashboard) —
@@ -33,7 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="es"
-      className={`${fraunces.variable} ${workSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={cn("h-full", "antialiased", fraunces.variable, workSans.variable, geistMono.variable, "font-sans")}
     >
       <body className="min-h-full flex flex-col">
         {children}

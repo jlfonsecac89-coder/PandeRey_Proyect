@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Wheat, ChefHat, Award, Store as StoreIcon, Truck, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/format";
 import { renderStars } from "@/lib/reviews/stars";
@@ -6,6 +7,14 @@ import { BannerCarousel } from "@/components/storefront/BannerCarousel";
 import { NewsletterForm } from "@/components/storefront/NewsletterForm";
 import { DepartmentIcon } from "@/components/storefront/DepartmentIcon";
 import { SocialIcons } from "@/components/storefront/SocialIcons";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
+import { Marquee } from "@/components/ui/marquee";
+import { NumberTicker } from "@/components/ui/number-ticker";
+import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
+import { DotPattern } from "@/components/ui/dot-pattern";
+import { BorderBeam } from "@/components/ui/border-beam";
 
 type ProductImage = { storage_path: string; sort_order: number };
 type ProductCard = {
@@ -24,27 +33,34 @@ function firstImagePath(images: ProductImage[]): string | null {
 export default async function Home() {
   const supabase = await createClient();
 
-  const [{ data: banners }, { data: bestSellerIds }, { data: store }, { data: departments }, { data: reviews }] =
-    await Promise.all([
-      supabase
-        .from("banners")
-        .select("id, title, subtitle, link_url, image_storage_path")
-        .eq("is_active", true)
-        .order("sort_order"),
-      supabase.rpc("get_best_selling_product_ids", { days: 30, limit_count: 8 }),
-      supabase
-        .from("stores")
-        .select("name, contact_address, contact_phone, contact_email, business_hours, social_links")
-        .eq("is_active", true)
-        .order("name")
-        .limit(1)
-        .maybeSingle(),
-      supabase.from("departments").select("id, name, slug").eq("is_active", true).order("sort_order"),
-      supabase
-        .from("product_reviews")
-        .select("rating, comment, product:products(name, slug)")
-        .eq("status", "approved"),
-    ]);
+  const [
+    { data: banners },
+    { data: bestSellerIds },
+    { data: store },
+    { data: departments },
+    { data: reviews },
+    { count: activeProductCount },
+  ] = await Promise.all([
+    supabase
+      .from("banners")
+      .select("id, title, subtitle, link_url, image_storage_path")
+      .eq("is_active", true)
+      .order("sort_order"),
+    supabase.rpc("get_best_selling_product_ids", { days: 30, limit_count: 8 }),
+    supabase
+      .from("stores")
+      .select("name, contact_address, contact_phone, contact_email, business_hours, social_links")
+      .eq("is_active", true)
+      .order("name")
+      .limit(1)
+      .maybeSingle(),
+    supabase.from("departments").select("id, name, slug").eq("is_active", true).order("sort_order"),
+    supabase
+      .from("product_reviews")
+      .select("rating, comment, product:products(name, slug)")
+      .eq("status", "approved"),
+    supabase.from("products").select("id", { count: "exact", head: true }).eq("is_active", true),
+  ]);
 
   const bestSellerProductIds = (bestSellerIds ?? []).map((r: { product_id: string }) => r.product_id);
   let bestSellers: ProductCard[] = [];
@@ -66,8 +82,9 @@ export default async function Home() {
   // volumen de reseñas de una panadería es chico, no justifica una vista
   // materializada.
   type ReviewRow = { rating: number; comment: string | null; product: { name: string; slug: string } | { name: string; slug: string }[] | null };
+  const allReviews = (reviews as ReviewRow[] | null) ?? [];
   const byProduct = new Map<string, { name: string; slug: string; ratings: number[]; comment: string | null }>();
-  for (const r of (reviews as ReviewRow[] | null) ?? []) {
+  for (const r of allReviews) {
     const product = Array.isArray(r.product) ? r.product[0] : r.product;
     if (!product) continue;
     const entry = byProduct.get(product.slug) ?? { name: product.name, slug: product.slug, ratings: [], comment: null };
@@ -75,10 +92,19 @@ export default async function Home() {
     if (r.comment && !entry.comment) entry.comment = r.comment;
     byProduct.set(product.slug, entry);
   }
-  const topRated = [...byProduct.values()]
+  const withAvg = [...byProduct.values()]
     .map((p) => ({ ...p, avg: p.ratings.reduce((a, b) => a + b, 0) / p.ratings.length }))
-    .sort((a, b) => b.avg - a.avg || b.ratings.length - a.ratings.length)
-    .slice(0, 3);
+    .sort((a, b) => b.avg - a.avg || b.ratings.length - a.ratings.length);
+  const topRated = withAvg.slice(0, 3);
+
+  // Testimonios con comentario, para el marquee — el resto de reseñas
+  // (sin comentario) sirven para el promedio pero no aportan a la cinta.
+  const testimonials = withAvg.filter((p) => p.comment);
+
+  const overallRatingCount = allReviews.length;
+  const overallRatingAvg = overallRatingCount
+    ? allReviews.reduce((sum, r) => sum + r.rating, 0) / overallRatingCount
+    : 0;
 
   const publicBannerBaseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/banners`;
   const publicProductBaseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images`;
@@ -87,6 +113,10 @@ export default async function Home() {
     <div className="space-y-24 pb-24">
       {/* Hero */}
       <div className="relative overflow-hidden">
+        <DotPattern
+          glow
+          className="absolute inset-0 [mask-image:radial-gradient(60%_50%_at_50%_0%,white,transparent)] text-gold/70"
+        />
         <div
           className="pointer-events-none absolute inset-0 opacity-60"
           style={{
@@ -95,7 +125,13 @@ export default async function Home() {
           }}
         />
         <div className="relative flex flex-col items-center justify-center gap-5 px-6 pb-6 pt-20 text-center">
-          <p className="text-xs uppercase tracking-[0.35em] text-gold-dark">Panadería · Pastelería · Cafetería</p>
+          <div className="inline-flex items-center gap-2 rounded-full border border-charcoal-border bg-background-alt px-4 py-1.5 text-xs">
+            <Sparkles className="h-3.5 w-3.5 text-gold" />
+            <AnimatedGradientText colorFrom="#D4AF37" colorTo="#F5F1E6" className="font-medium">
+              Pedidos online, horneado del día
+            </AnimatedGradientText>
+          </div>
+
           <h1 className="max-w-2xl font-display text-5xl font-medium leading-[1.1] text-foreground sm:text-6xl">
             Horneado con oficio,
             <br />
@@ -106,42 +142,59 @@ export default async function Home() {
             domicilio.
           </p>
           <div className="mt-3 flex gap-3">
-            <Link
-              href="/tienda"
-              className="rounded-full bg-gold px-6 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover"
-            >
+            <Button size="lg" className="rounded-full px-6" render={<Link href="/tienda" />} nativeButton={false}>
               Ver la tienda
-            </Link>
-            <a
-              href="#visitanos"
-              className="rounded-full border border-charcoal-border px-6 py-2.5 text-sm text-foreground-muted transition hover:border-gold-dark hover:text-gold"
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="rounded-full border-charcoal-border px-6 text-foreground-muted hover:border-gold-dark hover:text-gold"
+              render={<a href="#visitanos" />}
+              nativeButton={false}
             >
               Visítanos
-            </a>
+            </Button>
           </div>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs text-foreground-muted">
             <span className="flex items-center gap-2">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-gold-dark">
-                <path d="M4 10 12 4l8 6v9a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1v-9Z" />
-              </svg>
+              <StoreIcon className="h-4 w-4 text-gold-dark" strokeWidth={1.6} />
               Retiro en tienda
             </span>
             <span className="flex items-center gap-2">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-gold-dark">
-                <path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" />
-                <circle cx="7.5" cy="18" r="1.5" />
-                <circle cx="17.5" cy="18" r="1.5" />
-              </svg>
+              <Truck className="h-4 w-4 text-gold-dark" strokeWidth={1.6} />
               Despacho a domicilio
             </span>
             <span className="flex items-center gap-2">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-gold-dark">
-                <path d="M4 13c0-4.5 3.5-8 8-8s8 3.5 8 8-3 6-8 6-8-1.5-8-6Z" />
-                <path d="M8 12c1-1.5 2.5-2 4-2s3 .5 4 2" />
-              </svg>
+              <ChefHat className="h-4 w-4 text-gold-dark" strokeWidth={1.6} />
               100% artesanal
             </span>
+          </div>
+        </div>
+
+        {/* Franja de confianza */}
+        <div className="relative mx-auto mt-14 flex max-w-3xl flex-wrap items-start justify-center gap-x-14 gap-y-6 px-6">
+          {overallRatingCount > 0 && (
+            <div className="flex flex-col items-center gap-1">
+              <span className="font-display text-3xl font-medium text-gold">
+                <NumberTicker value={overallRatingAvg} decimalPlaces={1} className="text-gold" />
+              </span>
+              <span className="text-xs text-foreground-muted">
+                valoración · {overallRatingCount} reseña{overallRatingCount === 1 ? "" : "s"}
+              </span>
+            </div>
+          )}
+          {typeof activeProductCount === "number" && activeProductCount > 0 && (
+            <div className="flex flex-col items-center gap-1">
+              <span className="font-display text-3xl font-medium text-gold">
+                <NumberTicker value={activeProductCount} className="text-gold" />
+              </span>
+              <span className="text-xs text-foreground-muted">productos en catálogo</span>
+            </div>
+          )}
+          <div className="flex flex-col items-center gap-1">
+            <span className="font-display text-3xl font-medium text-gold">100%</span>
+            <span className="text-xs text-foreground-muted">elaboración artesanal</span>
           </div>
         </div>
       </div>
@@ -152,58 +205,70 @@ export default async function Home() {
 
       {/* Historia */}
       <section className="mx-auto max-w-5xl px-6">
-        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 sm:items-center">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Nuestra historia</p>
-            <h2 className="mt-2 font-display text-3xl font-medium text-foreground">Hecho a mano, todos los días</h2>
-            <div className="mt-4 h-px w-12 bg-gold-dark/60" />
-            <p className="mt-6 text-[15px] leading-relaxed text-foreground-muted">
-              En {store?.name ?? "Pan de Rey"} amasamos, horneamos y decoramos cada producto en nuestro propio
-              obrador — sin atajos industriales. Empezamos con pan del día para el barrio y fuimos sumando
-              pastelería y café a medida que nuestros vecinos nos lo pedían.
-            </p>
-          </div>
-          <div className="space-y-6">
-            {[
-              {
-                title: "Ingredientes reales",
-                text: "Harinas, mantequilla y fruta de verdad — sin mezclas industriales ni atajos.",
-                icon: (
-                  <path d="M4 13c0-4.5 3.5-8 8-8s8 3.5 8 8-3 6-8 6-8-1.5-8-6Z" />
-                ),
-              },
-              {
-                title: "Horneado diario",
-                text: "Cada partida sale del horno el mismo día que se vende, nunca de un depósito.",
-                icon: (
-                  <>
-                    <path d="M5 9h11v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9Z" />
-                    <path d="M16 10h2a2 2 0 0 1 0 4h-2" />
-                  </>
-                ),
-              },
-              {
-                title: "Hecho a pedido",
-                text: "Relleno, cobertura y tamaño a elección en tortas y productos de celebración.",
-                icon: (
-                  <path d="M4 20h16M5 20v-6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6M4 12l1.5-4h13L20 12" />
-                ),
-              },
-            ].map((item) => (
-              <div key={item.title} className="flex gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gold/10">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5 text-gold-dark">
-                    {item.icon}
-                  </svg>
-                </div>
-                <div>
-                  <p className="font-display text-base font-medium text-foreground">{item.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-foreground-muted">{item.text}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Nuestra historia</p>
+          <h2 className="mt-2 font-display text-3xl font-medium text-foreground">Hecho a mano, todos los días</h2>
+          <div className="mx-auto mt-4 h-px w-12 bg-gold-dark/60" />
+          <p className="mt-6 text-[15px] leading-relaxed text-foreground-muted">
+            En {store?.name ?? "Pan de Rey"} amasamos, horneamos y decoramos cada producto en nuestro propio
+            obrador — sin atajos industriales. Empezamos con pan del día para el barrio y fuimos sumando
+            pastelería y café a medida que nuestros vecinos nos lo pedían.
+          </p>
         </div>
+
+        <BentoGrid className="mt-10 auto-rows-[16rem] grid-cols-1 sm:grid-cols-3">
+          <BentoCard
+            name="Ingredientes reales"
+            description="Harinas, mantequilla y fruta de verdad — sin mezclas industriales ni atajos."
+            Icon={Wheat}
+            href="/tienda"
+            cta="Ver tienda"
+            className="col-span-1"
+            background={
+              <div
+                className="absolute inset-0 opacity-70"
+                style={{
+                  background:
+                    "radial-gradient(60% 60% at 80% 10%, color-mix(in srgb, var(--color-gold) 14%, transparent), transparent 70%)",
+                }}
+              />
+            }
+          />
+          <BentoCard
+            name="Horneado diario"
+            description="Cada partida sale del horno el mismo día que se vende, nunca de un depósito."
+            Icon={ChefHat}
+            href="/tienda"
+            cta="Ver tienda"
+            className="col-span-1"
+            background={
+              <div
+                className="absolute inset-0 opacity-70"
+                style={{
+                  background:
+                    "radial-gradient(60% 60% at 80% 10%, color-mix(in srgb, var(--color-gold) 14%, transparent), transparent 70%)",
+                }}
+              />
+            }
+          />
+          <BentoCard
+            name="Hecho a pedido"
+            description="Relleno, cobertura y tamaño a elección en tortas y productos de celebración."
+            Icon={Award}
+            href="/tienda"
+            cta="Ver tienda"
+            className="col-span-1"
+            background={
+              <div
+                className="absolute inset-0 opacity-70"
+                style={{
+                  background:
+                    "radial-gradient(60% 60% at 80% 10%, color-mix(in srgb, var(--color-gold) 14%, transparent), transparent 70%)",
+                }}
+              />
+            }
+          />
+        </BentoGrid>
       </section>
 
       {/* Especialidades por departamento */}
@@ -254,9 +319,9 @@ export default async function Home() {
                   className="group relative overflow-hidden rounded-2xl border border-charcoal-border bg-background-elevated shadow-card transition hover:-translate-y-1 hover:border-gold-dark"
                 >
                   {index < 3 && (
-                    <span className="absolute left-2 top-2 z-10 rounded-full bg-gold px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink shadow-card">
+                    <Badge className="absolute left-2 top-2 z-10 h-auto px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide shadow-card">
                       Más vendido
-                    </span>
+                    </Badge>
                   )}
                   <div className="aspect-square overflow-hidden bg-background">
                     {imagePath ? (
@@ -298,31 +363,60 @@ export default async function Home() {
             </p>
             <h2 className="mt-2 font-display text-3xl font-medium text-foreground">Mejores valorados</h2>
           </div>
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {topRated.map((p) => (
-              <Link
-                key={p.slug}
-                href={`/tienda/${p.slug}`}
-                className="rounded-2xl border border-charcoal-border bg-background-elevated p-6 shadow-card transition hover:-translate-y-0.5 hover:border-gold-dark"
-              >
-                <p className="font-display text-base font-medium text-foreground">{p.name}</p>
-                <p className="mt-1.5 text-gold">
-                  {renderStars(p.avg)}{" "}
-                  <span className="text-xs text-foreground-muted">
-                    {p.avg.toFixed(1)} · {p.ratings.length} reseña{p.ratings.length === 1 ? "" : "s"}
-                  </span>
-                </p>
-                {p.comment && (
-                  <p className="mt-3 text-sm italic leading-relaxed text-foreground-muted">&quot;{p.comment}&quot;</p>
-                )}
-              </Link>
-            ))}
-          </div>
+
+          {testimonials.length > 0 ? (
+            <div className="mt-8 -mx-6">
+              <Marquee pauseOnHover className="[--duration:35s]">
+                {testimonials.map((p) => (
+                  <Link
+                    key={p.slug}
+                    href={`/tienda/${p.slug}`}
+                    className="w-72 shrink-0 rounded-2xl border border-charcoal-border bg-background-elevated p-5 shadow-card transition hover:-translate-y-0.5 hover:border-gold-dark"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold/10 text-sm font-semibold text-gold-dark">
+                        {p.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-display text-sm font-medium text-foreground">{p.name}</p>
+                        <p className="text-gold">
+                          {renderStars(p.avg)}{" "}
+                          <span className="text-xs text-foreground-muted">{p.avg.toFixed(1)}</span>
+                        </p>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-sm italic leading-relaxed text-foreground-muted">&quot;{p.comment}&quot;</p>
+                  </Link>
+                ))}
+              </Marquee>
+            </div>
+          ) : (
+            <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {topRated.map((p) => (
+                <Link
+                  key={p.slug}
+                  href={`/tienda/${p.slug}`}
+                  className="rounded-2xl border border-charcoal-border bg-background-elevated p-6 shadow-card transition hover:-translate-y-0.5 hover:border-gold-dark"
+                >
+                  <p className="font-display text-base font-medium text-foreground">{p.name}</p>
+                  <p className="mt-1.5 text-gold">
+                    {renderStars(p.avg)}{" "}
+                    <span className="text-xs text-foreground-muted">
+                      {p.avg.toFixed(1)} · {p.ratings.length} reseña{p.ratings.length === 1 ? "" : "s"}
+                    </span>
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
       <section className="mx-auto max-w-5xl px-6">
-        <NewsletterForm />
+        <div className="relative mx-auto max-w-sm overflow-hidden rounded-2xl border border-charcoal-border bg-background-elevated p-8 shadow-card">
+          <BorderBeam size={80} duration={8} colorFrom="var(--color-gold)" colorTo="var(--color-gold-hover)" />
+          <NewsletterForm />
+        </div>
       </section>
 
       {/* Visítanos o Escríbenos */}

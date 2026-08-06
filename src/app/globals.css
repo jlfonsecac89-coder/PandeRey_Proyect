@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 /* Identidad Pan de Rey — la marca real es el escudo negro con corona y
    trigo dorados (public/logo.png): negro, dorado y blanco, sin más colores
@@ -29,6 +33,29 @@
   --color-burgundy-hover: #8C3A3A;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 36px -16px rgba(0, 0, 0, 0.55);
+
+  /* Tokens semánticos de shadcn/Magic UI remapeados a la paleta de marca
+     (negro/dorado/blanco) — así cualquier componente instalado desde el
+     registry (Button, Card, Badge, BorderBeam, etc.) hereda la identidad
+     real sin tocar sus className. */
+  --card: var(--background-elevated);
+  --card-foreground: #1E1912;
+  --popover: var(--background-elevated);
+  --popover-foreground: #1E1912;
+  --primary: var(--color-gold);
+  --primary-foreground: var(--color-ink);
+  --secondary: var(--background-alt);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--background-alt);
+  --muted-foreground: var(--foreground-muted);
+  --accent: var(--color-gold);
+  --accent-foreground: var(--color-ink);
+  --destructive: var(--color-burgundy);
+  --border: var(--color-charcoal-border);
+  --input: var(--color-charcoal-border);
+  --ring: var(--color-gold);
+
+  --radius: 0.75rem;
 }
 
 @theme inline {
@@ -49,11 +76,56 @@
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
   --font-mono: var(--font-geist-mono);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --animate-marquee: marquee var(--duration) infinite linear;
+  --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+  --animate-gradient: gradient 8s linear infinite;
+  @keyframes marquee {
+  from {
+    transform: translateX(0);
+    }
+  to {
+    transform: translateX(calc(-100% - var(--gap)));
+    }
+  }
+  @keyframes marquee-vertical {
+  from {
+    transform: translateY(0);
+    }
+  to {
+    transform: translateY(calc(-100% - var(--gap)));
+    }
+  }
+  @keyframes gradient {
+  to {
+    background-position: var(--bg-size, 300%) 0;
+    }
+  }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -104,4 +176,16 @@ body {
    tarjeta esté metido. */
 .bg-background {
   color: #f5f1e6;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }
