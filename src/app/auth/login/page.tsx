@@ -12,7 +12,7 @@ export default async function LoginPage({
 
   return (
     <AuthCard
-      eyebrow={fromCheckout ? "Paso 1 de 4 — Checkout" : undefined}
+      eyebrow={fromCheckout ? "Paso 1 de 5 — Checkout" : undefined}
       title="Iniciar sesión"
       subtitle={fromCheckout ? "Iniciá sesión o creá una cuenta para continuar tu compra" : "Accedé a tu cuenta de Pan de Rey"}
     >

@@ -52,53 +52,56 @@ export default async function CheckoutResultadoPage({
       {isPaid ? (
         <>
           <ClearCartOnSuccess />
-          <h1 className="text-xl font-semibold text-gold">¡Gracias por tu compra!</h1>
-          <p className="mt-2 text-sm text-foreground/70">Tu pedido fue confirmado.</p>
+          <h1 className="font-display text-2xl font-medium text-foreground">¡Gracias por tu compra!</h1>
+          <p className="mt-2 text-sm text-foreground-muted">Tu pedido fue confirmado.</p>
 
-          <div className="mt-6 space-y-2 rounded-lg border border-charcoal-border bg-charcoal-light p-4 text-left text-sm">
+          <div className="mt-6 space-y-2 rounded-2xl border border-charcoal-border bg-background-elevated p-5 text-left text-sm shadow-card">
             <div className="flex justify-between">
-              <span className="text-foreground/60">Código de pedido</span>
+              <span className="text-foreground-muted">Código de pedido</span>
               <span className="font-mono text-xs text-gold-dark">{order!.id.slice(0, 8).toUpperCase()}</span>
             </div>
             {paymentId && (
               <div className="flex justify-between">
-                <span className="text-foreground/60">Transacción Mercado Pago</span>
-                <span className="font-mono text-xs text-foreground/80">{paymentId}</span>
+                <span className="text-foreground-muted">Transacción Mercado Pago</span>
+                <span className="font-mono text-xs text-foreground">{paymentId}</span>
               </div>
             )}
             <div className="flex justify-between border-t border-charcoal-border pt-2">
-              <span className="text-foreground/60">Total pagado</span>
+              <span className="text-foreground-muted">Total pagado</span>
               <span className="font-semibold text-gold">{formatCLP(order!.total)}</span>
             </div>
           </div>
 
-          <p className="mt-4 text-xs text-foreground/50">
+          <p className="mt-4 text-xs text-foreground-muted">
+            Te va a llegar un email de confirmación con el detalle de tu pedido
             {order!.delivery_method === "pickup"
-              ? "Te enviamos por email el código para validar el retiro en tienda."
-              : "Te enviamos por email el código de confirmación que le vas a dar al repartidor."}
+              ? " y el código para validar el retiro en tienda."
+              : " y el código de confirmación que le vas a dar al repartidor."}
           </p>
 
           <Link
-            href={`/pedido/${order!.id}`}
-            className="mt-4 inline-block text-sm text-gold-hover underline"
+            href={`/seguimiento/${order!.id}`}
+            className="mt-6 inline-block rounded-full bg-gold px-6 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover"
           >
-            Ver el seguimiento de mi pedido
+            Seguir mi pedido
           </Link>
         </>
       ) : mpStatus === "pending" || mpStatus === "in_process" ? (
         <>
-          <h1 className="text-xl font-semibold text-gold">Pago pendiente</h1>
-          <p className="mt-2 text-sm text-foreground/70">Te avisaremos apenas se confirme el pago.</p>
+          <h1 className="font-display text-2xl font-medium text-foreground">Pago pendiente</h1>
+          <p className="mt-2 text-sm text-foreground-muted">Te avisaremos apenas se confirme el pago.</p>
         </>
       ) : (
         <>
-          <h1 className="text-xl font-semibold text-red-400">El pago no se pudo completar</h1>
-          <p className="mt-2 text-sm text-foreground/70">Podés intentarlo de nuevo desde tu carrito.</p>
+          <h1 className="font-display text-2xl font-medium text-burgundy-hover">El pago no se pudo completar</h1>
+          <p className="mt-2 text-sm text-foreground-muted">Podés intentarlo de nuevo desde tu carrito.</p>
         </>
       )}
-      <Link href="/tienda" className="mt-6 inline-block text-sm text-gold-hover underline">
-        Volver a la tienda
-      </Link>
+      <p className="mt-6">
+        <Link href="/tienda" className="text-sm text-gold-hover hover:underline">
+          Volver a la tienda
+        </Link>
+      </p>
     </div>
   );
 }

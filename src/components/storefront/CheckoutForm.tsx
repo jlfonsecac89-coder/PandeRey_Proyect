@@ -34,8 +34,9 @@ type Store = {
   free_shipping_min_amount: number | null;
 };
 
-type Step = "entrega" | "programar" | "pago";
+type Step = "direccion" | "entrega" | "programar" | "pago";
 const STEPS: { key: Step; label: string }[] = [
+  { key: "direccion", label: "Dirección" },
   { key: "entrega", label: "Entrega" },
   { key: "programar", label: "Fecha y hora" },
   { key: "pago", label: "Pago" },
@@ -56,7 +57,7 @@ export function CheckoutForm({
   const { items, hydrated, subtotal } = useCart();
   const [couponCode, setCouponCode] = useState("");
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
-  const [step, setStep] = useState<Step>("entrega");
+  const [step, setStep] = useState<Step>("direccion");
 
   useEffect(() => {
     if (hydrated && items.length === 0) router.replace("/carrito");
@@ -107,10 +108,11 @@ export function CheckoutForm({
   }, [addressState, router]);
 
   // Chequeo automático de cobertura: apenas hay sucursal + dirección
-  // elegidas (envío) se dispara solo, sin que el cliente tenga que apretar
-  // un botón de "calcular" — así ve enseguida si llegamos o no.
+  // elegidas (paso "Dirección") se dispara solo, sin esperar a que el
+  // cliente elija "Despacho a domicilio" — así, cuando llega al paso
+  // "Entrega", ya sabe si esa opción sirve o no.
   useEffect(() => {
-    if (deliveryMethod !== "shipping" || !storeId || !addressId) return;
+    if (!storeId || !addressId) return;
     const fd = new FormData();
     fd.set("store_id", storeId);
     fd.set("delivery_method", "shipping");
@@ -118,7 +120,7 @@ export function CheckoutForm({
     fd.set("subtotal", String(subtotal));
     shippingAction(fd);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deliveryMethod, storeId, addressId, subtotal]);
+  }, [storeId, addressId, subtotal]);
 
   const selectedStore = stores.find((s) => s.id === storeId) ?? null;
   const shippingQuote = shippingState && "ok" in shippingState ? shippingState : null;
@@ -129,9 +131,8 @@ export function CheckoutForm({
   const estimatedPointsDiscount = Math.floor(pointsToRedeem * pointsToClpRate);
   const total = Math.max(totalBeforeDiscounts - estimatedPointsDiscount, 0);
 
-  const canLeaveEntrega =
-    !!storeId &&
-    (deliveryMethod === "pickup" || (!!addressId && !!shippingQuote && !shippingError));
+  const canLeaveDireccion = !!storeId && !!addressId && !addingAddress;
+  const canLeaveEntrega = deliveryMethod === "pickup" || (!!shippingQuote && !shippingError);
 
   if (!hydrated || items.length === 0) return null;
 
@@ -139,7 +140,7 @@ export function CheckoutForm({
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_380px]">
       {/* Columna izquierda: proceso por etapas */}
       <div className="rounded-2xl border border-charcoal-border bg-background-elevated p-6 shadow-card sm:p-8">
-        <ol className="flex items-center gap-2 text-xs">
+        <ol className="flex flex-wrap items-center gap-2 text-xs">
           {STEPS.map((s, i) => {
             const isActive = step === s.key;
             const isDone = STEPS.findIndex((x) => x.key === step) > i;
@@ -165,31 +166,9 @@ export function CheckoutForm({
           })}
         </ol>
 
-        {/* Paso 1: entrega */}
-        {step === "entrega" && (
+        {/* Paso 1: dirección */}
+        {step === "direccion" && (
           <div className="mt-6 space-y-6">
-            <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">
-                Método de entrega
-              </h2>
-              <div className="mt-2 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setDeliveryMethod("pickup")}
-                  className={`rounded-md border px-4 py-2 text-sm ${deliveryMethod === "pickup" ? "border-gold text-gold" : "border-charcoal-border text-foreground-muted"}`}
-                >
-                  Retiro en tienda
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeliveryMethod("shipping")}
-                  className={`rounded-md border px-4 py-2 text-sm ${deliveryMethod === "shipping" ? "border-gold text-gold" : "border-charcoal-border text-foreground-muted"}`}
-                >
-                  Despacho a domicilio
-                </button>
-              </div>
-            </section>
-
             <section>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">Sucursal</h2>
               {stores.length === 0 && (
@@ -220,156 +199,137 @@ export function CheckoutForm({
               </div>
             </section>
 
-            {deliveryMethod === "shipping" && (
-              <section>
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">
-                  Dirección de despacho
-                </h2>
+            <section>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">
+                Tu dirección
+              </h2>
+              <p className="mt-1 text-xs text-foreground-muted">
+                La necesitamos para saber si podemos despacharte a domicilio — si preferís retirar en tienda,
+                igual queda guardada para la próxima.
+              </p>
 
-                {!addingAddress && addresses.length > 0 && (
-                  <div className="mt-2 space-y-2">
-                    {addresses.map((addr) => (
-                      <label
-                        key={addr.id}
-                        className="flex items-center gap-2 rounded-md border border-charcoal-border p-3 text-sm has-[:checked]:border-gold"
-                      >
+              {!addingAddress && addresses.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {addresses.map((addr) => (
+                    <label
+                      key={addr.id}
+                      className="flex items-center gap-2 rounded-md border border-charcoal-border p-3 text-sm has-[:checked]:border-gold"
+                    >
+                      <input
+                        type="radio"
+                        name="address_radio"
+                        checked={addressId === addr.id}
+                        onChange={() => setAddressId(addr.id)}
+                      />
+                      <span>
+                        {addr.label && <span className="font-medium text-gold-dark">{addr.label}: </span>}
+                        {addr.calle} {addr.numero}
+                        {addr.housing_type === "departamento" && addr.depto_numero
+                          ? `, depto. ${addr.depto_numero}`
+                          : ""}
+                        , {addr.comuna}, {addr.ciudad}
+                      </span>
+                    </label>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setAddingAddress(true)}
+                    className="text-xs text-gold-hover underline"
+                  >
+                    Agregar otra dirección
+                  </button>
+                </div>
+              )}
+
+              {addingAddress && (
+                <form action={addressAction} className="mt-2 space-y-2">
+                  {addressState?.error && <p className="text-sm text-burgundy-hover">{addressState.error}</p>}
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      name="label"
+                      placeholder="Nombre de la dirección (ej. Casa)"
+                      className="col-span-2 rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
+                    />
+
+                    <div className="col-span-2 flex gap-3 text-sm">
+                      <label className="flex items-center gap-1.5">
                         <input
                           type="radio"
-                          name="address_radio"
-                          checked={addressId === addr.id}
-                          onChange={() => setAddressId(addr.id)}
+                          name="housing_type"
+                          value="casa"
+                          checked={housingType === "casa"}
+                          onChange={() => setHousingType("casa")}
                         />
-                        <span>
-                          {addr.label && <span className="font-medium text-gold-dark">{addr.label}: </span>}
-                          {addr.calle} {addr.numero}
-                          {addr.housing_type === "departamento" && addr.depto_numero
-                            ? `, depto. ${addr.depto_numero}`
-                            : ""}
-                          , {addr.comuna}, {addr.ciudad}
-                        </span>
+                        Casa
                       </label>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setAddingAddress(true)}
-                      className="text-xs text-gold-hover underline"
-                    >
-                      Agregar otra dirección
-                    </button>
-                  </div>
-                )}
+                      <label className="flex items-center gap-1.5">
+                        <input
+                          type="radio"
+                          name="housing_type"
+                          value="departamento"
+                          checked={housingType === "departamento"}
+                          onChange={() => setHousingType("departamento")}
+                        />
+                        Departamento
+                      </label>
+                    </div>
 
-                {/* Cobertura — se calcula solo apenas hay dirección elegida */}
-                {!addingAddress && addressId && (
-                  <div className="mt-3">
-                    {shippingPending && (
-                      <p className="text-xs text-foreground-muted">Verificando cobertura de envío...</p>
-                    )}
-                    {shippingQuote && (
-                      <p className="rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-sm text-gold-hover">
-                        ✓ Llegamos a esta dirección — envío {formatCLP(shippingQuote.shippingCost)}
-                        {shippingQuote.distanceKm != null ? ` (${shippingQuote.distanceKm.toFixed(1)} km)` : ""}
-                      </p>
-                    )}
-                    {shippingError && (
-                      <p className="rounded-md border border-burgundy/30 bg-burgundy/5 px-3 py-2 text-sm text-burgundy-hover">
-                        ✗ No llegamos a esta dirección ({shippingError}). Probá con retiro en tienda u otra
-                        dirección.
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {addingAddress && (
-                  <form action={addressAction} className="mt-2 space-y-2">
-                    {addressState?.error && <p className="text-sm text-burgundy-hover">{addressState.error}</p>}
-                    <div className="grid grid-cols-2 gap-2">
+                    <input
+                      name="calle"
+                      placeholder="Calle"
+                      required
+                      className="rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
+                    />
+                    <input
+                      name="numero"
+                      placeholder="Número"
+                      required
+                      className="rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
+                    />
+                    {housingType === "departamento" && (
                       <input
-                        name="label"
-                        placeholder="Nombre de la dirección (ej. Casa)"
+                        name="depto_numero"
+                        placeholder="N.º de departamento"
+                        required
                         className="col-span-2 rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
                       />
+                    )}
 
-                      <div className="col-span-2 flex gap-3 text-sm">
-                        <label className="flex items-center gap-1.5">
-                          <input
-                            type="radio"
-                            name="housing_type"
-                            value="casa"
-                            checked={housingType === "casa"}
-                            onChange={() => setHousingType("casa")}
-                          />
-                          Casa
-                        </label>
-                        <label className="flex items-center gap-1.5">
-                          <input
-                            type="radio"
-                            name="housing_type"
-                            value="departamento"
-                            checked={housingType === "departamento"}
-                            onChange={() => setHousingType("departamento")}
-                          />
-                          Departamento
-                        </label>
-                      </div>
+                    <RegionComunaFields />
 
-                      <input
-                        name="calle"
-                        placeholder="Calle"
-                        required
-                        className="rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
-                      />
-                      <input
-                        name="numero"
-                        placeholder="Número"
-                        required
-                        className="rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
-                      />
-                      {housingType === "departamento" && (
-                        <input
-                          name="depto_numero"
-                          placeholder="N.º de departamento"
-                          required
-                          className="col-span-2 rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
-                        />
-                      )}
-
-                      <RegionComunaFields />
-
-                      <input
-                        name="ciudad"
-                        placeholder="Ciudad"
-                        required
-                        className="rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
-                      />
-                      <input
-                        name="codigo_postal"
-                        placeholder="Código postal (opcional)"
-                        className="rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
-                      />
-                    </div>
-                    <div className="flex gap-2">
+                    <input
+                      name="ciudad"
+                      placeholder="Ciudad"
+                      required
+                      className="rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
+                    />
+                    <input
+                      name="codigo_postal"
+                      placeholder="Código postal (opcional)"
+                      className="rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={addressPending}
+                      className="rounded-md bg-gold px-4 py-1.5 text-sm font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
+                    >
+                      {addressPending ? "Ubicando..." : "Guardar dirección"}
+                    </button>
+                    {addresses.length > 0 && (
                       <button
-                        type="submit"
-                        disabled={addressPending}
-                        className="rounded-md bg-gold px-4 py-1.5 text-sm font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
+                        type="button"
+                        onClick={() => setAddingAddress(false)}
+                        className="rounded-md border border-charcoal-border px-4 py-1.5 text-sm text-foreground-muted"
                       >
-                        {addressPending ? "Ubicando..." : "Guardar dirección"}
+                        Cancelar
                       </button>
-                      {addresses.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setAddingAddress(false)}
-                          className="rounded-md border border-charcoal-border px-4 py-1.5 text-sm text-foreground-muted"
-                        >
-                          Cancelar
-                        </button>
-                      )}
-                    </div>
-                  </form>
-                )}
-              </section>
-            )}
+                    )}
+                  </div>
+                </form>
+              )}
+            </section>
 
             {selectedStore?.min_order_amount != null && subtotal < selectedStore.min_order_amount && (
               <p className="text-sm text-burgundy-hover">
@@ -379,8 +339,8 @@ export function CheckoutForm({
 
             <button
               type="button"
-              disabled={!canLeaveEntrega}
-              onClick={() => setStep("programar")}
+              disabled={!canLeaveDireccion}
+              onClick={() => setStep("entrega")}
               className="w-full rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover disabled:opacity-50"
             >
               Continuar
@@ -388,7 +348,68 @@ export function CheckoutForm({
           </div>
         )}
 
-        {/* Paso 2: programar */}
+        {/* Paso 2: entrega */}
+        {step === "entrega" && (
+          <div className="mt-6 space-y-6">
+            <section>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">
+                Método de entrega
+              </h2>
+              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setDeliveryMethod("pickup")}
+                  className={`rounded-md border p-4 text-left text-sm ${deliveryMethod === "pickup" ? "border-gold text-gold" : "border-charcoal-border text-foreground-muted"}`}
+                >
+                  <span className="block font-medium">Retiro en tienda</span>
+                  <span className="mt-1 block text-xs text-foreground-muted">Sin costo de envío.</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => shippingQuote && !shippingError && setDeliveryMethod("shipping")}
+                  disabled={!!shippingError}
+                  className={`rounded-md border p-4 text-left text-sm disabled:cursor-not-allowed disabled:opacity-60 ${deliveryMethod === "shipping" ? "border-gold text-gold" : "border-charcoal-border text-foreground-muted"}`}
+                >
+                  <span className="block font-medium">Despacho a domicilio</span>
+                  {shippingPending && (
+                    <span className="mt-1 block text-xs text-foreground-muted">Verificando cobertura...</span>
+                  )}
+                  {shippingQuote && (
+                    <span className="mt-1 block text-xs text-gold-hover">
+                      Envío {formatCLP(shippingQuote.shippingCost)}
+                      {shippingQuote.distanceKm != null ? ` · ${shippingQuote.distanceKm.toFixed(1)} km` : ""}
+                    </span>
+                  )}
+                  {shippingError && (
+                    <span className="mt-1 block text-xs text-burgundy-hover">
+                      Fuera del rango de cobertura de esta sucursal.
+                    </span>
+                  )}
+                </button>
+              </div>
+            </section>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setStep("direccion")}
+                className="rounded-full border border-charcoal-border px-5 py-2.5 text-sm text-foreground-muted transition hover:border-gold-dark hover:text-gold"
+              >
+                Atrás
+              </button>
+              <button
+                type="button"
+                disabled={!canLeaveEntrega}
+                onClick={() => setStep("programar")}
+                className="flex-1 rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover disabled:opacity-50"
+              >
+                Continuar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Paso 3: programar */}
         {step === "programar" && (
           <div className="mt-6 space-y-6">
             <section>
@@ -423,7 +444,7 @@ export function CheckoutForm({
           </div>
         )}
 
-        {/* Paso 3: pago */}
+        {/* Paso 4: pago */}
         {step === "pago" && (
           <div className="mt-6 space-y-6">
             <section>

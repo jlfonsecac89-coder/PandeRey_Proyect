@@ -24,7 +24,7 @@ export default async function CheckoutPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-10">
-      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Paso 2 de 4 — Checkout</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Checkout</p>
       <h1 className="mt-1 font-display text-3xl font-medium text-foreground">Finalizar compra</h1>
       <div className="mt-6">
         <CheckoutForm
