@@ -305,6 +305,16 @@ export async function updateProduct(
   return { success: "Producto actualizado." };
 }
 
+// Toggle rápido desde el listado — mismo patrón que
+// toggleDepartmentActive/toggleCategoryActive, para no forzar entrar a la
+// ficha completa solo para pausar un producto.
+export async function toggleProductActive(id: string, isActive: boolean) {
+  await requireRole(["admin", "operaciones"]);
+  const supabase = await createClient();
+  await supabase.from("products").update({ is_active: isActive }).eq("id", id);
+  revalidatePath("/admin/productos");
+}
+
 // Único punto de escritura de Marketing sobre `products` (sección 13):
 // exclusivamente el campo points_cost, a través del módulo "Canje de puntos".
 export async function updateProductPointsCost(

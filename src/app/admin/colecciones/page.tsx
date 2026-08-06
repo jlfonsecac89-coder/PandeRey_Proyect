@@ -1,9 +1,10 @@
 import { requireRole } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/server";
+import { CatalogoTabs } from "@/components/admin/CatalogoTabs";
 import { ColeccionForm } from "./ColeccionForm";
 
 export default async function ColeccionesPage() {
-  await requireRole(["admin", "marketing"]);
+  const profile = await requireRole(["admin", "marketing"], "/admin-login");
 
   const supabase = await createClient();
   const { data: collections } = await supabase
@@ -14,40 +15,45 @@ export default async function ColeccionesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-gold">Colecciones</h1>
-        <p className="mt-1 text-sm text-foreground/60">
-          Vitrinas transversales (Sin Gluten, Para Compartir, Navidad...). Un
-          producto puede estar en varias a la vez.
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-dark">Producto y categorías</p>
+        <h1 className="mt-1 font-display text-2xl font-medium text-foreground">Colecciones</h1>
       </div>
-      <ColeccionForm />
-      <table className="w-full max-w-2xl text-sm">
-        <thead>
-          <tr className="border-b border-charcoal-border text-left text-foreground/50">
-            <th className="py-2 font-normal">Nombre</th>
-            <th className="py-2 font-normal">Vigencia</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(collections ?? []).map((c) => (
-            <tr key={c.id} className="border-b border-charcoal-border/50">
-              <td className="py-2">{c.name}</td>
-              <td className="py-2 text-foreground/60">
-                {c.starts_at || c.ends_at
-                  ? `${c.starts_at ? new Date(c.starts_at).toLocaleDateString("es-CL") : "…"} — ${c.ends_at ? new Date(c.ends_at).toLocaleDateString("es-CL") : "…"}`
-                  : "Permanente"}
-              </td>
+      <CatalogoTabs active="colecciones" role={profile.role} />
+      <p className="text-sm text-foreground-muted">
+        Vitrinas transversales (Sin Gluten, Para Compartir, Navidad...). Un producto puede estar en varias a la vez.
+      </p>
+      <div className="rounded-2xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+        <ColeccionForm />
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-charcoal-border bg-background-elevated shadow-card">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-charcoal-border text-xs uppercase tracking-wide text-foreground-muted">
+              <th className="px-4 py-3 font-normal">Nombre</th>
+              <th className="px-4 py-3 font-normal">Vigencia</th>
             </tr>
-          ))}
-          {(collections ?? []).length === 0 && (
-            <tr>
-              <td colSpan={2} className="py-4 text-foreground/40">
-                Todavía no hay colecciones.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {(collections ?? []).map((c) => (
+              <tr key={c.id} className="border-b border-charcoal-border/50 last:border-0">
+                <td className="px-4 py-2.5 text-foreground">{c.name}</td>
+                <td className="px-4 py-2.5 text-foreground-muted">
+                  {c.starts_at || c.ends_at
+                    ? `${c.starts_at ? new Date(c.starts_at).toLocaleDateString("es-CL") : "…"} — ${c.ends_at ? new Date(c.ends_at).toLocaleDateString("es-CL") : "…"}`
+                    : "Permanente"}
+                </td>
+              </tr>
+            ))}
+            {(collections ?? []).length === 0 && (
+              <tr>
+                <td colSpan={2} className="px-4 py-6 text-center text-sm text-foreground-muted">
+                  Todavía no hay colecciones.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

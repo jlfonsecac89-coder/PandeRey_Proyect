@@ -9,7 +9,7 @@ import { formatCLP } from "@/lib/format";
 const publicProductBaseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images`;
 
 export function CartDrawer() {
-  const { items, hydrated, setQuantity, removeItem, subtotal, isOpen, closeCart } = useCart();
+  const { items, hydrated, setQuantity, removeItem, clear, subtotal, isOpen, closeCart } = useCart();
 
   // Cerrar con Escape y bloquear el scroll del body mientras el panel está
   // abierto — patrón estándar de drawer, sin librería extra.
@@ -32,7 +32,7 @@ export function CartDrawer() {
   return (
     <>
       <div
-        className={`fixed inset-0 z-50 bg-black/60 transition-opacity ${
+        className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
           isOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         onClick={closeCart}
@@ -48,16 +48,23 @@ export function CartDrawer() {
       >
         <div className="flex items-center justify-between border-b border-charcoal-border px-5 py-4">
           <p className="font-display text-lg font-medium text-foreground">Tu carrito</p>
-          <button
-            type="button"
-            onClick={closeCart}
-            aria-label="Cerrar carrito"
-            className="rounded-full p-1.5 text-foreground-muted hover:bg-gold/10 hover:text-gold"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-3">
+            {items.length > 0 && (
+              <button type="button" onClick={clear} className="text-xs text-foreground-muted hover:text-burgundy-hover">
+                Vaciar carrito
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={closeCart}
+              aria-label="Cerrar carrito"
+              className="rounded-full p-1.5 text-foreground-muted hover:bg-gold/10 hover:text-gold"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {items.length === 0 ? (

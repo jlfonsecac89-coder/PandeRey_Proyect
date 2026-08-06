@@ -18,6 +18,8 @@ export type AdminOrder = {
   delivery_method: "pickup" | "shipping";
   total: number;
   created_at: string;
+  store_id: string;
+  user_id: string;
   assigned_driver_id: string | null;
   sla_deadline: string | null;
   delivered_at: string | null;
@@ -32,12 +34,16 @@ export function AdminOrderRow({
   customer,
   assignedDriver,
   items,
+  selected = false,
+  onToggleSelect,
 }: {
   order: AdminOrder;
   drivers: Person[];
   customer: { full_name: string; phone: string | null } | null;
   assignedDriver: Person | null;
   items: OrderItemSummary[];
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   const [readyState, readyAction, readyPending] = useActionState<OrderActionState, FormData>(
     () => markOrderReady(order.id),
@@ -76,7 +82,18 @@ export function AdminOrderRow({
 
   return (
     <>
-      <tr className="border-b border-charcoal-border/50 align-top">
+      <tr className={`border-b border-charcoal-border/50 align-top ${selected ? "bg-gold/5" : ""}`}>
+        {onToggleSelect && (
+          <td className="w-8 py-2 pr-1">
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={onToggleSelect}
+              aria-label={`Seleccionar pedido ${order.id.slice(0, 8)}`}
+              className="h-4 w-4 accent-gold"
+            />
+          </td>
+        )}
         <td className="py-2 pr-3 font-mono text-xs text-gold-dark">
           {order.id.slice(0, 8)}
           <button
@@ -182,7 +199,7 @@ export function AdminOrderRow({
       </tr>
       {showItems && (
         <tr className="border-b border-charcoal-border/50 bg-charcoal-light/40">
-          <td colSpan={7} className="py-2 pl-3 text-xs text-foreground/60">
+          <td colSpan={onToggleSelect ? 8 : 7} className="py-2 pl-3 text-xs text-foreground/60">
             {items.map((item, i) => (
               <span key={i}>
                 {item.quantity}× {item.product_name_snapshot}

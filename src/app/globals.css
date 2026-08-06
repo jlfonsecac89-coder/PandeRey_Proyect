@@ -93,3 +93,15 @@ body {
      hacia abajo. */
   color: var(--color-foreground);
 }
+
+/* Bug real: casi todos los <input>/<select>/<textarea> del sitio usan
+   bg-background (relleno negro, "píldora negra sobre tarjeta blanca") sin
+   una clase de texto propia — heredaban el `color` oscuro de la tarjeta
+   blanca que los contiene (la regla de arriba), texto oscuro sobre fondo
+   negro, invisible mientras el cliente escribe. Acá se fuerza un color
+   claro FIJO (no una variable — para no heredar otra vez el pisado de
+   arriba) sobre cualquier elemento con fondo negro, sin importar en qué
+   tarjeta esté metido. */
+.bg-background {
+  color: #f5f1e6;
+}

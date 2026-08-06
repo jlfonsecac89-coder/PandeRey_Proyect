@@ -4,7 +4,7 @@ import { StoreCard } from "@/components/admin/StoreCard";
 import { NewStoreForm } from "@/components/admin/NewStoreForm";
 
 export default async function SucursalesPage() {
-  await requireRole(["admin"]);
+  await requireRole(["admin"], "/admin-login");
   const supabase = await createClient();
 
   const [{ data: stores }, { data: zones }] = await Promise.all([
@@ -23,10 +23,10 @@ export default async function SucursalesPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-gold">Sucursales</h1>
-        <p className="mt-1 text-sm text-foreground/60">
-          Radio de entrega, mínimo de compra, envío gratis y tramos de envío por
-          sucursal — módulo exclusivo de Admin (sección 09 del blueprint).
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-dark">Seguimiento y control</p>
+        <h1 className="mt-1 font-display text-2xl font-medium text-foreground">Envíos y sucursales</h1>
+        <p className="mt-1 text-sm text-foreground-muted">
+          Radio de entrega, mínimo de compra, envío gratis y tramos de envío por sucursal.
         </p>
       </div>
 

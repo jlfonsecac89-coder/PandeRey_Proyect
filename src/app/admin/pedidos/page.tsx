@@ -1,22 +1,65 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/server";
-import { AdminOrderRow } from "@/components/admin/AdminOrderRow";
+import { PIPELINE_GROUPS, PIPELINE_ORDER, type PipelineGroup } from "@/lib/orders/pipeline";
+import { PedidosTable } from "@/components/admin/PedidosTable";
 
-export default async function AdminPedidosPage() {
-  await requireRole(["admin", "operaciones"]);
+function startOfDay(date: Date): string {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return startOfDay(d);
+}
+
+const RANGO_OPTIONS: { key: string; label: string; since: () => string | null }[] = [
+  { key: "hoy", label: "Hoy", since: () => startOfDay(new Date()) },
+  { key: "7d", label: "Últimos 7 días", since: () => daysAgo(7) },
+  { key: "30d", label: "Últimos 30 días", since: () => daysAgo(30) },
+  { key: "todos", label: "Todos", since: () => null },
+];
+
+type SearchParams = { grupo?: string; entrega?: string; rango?: string };
+
+export default async function AdminPedidosPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  await requireRole(["admin", "operaciones"], "/admin-login");
+  const { grupo, entrega, rango } = await searchParams;
   const supabase = await createClient();
 
-  // RLS (operaciones_manage_orders_in_scope / admin_manage_orders) ya limita
-  // esto por sucursal para Operaciones — acá solo se excluyen los pedidos que
-  // todavía no son "reales" (pending_payment) para no saturar la vista.
-  const { data: orders } = await supabase
+  const activeRango = RANGO_OPTIONS.find((r) => r.key === rango) ?? RANGO_OPTIONS[2]; // default 30d
+  const since = activeRango.since();
+  const activeGroup = grupo && PIPELINE_ORDER.includes(grupo as PipelineGroup) ? (grupo as PipelineGroup) : null;
+
+  // Conteos del pipeline — respetan el rango de fechas pero NO el grupo/entrega
+  // activos, para que las tarjetas sigan mostrando el panorama completo aunque
+  // ya se esté filtrando la tabla de abajo.
+  const countQueries = PIPELINE_ORDER.map((key) => {
+    let q = supabase.from("orders").select("id", { count: "exact", head: true }).in(
+      "status",
+      PIPELINE_GROUPS[key].statuses,
+    );
+    if (since) q = q.gte("created_at", since);
+    return q;
+  });
+  const counts = await Promise.all(countQueries);
+
+  let query = supabase
     .from("orders")
     .select(
       "id, status, delivery_method, total, created_at, store_id, user_id, assigned_driver_id, sla_deadline, delivered_at",
     )
     .neq("status", "pending_payment")
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(150);
+
+  if (since) query = query.gte("created_at", since);
+  if (activeGroup) query = query.in("status", PIPELINE_GROUPS[activeGroup].statuses);
+  if (entrega === "pickup" || entrega === "shipping") query = query.eq("delivery_method", entrega);
+
+  const { data: orders } = await query;
 
   const orderIds = (orders ?? []).map((o) => o.id);
   const customerIds = [...new Set((orders ?? []).map((o) => o.user_id))];
@@ -31,54 +74,90 @@ export default async function AdminPedidosPage() {
       : Promise.resolve({ data: [] as { order_id: string; product_name_snapshot: string; quantity: number }[] }),
   ]);
 
-  const driversByStore = new Map<string, { id: string; full_name: string; phone: string | null }[]>();
-  const driverById = new Map((repartidores ?? []).map((d) => [d.id, d]));
-  for (const d of repartidores ?? []) {
-    if (!d.store_id) continue;
-    const list = driversByStore.get(d.store_id) ?? [];
-    list.push({ id: d.id, full_name: d.full_name, phone: d.phone });
-    driversByStore.set(d.store_id, list);
-  }
-  const customerById = new Map((customers ?? []).map((c) => [c.id, c]));
-  const itemsByOrder = new Map<string, { product_name_snapshot: string; quantity: number }[]>();
-  for (const item of items ?? []) {
-    const list = itemsByOrder.get(item.order_id) ?? [];
-    list.push({ product_name_snapshot: item.product_name_snapshot, quantity: item.quantity });
-    itemsByOrder.set(item.order_id, list);
+  function buildHref(overrides: Partial<SearchParams>) {
+    const merged = { grupo, entrega, rango, ...overrides };
+    const params = new URLSearchParams();
+    if (merged.grupo) params.set("grupo", merged.grupo);
+    if (merged.entrega) params.set("entrega", merged.entrega);
+    if (merged.rango) params.set("rango", merged.rango);
+    const qs = params.toString();
+    return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
   }
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-gold">Gestión de pedidos</h1>
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-charcoal-border text-xs uppercase tracking-wide text-foreground/50">
-              <th className="py-2 pr-3 font-normal">Pedido</th>
-              <th className="py-2 pr-3 font-normal">Cliente</th>
-              <th className="py-2 pr-3 font-normal">Estado</th>
-              <th className="py-2 pr-3 font-normal">Entrega</th>
-              <th className="py-2 pr-3 font-normal">Total</th>
-              <th className="py-2 pr-3 font-normal">Fecha</th>
-              <th className="py-2 font-normal">Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(orders ?? []).map((order) => (
-              <AdminOrderRow
-                key={order.id}
-                order={order}
-                drivers={driversByStore.get(order.store_id) ?? []}
-                customer={customerById.get(order.user_id) ?? null}
-                assignedDriver={order.assigned_driver_id ? driverById.get(order.assigned_driver_id) ?? null : null}
-                items={itemsByOrder.get(order.id) ?? []}
-              />
-            ))}
-          </tbody>
-        </table>
-        {(orders ?? []).length === 0 && (
-          <p className="mt-4 text-sm text-foreground/50">No hay pedidos todavía.</p>
-        )}
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-dark">Seguimiento y control</p>
+      <h1 className="mt-1 font-display text-2xl font-medium text-foreground">Pedidos</h1>
+
+      {/* Pipeline */}
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {PIPELINE_ORDER.map((key, i) => {
+          const isActive = activeGroup === key;
+          return (
+            <Link
+              key={key}
+              href={buildHref({ grupo: isActive ? undefined : key })}
+              className={`rounded-xl border p-4 shadow-card transition ${
+                isActive
+                  ? "border-gold bg-gold/10"
+                  : "border-charcoal-border bg-background-elevated hover:border-gold-dark"
+              }`}
+            >
+              <p className="text-xs font-medium uppercase tracking-wide text-foreground-muted">
+                {PIPELINE_GROUPS[key].label}
+              </p>
+              <p className="mt-1.5 font-display text-2xl font-medium text-gold">{counts[i].count ?? 0}</p>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Filtros */}
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-1.5">
+          {RANGO_OPTIONS.map((r) => (
+            <Link
+              key={r.key}
+              href={buildHref({ rango: r.key })}
+              className={`rounded-full border px-3 py-1 text-xs transition ${
+                activeRango.key === r.key
+                  ? "border-gold-dark text-gold-hover"
+                  : "border-charcoal-border text-foreground-muted hover:text-gold"
+              }`}
+            >
+              {r.label}
+            </Link>
+          ))}
+        </div>
+        <span className="text-charcoal-border">|</span>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { key: undefined, label: "Todas las entregas" },
+            { key: "pickup", label: "Retiro" },
+            { key: "shipping", label: "Envío" },
+          ].map((e) => (
+            <Link
+              key={e.label}
+              href={buildHref({ entrega: e.key })}
+              className={`rounded-full border px-3 py-1 text-xs transition ${
+                (entrega ?? undefined) === e.key
+                  ? "border-gold-dark text-gold-hover"
+                  : "border-charcoal-border text-foreground-muted hover:text-gold"
+              }`}
+            >
+              {e.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <PedidosTable
+          orders={orders ?? []}
+          repartidores={repartidores ?? []}
+          customers={customers ?? []}
+          items={items ?? []}
+        />
       </div>
     </div>
   );
