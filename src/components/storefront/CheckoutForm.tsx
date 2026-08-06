@@ -113,7 +113,7 @@ export function CheckoutForm({
   if (!hydrated || items.length === 0) return null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 rounded-2xl border border-charcoal-border bg-background-elevated p-6 shadow-card sm:p-8">
       {/* Resumen */}
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/50">
@@ -446,7 +446,7 @@ export function CheckoutForm({
               !storeId ||
               (deliveryMethod === "shipping" && !addressId)
             }
-            className="w-full rounded-md bg-gold px-5 py-2.5 text-sm font-semibold text-background hover:bg-gold-hover disabled:opacity-50"
+            className="w-full rounded-full bg-gold px-5 py-3 text-sm font-semibold text-background shadow-card transition hover:bg-gold-hover disabled:opacity-50"
           >
             {checkoutPending ? "Redirigiendo a Mercado Pago..." : "Pagar con Mercado Pago"}
           </button>

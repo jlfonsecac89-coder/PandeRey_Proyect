@@ -101,77 +101,79 @@ export default async function AdminHomePage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-xl font-semibold text-gold">Panel de administración</h1>
-        <p className="mt-1 text-sm text-foreground/60">Bienvenido, {profile.full_name}.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-dark">Panel administrativo</p>
+        <h1 className="mt-1 font-display text-3xl font-medium text-foreground">Hola, {profile.full_name}</h1>
       </div>
 
       {isOps && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-lg border border-charcoal-border bg-charcoal-light p-4">
-            <p className="text-xs uppercase tracking-wide text-foreground/40">Ventas hoy</p>
-            <p className="mt-1 text-xl font-semibold text-gold">{formatCLP(sumTotal(salesToday))}</p>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="rounded-xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+            <p className="text-xs uppercase tracking-wide text-foreground-muted">Ventas hoy</p>
+            <p className="mt-1.5 font-display text-2xl font-medium text-gold">{formatCLP(sumTotal(salesToday))}</p>
           </div>
-          <div className="rounded-lg border border-charcoal-border bg-charcoal-light p-4">
-            <p className="text-xs uppercase tracking-wide text-foreground/40">Ventas 7 días</p>
-            <p className="mt-1 text-xl font-semibold text-gold">{formatCLP(sumTotal(salesWeek))}</p>
+          <div className="rounded-xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+            <p className="text-xs uppercase tracking-wide text-foreground-muted">Ventas 7 días</p>
+            <p className="mt-1.5 font-display text-2xl font-medium text-gold">{formatCLP(sumTotal(salesWeek))}</p>
           </div>
-          <div className="rounded-lg border border-charcoal-border bg-charcoal-light p-4">
-            <p className="text-xs uppercase tracking-wide text-foreground/40">Pedidos activos</p>
-            <p className="mt-1 text-xl font-semibold text-gold">{activeOrders?.length ?? 0}</p>
+          <div className="rounded-xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+            <p className="text-xs uppercase tracking-wide text-foreground-muted">Pedidos activos</p>
+            <p className="mt-1.5 font-display text-2xl font-medium text-foreground">{activeOrders?.length ?? 0}</p>
           </div>
-          <div className="rounded-lg border border-charcoal-border bg-charcoal-light p-4">
-            <p className="text-xs uppercase tracking-wide text-foreground/40">A tiempo (30 días)</p>
-            <p className="mt-1 text-xl font-semibold text-gold">{onTimePct !== null ? `${onTimePct}%` : "—"}</p>
+          <div className="rounded-xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+            <p className="text-xs uppercase tracking-wide text-foreground-muted">A tiempo (30 días)</p>
+            <p className="mt-1.5 font-display text-2xl font-medium text-foreground">
+              {onTimePct !== null ? `${onTimePct}%` : "—"}
+            </p>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/50">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <section className="rounded-xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">
             Más vendidos (30 días)
           </h2>
           <ul className="mt-3 space-y-1.5 text-sm">
             {bestSellers.map((p, i) => (
-              <li key={p.name} className="flex items-center gap-2 text-foreground/80">
+              <li key={p.name} className="flex items-center gap-2 text-foreground">
                 <span className="text-xs text-gold-dark">{i + 1}.</span> {p.name}
               </li>
             ))}
-            {bestSellers.length === 0 && <p className="text-sm text-foreground/40">Sin ventas todavía.</p>}
+            {bestSellers.length === 0 && <p className="text-sm text-foreground-muted">Sin ventas todavía.</p>}
           </ul>
         </section>
 
         {isOps && (
-          <section>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/50">
+          <section className="rounded-xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">
               Lotes próximos a vencer
             </h2>
             <ul className="mt-3 space-y-1.5 text-sm">
               {(expiringBatches ?? []).map((b, i) => {
                 const product = Array.isArray(b.product) ? b.product[0] : b.product;
                 return (
-                  <li key={i} className="flex justify-between text-foreground/80">
+                  <li key={i} className="flex justify-between text-foreground">
                     <span>{product?.name}</span>
-                    <span className="text-amber-400">
+                    <span className="text-gold-hover">
                       {b.quantity} u. · {new Date(b.expiration_date).toLocaleDateString("es-CL")}
                     </span>
                   </li>
                 );
               })}
               {(expiringBatches ?? []).length === 0 && (
-                <p className="text-sm text-foreground/40">Sin lotes próximos a vencer.</p>
+                <p className="text-sm text-foreground-muted">Sin lotes próximos a vencer.</p>
               )}
             </ul>
-            <Link href="/admin/productos" className="mt-2 inline-block text-xs text-gold-hover hover:underline">
+            <Link href="/admin/productos" className="mt-3 inline-block text-xs text-gold-hover hover:underline">
               Ver productos y stock →
             </Link>
           </section>
         )}
 
         {isMarketingView && (
-          <section>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/50">Marketing</h2>
-            <ul className="mt-3 space-y-2 text-sm text-foreground/80">
+          <section className="rounded-xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Marketing</h2>
+            <ul className="mt-3 space-y-2 text-sm text-foreground">
               <li className="flex justify-between">
                 <span>Reseñas pendientes de moderar</span>
                 <Link href="/admin/resenas" className="text-gold-hover hover:underline">

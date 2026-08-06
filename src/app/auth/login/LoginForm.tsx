@@ -46,7 +46,7 @@ export function LoginForm({ next, oauthError }: { next?: string; oauthError?: st
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-md bg-gold px-3 py-2 text-sm font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+          className="w-full rounded-full bg-gold px-3 py-2.5 text-sm font-semibold text-background shadow-card transition hover:bg-gold-hover disabled:opacity-50"
         >
           {pending ? "Ingresando..." : "Ingresar"}
         </button>

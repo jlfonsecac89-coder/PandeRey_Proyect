@@ -6,6 +6,7 @@ import { getClearanceDiscounts, applyClearanceDiscount } from "@/lib/catalog/cle
 import { AddToCartForm } from "@/components/storefront/AddToCartForm";
 import { RedeemPointsButton } from "@/components/storefront/RedeemPointsButton";
 import { ProductReviews } from "@/components/storefront/ProductReviews";
+import { DepartmentIcon } from "@/components/storefront/DepartmentIcon";
 
 export default async function ProductoDetallePage({
   params,
@@ -70,47 +71,51 @@ export default async function ProductoDetallePage({
     .order("created_at", { ascending: false });
 
   return (
-    <div className="mx-auto grid max-w-4xl grid-cols-1 gap-8 px-6 py-8 sm:grid-cols-2">
-      <div className="aspect-square overflow-hidden rounded-lg border border-charcoal-border bg-charcoal-light">
-        {images[0] && (
+    <div className="mx-auto grid max-w-4xl grid-cols-1 gap-10 px-6 py-10 sm:grid-cols-2">
+      <div className="aspect-square overflow-hidden rounded-2xl border border-charcoal-border bg-background-elevated shadow-card">
+        {images[0] ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={`${publicBaseUrl}/${images[0].storage_path}`}
             alt={product.name}
             className="h-full w-full object-cover"
           />
+        ) : (
+          <div className="flex h-full items-center justify-center text-foreground-muted/25">
+            <DepartmentIcon name="" className="h-16 w-16" />
+          </div>
         )}
       </div>
 
       <div>
-        <h1 className="text-2xl font-semibold text-gold">{product.name}</h1>
+        <h1 className="font-display text-3xl font-medium text-foreground">{product.name}</h1>
         {clearancePct ? (
-          <p className="mt-1 text-lg text-foreground/90">
+          <p className="mt-2 text-xl text-foreground">
             {formatCLP(discountedPrice)}{" "}
-            <span className="text-sm font-normal text-foreground/40 line-through">
+            <span className="text-sm font-normal text-foreground-muted/60 line-through">
               {formatCLP(product.price)}
             </span>
           </p>
         ) : (
-          <p className="mt-1 text-lg text-foreground/90">{formatCLP(product.price)}</p>
+          <p className="mt-2 text-xl font-semibold text-gold">{formatCLP(product.price)}</p>
         )}
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           {clearancePct && (
-            <span className="inline-block rounded-full border border-red-500/60 px-2 py-0.5 text-[10px] text-red-400">
+            <span className="inline-block rounded-full bg-burgundy px-2.5 py-1 text-[11px] font-medium text-foreground">
               Liquidación -{clearancePct}%
             </span>
           )}
           {product.is_gluten_free && (
-            <span className="inline-block rounded-full border border-charcoal-border px-2 py-0.5 text-[10px] text-foreground/60">
+            <span className="inline-block rounded-full border border-charcoal-border px-2.5 py-1 text-[11px] text-foreground-muted">
               Sin gluten
             </span>
           )}
         </div>
         {product.description && (
-          <p className="mt-4 text-sm text-foreground/70">{product.description}</p>
+          <p className="mt-5 text-[15px] leading-relaxed text-foreground-muted">{product.description}</p>
         )}
 
-        <div className="mt-6">
+        <div className="mt-7 border-t border-charcoal-border pt-6">
           <AddToCartForm
             product={{
               id: product.id,
@@ -124,9 +129,9 @@ export default async function ProductoDetallePage({
         </div>
 
         {product.points_cost != null && (
-          <div className="mt-4 rounded-lg border border-charcoal-border bg-charcoal-light p-3">
-            <p className="text-sm text-foreground/80">
-              Canjeable por <span className="text-gold">{product.points_cost} puntos</span>
+          <div className="mt-5 rounded-xl border border-gold-dark/30 bg-gold/5 p-4">
+            <p className="text-sm text-foreground">
+              Canjeable por <span className="font-semibold text-gold">{product.points_cost} puntos</span>
             </p>
             {redeemInfo ? (
               <RedeemPointsButton
@@ -136,7 +141,7 @@ export default async function ProductoDetallePage({
                 pointsBalance={redeemInfo.pointsBalance}
               />
             ) : (
-              <p className="mt-1 text-xs text-foreground/50">
+              <p className="mt-1 text-xs text-foreground-muted">
                 Iniciá sesión para canjear este producto con tus puntos.
               </p>
             )}
@@ -144,8 +149,8 @@ export default async function ProductoDetallePage({
         )}
       </div>
 
-      <div className="sm:col-span-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/50">Reseñas</h2>
+      <div className="border-t border-charcoal-border pt-8 sm:col-span-2">
+        <h2 className="font-display text-xl font-medium text-foreground">Reseñas</h2>
         <ProductReviews reviews={reviews ?? []} />
       </div>
     </div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/format";
 import { getClearanceDiscounts, getClearanceProductIds, applyClearanceDiscount } from "@/lib/catalog/clearance";
+import { DepartmentIcon } from "@/components/storefront/DepartmentIcon";
 
 type ProductImage = { storage_path: string; sort_order: number };
 type ProductRow = {
@@ -165,14 +166,17 @@ export default async function TiendaPage({
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
-      <h1 className="text-xl font-semibold text-gold">Tienda</h1>
+    <div className="mx-auto max-w-5xl px-6 py-10">
+      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Catálogo</p>
+      <h1 className="mt-1 font-display text-3xl font-medium text-foreground">Tienda</h1>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-6 flex flex-wrap gap-2">
         <Link
           href={buildHref({ departamento: null, categoria: null })}
-          className={`rounded-full border px-3 py-1 text-xs ${
-            !departamento ? "border-gold text-gold" : "border-charcoal-border text-foreground/60"
+          className={`rounded-full border px-3.5 py-1.5 text-xs transition ${
+            !departamento
+              ? "border-gold bg-gold/10 text-gold"
+              : "border-charcoal-border text-foreground-muted hover:border-gold-dark hover:text-gold"
           }`}
         >
           Todo
@@ -181,8 +185,10 @@ export default async function TiendaPage({
           <Link
             key={d.id}
             href={buildHref({ departamento: d.slug, categoria: null })}
-            className={`rounded-full border px-3 py-1 text-xs ${
-              departamento === d.slug ? "border-gold text-gold" : "border-charcoal-border text-foreground/60"
+            className={`rounded-full border px-3.5 py-1.5 text-xs transition ${
+              departamento === d.slug
+                ? "border-gold bg-gold/10 text-gold"
+                : "border-charcoal-border text-foreground-muted hover:border-gold-dark hover:text-gold"
             }`}
           >
             {d.name}
@@ -194,8 +200,10 @@ export default async function TiendaPage({
         <div className="mt-2 flex flex-wrap gap-2">
           <Link
             href={buildHref({ categoria: null })}
-            className={`rounded-full border px-3 py-1 text-xs ${
-              !categoria ? "border-gold-dark text-gold-hover" : "border-charcoal-border text-foreground/50"
+            className={`rounded-full border px-3 py-1 text-xs transition ${
+              !categoria
+                ? "border-gold-dark text-gold-hover"
+                : "border-charcoal-border text-foreground-muted/70 hover:text-gold"
             }`}
           >
             Todas las categorías
@@ -204,8 +212,10 @@ export default async function TiendaPage({
             <Link
               key={c.id}
               href={buildHref({ categoria: c.slug })}
-              className={`rounded-full border px-3 py-1 text-xs ${
-                categoria === c.slug ? "border-gold-dark text-gold-hover" : "border-charcoal-border text-foreground/50"
+              className={`rounded-full border px-3 py-1 text-xs transition ${
+                categoria === c.slug
+                  ? "border-gold-dark text-gold-hover"
+                  : "border-charcoal-border text-foreground-muted/70 hover:text-gold"
               }`}
             >
               {c.name}
@@ -217,23 +227,27 @@ export default async function TiendaPage({
       <div className="mt-2 flex flex-wrap gap-2">
         <Link
           href={buildHref({ filtro: filtro === "ofertas" ? null : "ofertas" })}
-          className={`rounded-full border px-3 py-1 text-xs ${
-            filtro === "ofertas" ? "border-gold text-gold" : "border-charcoal-border text-foreground/60"
+          className={`rounded-full border px-3.5 py-1.5 text-xs transition ${
+            filtro === "ofertas"
+              ? "border-burgundy bg-burgundy/15 text-burgundy-hover"
+              : "border-charcoal-border text-foreground-muted hover:border-gold-dark hover:text-gold"
           }`}
         >
           Ofertas
         </Link>
         <Link
           href={buildHref({ filtro: filtro === "evento" ? null : "evento" })}
-          className={`rounded-full border px-3 py-1 text-xs ${
-            filtro === "evento" ? "border-gold text-gold" : "border-charcoal-border text-foreground/60"
+          className={`rounded-full border px-3.5 py-1.5 text-xs transition ${
+            filtro === "evento"
+              ? "border-gold bg-gold/10 text-gold"
+              : "border-charcoal-border text-foreground-muted hover:border-gold-dark hover:text-gold"
           }`}
         >
           Edición limitada
         </Link>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {(products as ProductRow[] | null ?? []).map((product) => {
           const imagePath = firstImagePath(product.images);
           const clearancePct = clearanceDiscounts.get(product.id);
@@ -242,43 +256,49 @@ export default async function TiendaPage({
             <Link
               key={product.id}
               href={`/tienda/${product.slug}`}
-              className="group rounded-lg border border-charcoal-border bg-charcoal-light p-3 transition hover:border-gold-dark"
+              className="group overflow-hidden rounded-xl border border-charcoal-border bg-background-elevated shadow-card transition hover:-translate-y-0.5 hover:border-gold-dark"
             >
-              <div className="aspect-square overflow-hidden rounded-md bg-background">
-                {imagePath && (
+              <div className="relative aspect-square overflow-hidden bg-background">
+                {imagePath ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={`${publicBaseUrl}/${imagePath}`}
                     alt={product.name}
-                    className="h-full w-full object-cover transition group-hover:scale-105"
+                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                   />
-                )}
-              </div>
-              <p className="mt-2 text-sm text-foreground/90">{product.name}</p>
-              <div className="mt-1 flex items-center justify-between">
-                {clearancePct ? (
-                  <p className="text-sm font-semibold text-gold">
-                    {formatCLP(discountedPrice)}{" "}
-                    <span className="text-xs font-normal text-foreground/40 line-through">
-                      {formatCLP(product.price)}
-                    </span>
-                  </p>
                 ) : (
-                  <p className="text-sm font-semibold text-gold">{formatCLP(product.price)}</p>
+                  <div className="flex h-full items-center justify-center text-foreground-muted/25">
+                    <DepartmentIcon name="" className="h-10 w-10" />
+                  </div>
                 )}
-                <div className="flex gap-1">
+                <div className="absolute left-2 top-2 flex flex-col gap-1">
                   {clearancePct && (
-                    <span className="rounded-full border border-red-500/60 px-2 py-0.5 text-[10px] text-red-400">
-                      Liquidación -{clearancePct}%
+                    <span className="rounded-full bg-burgundy px-2 py-0.5 text-[10px] font-medium text-foreground shadow-card">
+                      -{clearancePct}%
                     </span>
                   )}
                   {product.is_special_event && (
-                    <span className="rounded-full border border-gold-dark px-2 py-0.5 text-[10px] text-gold-hover">
+                    <span className="rounded-full bg-gold px-2 py-0.5 text-[10px] font-medium text-background shadow-card">
                       Edición limitada
                     </span>
                   )}
+                </div>
+              </div>
+              <div className="p-3.5">
+                <p className="text-sm text-foreground">{product.name}</p>
+                <div className="mt-1.5 flex items-center justify-between gap-2">
+                  {clearancePct ? (
+                    <p className="text-sm font-semibold text-gold">
+                      {formatCLP(discountedPrice)}{" "}
+                      <span className="text-xs font-normal text-foreground-muted/60 line-through">
+                        {formatCLP(product.price)}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-sm font-semibold text-gold">{formatCLP(product.price)}</p>
+                  )}
                   {product.is_gluten_free && (
-                    <span className="rounded-full border border-charcoal-border px-2 py-0.5 text-[10px] text-foreground/60">
+                    <span className="shrink-0 rounded-full border border-charcoal-border px-2 py-0.5 text-[10px] text-foreground-muted">
                       Sin gluten
                     </span>
                   )}
@@ -288,9 +308,9 @@ export default async function TiendaPage({
           );
         })}
         {(products ?? []).length === 0 && (
-          <p className="col-span-full text-sm text-foreground/50">
-            No hay productos que coincidan con este filtro.
-          </p>
+          <div className="col-span-full rounded-xl border border-dashed border-charcoal-border py-16 text-center">
+            <p className="text-sm text-foreground-muted">No hay productos que coincidan con este filtro.</p>
+          </div>
         )}
       </div>
     </div>
