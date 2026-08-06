@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/format";
 import { getClearanceDiscounts, getClearanceProductIds, applyClearanceDiscount } from "@/lib/catalog/clearance";
 import { DepartmentIcon } from "@/components/storefront/DepartmentIcon";
+import { SortSelect } from "@/components/storefront/SortSelect";
 
 type ProductImage = { storage_path: string; sort_order: number };
 type ProductRow = {
@@ -14,6 +15,29 @@ type ProductRow = {
   is_special_event: boolean;
   images: ProductImage[];
 };
+
+type SearchParams = {
+  departamento?: string;
+  categoria?: string;
+  filtro?: string;
+  precio?: string;
+  singluten?: string;
+  orden?: string;
+};
+
+const PRICE_BUCKETS = [
+  { key: "0-1500", label: "Hasta $1.500", min: 0, max: 1500 },
+  { key: "1500-3000", label: "$1.500 – $3.000", min: 1500, max: 3000 },
+  { key: "3000-10000", label: "$3.000 – $10.000", min: 3000, max: 10000 },
+  { key: "10000-", label: "Más de $10.000", min: 10000, max: null as number | null },
+];
+
+const SORT_OPTIONS = [
+  { key: "recientes", label: "Más recientes" },
+  { key: "nombre", label: "Nombre A-Z" },
+  { key: "precio_asc", label: "Precio: menor a mayor" },
+  { key: "precio_desc", label: "Precio: mayor a menor" },
+];
 
 function firstImagePath(images: ProductImage[]): string | null {
   if (!images.length) return null;
@@ -70,12 +94,8 @@ async function resolveOfferedProductIds(
   return productIds;
 }
 
-export default async function TiendaPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ departamento?: string; categoria?: string; filtro?: string }>;
-}) {
-  const { departamento, categoria, filtro } = await searchParams;
+export default async function TiendaPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const { departamento, categoria, filtro, precio, singluten, orden } = await searchParams;
   const supabase = await createClient();
 
   const { data: activeStore } = await supabase
@@ -119,14 +139,26 @@ export default async function TiendaPage({
     .select(
       "id, name, slug, price, is_gluten_free, is_special_event, images:product_images(storage_path, sort_order)",
     )
-    .eq("is_active", true)
-    .order("name");
+    .eq("is_active", true);
+
+  if (orden === "precio_asc") query = query.order("price", { ascending: true });
+  else if (orden === "precio_desc") query = query.order("price", { ascending: false });
+  else if (orden === "recientes") query = query.order("created_at", { ascending: false });
+  else query = query.order("name", { ascending: true });
 
   if (categoryIds) {
     query = query.in("category_id", categoryIds.length ? categoryIds : ["00000000-0000-0000-0000-000000000000"]);
   }
   if (filtro === "evento") {
     query = query.eq("is_special_event", true);
+  }
+  if (singluten === "1") {
+    query = query.eq("is_gluten_free", true);
+  }
+  const activeBucket = PRICE_BUCKETS.find((b) => b.key === precio);
+  if (activeBucket) {
+    query = query.gte("price", activeBucket.min);
+    if (activeBucket.max !== null) query = query.lt("price", activeBucket.max);
   }
 
   let offeredIds: Set<string> | null = null;
@@ -153,171 +185,264 @@ export default async function TiendaPage({
 
   const publicBaseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images`;
 
-  function buildHref(overrides: { departamento?: string | null; categoria?: string | null; filtro?: string | null }) {
+  function buildHref(overrides: Partial<SearchParams>) {
+    const current: SearchParams = { departamento, categoria, filtro, precio, singluten, orden };
+    const merged = { ...current, ...overrides };
     const params = new URLSearchParams();
-    const dept = overrides.departamento !== undefined ? overrides.departamento : departamento;
-    const cat = overrides.categoria !== undefined ? overrides.categoria : categoria;
-    const filt = overrides.filtro !== undefined ? overrides.filtro : filtro;
-    if (dept) params.set("departamento", dept);
-    if (cat) params.set("categoria", cat);
-    if (filt) params.set("filtro", filt);
+    if (merged.departamento) params.set("departamento", merged.departamento);
+    if (merged.categoria) params.set("categoria", merged.categoria);
+    if (merged.filtro) params.set("filtro", merged.filtro);
+    if (merged.precio) params.set("precio", merged.precio);
+    if (merged.singluten) params.set("singluten", merged.singluten);
+    if (merged.orden) params.set("orden", merged.orden);
     const qs = params.toString();
     return qs ? `/tienda?${qs}` : "/tienda";
   }
 
+  const activeFilterCount =
+    (departamento ? 1 : 0) +
+    (filtro ? 1 : 0) +
+    (precio ? 1 : 0) +
+    (singluten ? 1 : 0);
+
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="mx-auto max-w-6xl px-6 py-10">
       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Catálogo</p>
       <h1 className="mt-1 font-display text-3xl font-medium text-foreground">Tienda</h1>
 
-      <div className="mt-6 flex flex-wrap gap-2">
-        <Link
-          href={buildHref({ departamento: null, categoria: null })}
-          className={`rounded-full border px-3.5 py-1.5 text-xs transition ${
-            !departamento
-              ? "border-gold bg-gold/10 text-gold"
-              : "border-charcoal-border text-foreground-muted hover:border-gold-dark hover:text-gold"
-          }`}
-        >
-          Todo
-        </Link>
-        {(departments ?? []).map((d) => (
-          <Link
-            key={d.id}
-            href={buildHref({ departamento: d.slug, categoria: null })}
-            className={`rounded-full border px-3.5 py-1.5 text-xs transition ${
-              departamento === d.slug
-                ? "border-gold bg-gold/10 text-gold"
-                : "border-charcoal-border text-foreground-muted hover:border-gold-dark hover:text-gold"
-            }`}
-          >
-            {d.name}
-          </Link>
-        ))}
-      </div>
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[240px_1fr]">
+        {/* Filtros laterales */}
+        <aside className="space-y-6 rounded-2xl border border-charcoal-border bg-background-elevated p-5 shadow-card lg:sticky lg:top-24 lg:self-start">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Filtros</p>
+            {activeFilterCount > 0 && (
+              <Link href="/tienda" className="text-xs text-gold-hover hover:underline">
+                Limpiar
+              </Link>
+            )}
+          </div>
 
-      {currentDept && categoriesInDept.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Link
-            href={buildHref({ categoria: null })}
-            className={`rounded-full border px-3 py-1 text-xs transition ${
-              !categoria
-                ? "border-gold-dark text-gold-hover"
-                : "border-charcoal-border text-foreground-muted/70 hover:text-gold"
-            }`}
-          >
-            Todas las categorías
-          </Link>
-          {categoriesInDept.map((c) => (
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Departamento</p>
+            <ul className="mt-2 space-y-1">
+              <li>
+                <Link
+                  href={buildHref({ departamento: undefined, categoria: undefined })}
+                  className={`block rounded-md px-2 py-1 text-sm transition ${
+                    !departamento ? "bg-gold/10 font-medium text-gold" : "text-foreground-muted hover:text-gold"
+                  }`}
+                >
+                  Todas
+                </Link>
+              </li>
+              {(departments ?? []).map((d) => (
+                <li key={d.id}>
+                  <Link
+                    href={buildHref({ departamento: d.slug, categoria: undefined })}
+                    className={`block rounded-md px-2 py-1 text-sm transition ${
+                      departamento === d.slug
+                        ? "bg-gold/10 font-medium text-gold"
+                        : "text-foreground-muted hover:text-gold"
+                    }`}
+                  >
+                    {d.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {currentDept && categoriesInDept.length > 0 && (
+            <div className="border-t border-charcoal-border pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Categoría</p>
+              <ul className="mt-2 space-y-1">
+                <li>
+                  <Link
+                    href={buildHref({ categoria: undefined })}
+                    className={`block rounded-md px-2 py-1 text-sm transition ${
+                      !categoria ? "bg-gold/10 font-medium text-gold" : "text-foreground-muted hover:text-gold"
+                    }`}
+                  >
+                    Todas las categorías
+                  </Link>
+                </li>
+                {categoriesInDept.map((c) => (
+                  <li key={c.id}>
+                    <Link
+                      href={buildHref({ categoria: c.slug })}
+                      className={`block rounded-md px-2 py-1 text-sm transition ${
+                        categoria === c.slug
+                          ? "bg-gold/10 font-medium text-gold"
+                          : "text-foreground-muted hover:text-gold"
+                      }`}
+                    >
+                      {c.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="border-t border-charcoal-border pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Precio</p>
+            <ul className="mt-2 space-y-1">
+              <li>
+                <Link
+                  href={buildHref({ precio: undefined })}
+                  className={`block rounded-md px-2 py-1 text-sm transition ${
+                    !precio ? "bg-gold/10 font-medium text-gold" : "text-foreground-muted hover:text-gold"
+                  }`}
+                >
+                  Todos los precios
+                </Link>
+              </li>
+              {PRICE_BUCKETS.map((b) => (
+                <li key={b.key}>
+                  <Link
+                    href={buildHref({ precio: precio === b.key ? undefined : b.key })}
+                    className={`block rounded-md px-2 py-1 text-sm transition ${
+                      precio === b.key ? "bg-gold/10 font-medium text-gold" : "text-foreground-muted hover:text-gold"
+                    }`}
+                  >
+                    {b.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="space-y-1 border-t border-charcoal-border pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Otros</p>
             <Link
-              key={c.id}
-              href={buildHref({ categoria: c.slug })}
-              className={`rounded-full border px-3 py-1 text-xs transition ${
-                categoria === c.slug
-                  ? "border-gold-dark text-gold-hover"
-                  : "border-charcoal-border text-foreground-muted/70 hover:text-gold"
+              href={buildHref({ filtro: filtro === "ofertas" ? undefined : "ofertas" })}
+              className={`flex items-center gap-2 rounded-md px-2 py-1 text-sm transition ${
+                filtro === "ofertas" ? "bg-burgundy/10 font-medium text-burgundy-hover" : "text-foreground-muted hover:text-gold"
               }`}
             >
-              {c.name}
+              <span
+                className={`flex h-4 w-4 items-center justify-center rounded border ${filtro === "ofertas" ? "border-burgundy bg-burgundy" : "border-charcoal-border"}`}
+              >
+                {filtro === "ofertas" && <span className="h-2 w-2 rounded-sm bg-white" />}
+              </span>
+              Ofertas
             </Link>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-2 flex flex-wrap gap-2">
-        <Link
-          href={buildHref({ filtro: filtro === "ofertas" ? null : "ofertas" })}
-          className={`rounded-full border px-3.5 py-1.5 text-xs transition ${
-            filtro === "ofertas"
-              ? "border-burgundy bg-burgundy/15 text-burgundy-hover"
-              : "border-charcoal-border text-foreground-muted hover:border-gold-dark hover:text-gold"
-          }`}
-        >
-          Ofertas
-        </Link>
-        <Link
-          href={buildHref({ filtro: filtro === "evento" ? null : "evento" })}
-          className={`rounded-full border px-3.5 py-1.5 text-xs transition ${
-            filtro === "evento"
-              ? "border-gold bg-gold/10 text-gold"
-              : "border-charcoal-border text-foreground-muted hover:border-gold-dark hover:text-gold"
-          }`}
-        >
-          Edición limitada
-        </Link>
-      </div>
-
-      <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {(products as ProductRow[] | null ?? []).map((product) => {
-          const imagePath = firstImagePath(product.images);
-          const clearancePct = clearanceDiscounts.get(product.id);
-          const discountedPrice = applyClearanceDiscount(product.price, clearancePct);
-          return (
             <Link
-              key={product.id}
-              href={`/tienda/${product.slug}`}
-              className="group overflow-hidden rounded-2xl border border-charcoal-border bg-background-elevated shadow-card transition hover:-translate-y-1 hover:border-gold-dark"
+              href={buildHref({ filtro: filtro === "evento" ? undefined : "evento" })}
+              className={`flex items-center gap-2 rounded-md px-2 py-1 text-sm transition ${
+                filtro === "evento" ? "bg-gold/10 font-medium text-gold" : "text-foreground-muted hover:text-gold"
+              }`}
             >
-              <div className="relative aspect-square overflow-hidden bg-background">
-                {imagePath ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={`${publicBaseUrl}/${imagePath}`}
-                    alt={product.name}
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                  />
-                ) : (
-                  <div
-                    className="flex h-full items-center justify-center text-gold-dark/35"
-                    style={{
-                      background:
-                        "radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--color-gold) 12%, transparent), transparent 70%)",
-                    }}
-                  >
-                    <DepartmentIcon name={product.name} className="h-10 w-10" />
-                  </div>
-                )}
-                <div className="absolute left-2 top-2 flex flex-col gap-1">
-                  {clearancePct && (
-                    <span className="rounded-full bg-burgundy px-2 py-0.5 text-[10px] font-medium text-foreground shadow-card">
-                      -{clearancePct}%
-                    </span>
-                  )}
-                  {product.is_special_event && (
-                    <span className="rounded-full bg-gold px-2 py-0.5 text-[10px] font-medium text-ink shadow-card">
-                      Edición limitada
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="p-3.5">
-                <p className="font-display text-[15px] font-medium leading-snug text-foreground">{product.name}</p>
-                <div className="mt-1.5 flex items-center justify-between gap-2">
-                  {clearancePct ? (
-                    <p className="text-sm font-semibold text-gold">
-                      {formatCLP(discountedPrice)}{" "}
-                      <span className="text-xs font-normal text-foreground-muted/60 line-through">
-                        {formatCLP(product.price)}
-                      </span>
-                    </p>
-                  ) : (
-                    <p className="text-sm font-semibold text-gold">{formatCLP(product.price)}</p>
-                  )}
-                  {product.is_gluten_free && (
-                    <span className="shrink-0 rounded-full border border-charcoal-border px-2 py-0.5 text-[10px] text-foreground-muted">
-                      Sin gluten
-                    </span>
-                  )}
-                </div>
-              </div>
+              <span
+                className={`flex h-4 w-4 items-center justify-center rounded border ${filtro === "evento" ? "border-gold bg-gold" : "border-charcoal-border"}`}
+              >
+                {filtro === "evento" && <span className="h-2 w-2 rounded-sm bg-ink" />}
+              </span>
+              Edición limitada
             </Link>
-          );
-        })}
-        {(products ?? []).length === 0 && (
-          <div className="col-span-full rounded-xl border border-dashed border-charcoal-border py-16 text-center">
-            <p className="text-sm text-foreground-muted">No hay productos que coincidan con este filtro.</p>
+            <Link
+              href={buildHref({ singluten: singluten === "1" ? undefined : "1" })}
+              className={`flex items-center gap-2 rounded-md px-2 py-1 text-sm transition ${
+                singluten === "1" ? "bg-gold/10 font-medium text-gold" : "text-foreground-muted hover:text-gold"
+              }`}
+            >
+              <span
+                className={`flex h-4 w-4 items-center justify-center rounded border ${singluten === "1" ? "border-gold bg-gold" : "border-charcoal-border"}`}
+              >
+                {singluten === "1" && <span className="h-2 w-2 rounded-sm bg-ink" />}
+              </span>
+              Sin gluten
+            </Link>
           </div>
-        )}
+        </aside>
+
+        {/* Resultados */}
+        <div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-foreground-muted">
+              {(products ?? []).length} producto{(products ?? []).length === 1 ? "" : "s"} encontrado
+              {(products ?? []).length === 1 ? "" : "s"}
+            </p>
+            <SortSelect
+              current={orden ?? "nombre"}
+              options={SORT_OPTIONS}
+              currentParams={{ departamento, categoria, filtro, precio, singluten }}
+            />
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {(products as ProductRow[] | null ?? []).map((product) => {
+              const imagePath = firstImagePath(product.images);
+              const clearancePct = clearanceDiscounts.get(product.id);
+              const discountedPrice = applyClearanceDiscount(product.price, clearancePct);
+              return (
+                <Link
+                  key={product.id}
+                  href={`/tienda/${product.slug}`}
+                  className="group overflow-hidden rounded-2xl border border-charcoal-border bg-background-elevated shadow-card transition hover:-translate-y-1 hover:border-gold-dark"
+                >
+                  <div className="relative aspect-square overflow-hidden bg-background">
+                    {imagePath ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`${publicBaseUrl}/${imagePath}`}
+                        alt={product.name}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div
+                        className="flex h-full items-center justify-center text-gold-dark/35"
+                        style={{
+                          background:
+                            "radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--color-gold) 12%, transparent), transparent 70%)",
+                        }}
+                      >
+                        <DepartmentIcon name={product.name} className="h-10 w-10" />
+                      </div>
+                    )}
+                    <div className="absolute left-2 top-2 flex flex-col gap-1">
+                      {clearancePct && (
+                        <span className="rounded-full bg-burgundy px-2 py-0.5 text-[10px] font-medium text-foreground shadow-card">
+                          -{clearancePct}%
+                        </span>
+                      )}
+                      {product.is_special_event && (
+                        <span className="rounded-full bg-gold px-2 py-0.5 text-[10px] font-medium text-ink shadow-card">
+                          Edición limitada
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-3.5">
+                    <p className="font-display text-[15px] font-medium leading-snug text-foreground">{product.name}</p>
+                    <div className="mt-1.5 flex items-center justify-between gap-2">
+                      {clearancePct ? (
+                        <p className="text-sm font-semibold text-gold">
+                          {formatCLP(discountedPrice)}{" "}
+                          <span className="text-xs font-normal text-foreground-muted/60 line-through">
+                            {formatCLP(product.price)}
+                          </span>
+                        </p>
+                      ) : (
+                        <p className="text-sm font-semibold text-gold">{formatCLP(product.price)}</p>
+                      )}
+                      {product.is_gluten_free && (
+                        <span className="shrink-0 rounded-full border border-charcoal-border px-2 py-0.5 text-[10px] text-foreground-muted">
+                          Sin gluten
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+            {(products ?? []).length === 0 && (
+              <div className="col-span-full rounded-xl border border-dashed border-charcoal-border py-16 text-center">
+                <p className="text-sm text-foreground-muted">No hay productos que coincidan con este filtro.</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

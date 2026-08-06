@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CartProvider } from "@/lib/cart/CartContext";
 import { CartBadgeLink } from "@/components/storefront/CartBadgeLink";
+import { CartDrawer } from "@/components/storefront/CartDrawer";
 import { Logo } from "@/components/storefront/Logo";
 import { StorefrontFooter } from "@/components/storefront/StorefrontFooter";
 import { getCurrentProfile } from "@/lib/auth/session";
@@ -59,6 +60,7 @@ export default async function StorefrontLayout({ children }: { children: React.R
           socialLinks={store?.social_links}
         />
       </div>
+      <CartDrawer />
     </CartProvider>
   );
 }

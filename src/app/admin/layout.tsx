@@ -35,7 +35,7 @@ const ROLE_LABELS: Record<Profile["role"], string> = {
 // Capa 2 (sección 10): vuelve a verificar el rol acá, además de lo que ya
 // filtró middleware.ts (Capa 1) — nunca confiar en una sola capa.
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const profile = await requireRole(["admin", "marketing", "operaciones"]);
+  const profile = await requireRole(["admin", "marketing", "operaciones"], "/admin-login");
   const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(profile.role));
 
   return (

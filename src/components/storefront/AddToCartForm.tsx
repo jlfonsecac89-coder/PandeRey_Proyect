@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart/CartContext";
 import type { CartOptionSelection } from "@/lib/cart/types";
 import { formatCLP } from "@/lib/format";
@@ -22,8 +21,7 @@ export function AddToCartForm({
   product: { id: string; name: string; slug: string; price: number; imagePath: string | null };
   optionGroups: OptionGroup[];
 }) {
-  const { addItem } = useCart();
-  const router = useRouter();
+  const { addItem, openCart } = useCart();
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
@@ -73,6 +71,7 @@ export function AddToCartForm({
       quantity,
     );
     setAdded(true);
+    openCart();
   };
 
   return (
@@ -127,14 +126,7 @@ export function AddToCartForm({
         Agregar al carrito
       </button>
 
-      {added && (
-        <p className="text-sm text-gold">
-          Agregado al carrito.{" "}
-          <button type="button" onClick={() => router.push("/carrito")} className="underline">
-            Ver carrito
-          </button>
-        </p>
-      )}
+      {added && <p className="text-sm text-gold">Agregado al carrito.</p>}
     </form>
   );
 }

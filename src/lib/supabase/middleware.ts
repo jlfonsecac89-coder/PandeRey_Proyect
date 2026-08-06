@@ -3,9 +3,18 @@ import { NextResponse, type NextRequest } from "next/server";
 import { noStoreFetch } from "./fetch";
 
 const STAFF_PREFIXES = ["/admin"];
+const STAFF_LOGIN_PATH = "/admin-login";
 const REPARTIDOR_PREFIX = "/repartidor";
 const CUSTOMER_PREFIXES = ["/cuenta", "/checkout", "/pedido"];
 const CHANGE_PASSWORD_PATH = "/auth/cambiar-password";
+
+// startsWith a secas trataría "/admin-login" como parte de "/admin" (son la
+// misma cadena de caracteres hasta ahí) — acá se exige que lo que sigue sea
+// "/" o el fin del path, para que un prefijo "/admin" no absorba una ruta
+// hermana como "/admin-login" (que es pública, es el login del panel).
+function matchesPrefix(path: string, prefix: string): boolean {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -37,16 +46,20 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isStaffRoute = STAFF_PREFIXES.some((p) => path.startsWith(p));
-  const isRepartidorRoute = path.startsWith(REPARTIDOR_PREFIX);
-  const isCustomerRoute = CUSTOMER_PREFIXES.some((p) => path.startsWith(p));
+  const isStaffRoute = STAFF_PREFIXES.some((p) => matchesPrefix(path, p));
+  const isRepartidorRoute = matchesPrefix(path, REPARTIDOR_PREFIX);
+  const isCustomerRoute = CUSTOMER_PREFIXES.some((p) => matchesPrefix(path, p));
 
   if (!isStaffRoute && !isRepartidorRoute && !isCustomerRoute) {
     return supabaseResponse;
   }
 
   if (!user) {
-    const redirectUrl = new URL("/auth/login", request.url);
+    // El módulo admin tiene su propio login por usuario, separado del de
+    // clientes (no debe cruzarse con /auth/login) — todo lo demás sigue
+    // yendo ahí.
+    const loginPath = isStaffRoute ? STAFF_LOGIN_PATH : "/auth/login";
+    const redirectUrl = new URL(loginPath, request.url);
     redirectUrl.searchParams.set("next", path);
     return NextResponse.redirect(redirectUrl);
   }

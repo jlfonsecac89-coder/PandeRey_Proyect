@@ -19,6 +19,9 @@ type CartContextValue = {
   clear: () => void;
   subtotal: number;
   itemCount: number;
+  isOpen: boolean;
+  openCart: () => void;
+  closeCart: () => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -26,6 +29,9 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const openCart = useCallback(() => setIsOpen(true), []);
+  const closeCart = useCallback(() => setIsOpen(false), []);
 
   // El carrito es client-side por diseño (sección 07 del blueprint) — vive en
   // localStorage, no en la DB, hasta que se confirma el checkout. Se carga acá
@@ -84,8 +90,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const itemCount = useMemo(() => items.reduce((sum, i) => sum + i.quantity, 0), [items]);
 
   const value = useMemo(
-    () => ({ items, hydrated, addItem, removeItem, setQuantity, clear, subtotal, itemCount }),
-    [items, hydrated, addItem, removeItem, setQuantity, clear, subtotal, itemCount],
+    () => ({
+      items,
+      hydrated,
+      addItem,
+      removeItem,
+      setQuantity,
+      clear,
+      subtotal,
+      itemCount,
+      isOpen,
+      openCart,
+      closeCart,
+    }),
+    [items, hydrated, addItem, removeItem, setQuantity, clear, subtotal, itemCount, isOpen, openCart, closeCart],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
