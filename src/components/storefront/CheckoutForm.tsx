@@ -3,7 +3,9 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart/CartContext";
-import { formatCLP } from "@/lib/format";
+import { cartItemUnitPrice } from "@/lib/cart/types";
+import { formatCLP, splitIva } from "@/lib/format";
+import { RegionComunaFields } from "./RegionComunaFields";
 import {
   createCheckoutPreference,
   previewShipping,
@@ -20,6 +22,8 @@ type Address = {
   comuna: string;
   ciudad: string;
   region: string;
+  housing_type: string | null;
+  depto_numero: string | null;
 };
 
 type Store = {
@@ -55,6 +59,7 @@ export function CheckoutForm({
   const [addressId, setAddressId] = useState(addresses[0]?.id ?? "");
   const [addingAddress, setAddingAddress] = useState(addresses.length === 0);
   const [scheduledAt, setScheduledAt] = useState("");
+  const [housingType, setHousingType] = useState<"casa" | "departamento">("casa");
 
   // `addresses` llega como prop del Server Component padre — cuando se agrega
   // una dirección nueva y router.refresh() la trae, este componente no se
@@ -115,17 +120,32 @@ export function CheckoutForm({
           Resumen
         </h2>
         <ul className="mt-2 space-y-1 text-sm text-foreground/70">
-          {items.map((item) => (
-            <li key={item.key} className="flex justify-between">
-              <span>
-                {item.quantity}× {item.name}
-              </span>
-            </li>
-          ))}
+          {items.map((item) => {
+            const lineTotal = cartItemUnitPrice(item) * item.quantity;
+            const { neto } = splitIva(lineTotal);
+            return (
+              <li key={item.key} className="flex justify-between gap-4">
+                <span>
+                  {item.quantity}× {item.name}
+                </span>
+                <span className="shrink-0 text-foreground/50">{formatCLP(neto)} + IVA</span>
+              </li>
+            );
+          })}
         </ul>
-        <div className="mt-2 flex justify-between border-t border-charcoal-border pt-2 text-sm">
-          <span className="text-foreground/70">Subtotal</span>
-          <span className="text-foreground/90">{formatCLP(subtotal)}</span>
+        <div className="mt-2 space-y-1 border-t border-charcoal-border pt-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-foreground/70">Neto</span>
+            <span className="text-foreground/90">{formatCLP(splitIva(subtotal).neto)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-foreground/70">IVA (19%)</span>
+            <span className="text-foreground/90">{formatCLP(splitIva(subtotal).iva)}</span>
+          </div>
+          <div className="flex justify-between font-medium">
+            <span className="text-foreground/80">Subtotal</span>
+            <span className="text-foreground/90">{formatCLP(subtotal)}</span>
+          </div>
         </div>
       </section>
 
@@ -207,7 +227,11 @@ export function CheckoutForm({
                   />
                   <span>
                     {addr.label && <span className="text-gold-dark">{addr.label}: </span>}
-                    {addr.calle} {addr.numero}, {addr.comuna}, {addr.ciudad}
+                    {addr.calle} {addr.numero}
+                    {addr.housing_type === "departamento" && addr.depto_numero
+                      ? `, depto. ${addr.depto_numero}`
+                      : ""}
+                    , {addr.comuna}, {addr.ciudad}
                   </span>
                 </label>
               ))}
@@ -227,9 +251,33 @@ export function CheckoutForm({
               <div className="grid grid-cols-2 gap-2">
                 <input
                   name="label"
-                  placeholder="Etiqueta (ej. Casa)"
+                  placeholder="Nombre de la dirección (ej. Casa)"
                   className="col-span-2 rounded-md border border-charcoal-border bg-charcoal-light px-3 py-1.5 text-sm"
                 />
+
+                <div className="col-span-2 flex gap-3 text-sm">
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="radio"
+                      name="housing_type"
+                      value="casa"
+                      checked={housingType === "casa"}
+                      onChange={() => setHousingType("casa")}
+                    />
+                    Casa
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="radio"
+                      name="housing_type"
+                      value="departamento"
+                      checked={housingType === "departamento"}
+                      onChange={() => setHousingType("departamento")}
+                    />
+                    Departamento
+                  </label>
+                </div>
+
                 <input
                   name="calle"
                   placeholder="Calle"
@@ -242,21 +290,20 @@ export function CheckoutForm({
                   required
                   className="rounded-md border border-charcoal-border bg-charcoal-light px-3 py-1.5 text-sm"
                 />
-                <input
-                  name="comuna"
-                  placeholder="Comuna"
-                  required
-                  className="rounded-md border border-charcoal-border bg-charcoal-light px-3 py-1.5 text-sm"
-                />
+                {housingType === "departamento" && (
+                  <input
+                    name="depto_numero"
+                    placeholder="N.º de departamento"
+                    required
+                    className="col-span-2 rounded-md border border-charcoal-border bg-charcoal-light px-3 py-1.5 text-sm"
+                  />
+                )}
+
+                <RegionComunaFields />
+
                 <input
                   name="ciudad"
                   placeholder="Ciudad"
-                  required
-                  className="rounded-md border border-charcoal-border bg-charcoal-light px-3 py-1.5 text-sm"
-                />
-                <input
-                  name="region"
-                  placeholder="Región"
                   required
                   className="rounded-md border border-charcoal-border bg-charcoal-light px-3 py-1.5 text-sm"
                 />
@@ -372,6 +419,7 @@ export function CheckoutForm({
           <span className="text-foreground/80">Total</span>
           <span className="text-gold">{formatCLP(total)}</span>
         </div>
+        <p className="text-right text-xs text-foreground/40">IVA incluido{deliveryMethod === "shipping" && shippingCost > 0 ? " · envío incluido" : ""}</p>
         {selectedStore?.min_order_amount != null && subtotal < selectedStore.min_order_amount && (
           <p className="mt-2 text-sm text-red-400">
             El pedido mínimo para esta sucursal es {formatCLP(selectedStore.min_order_amount)}.

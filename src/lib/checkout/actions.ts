@@ -38,9 +38,17 @@ export async function saveAddress(
   const ciudad = String(formData.get("ciudad") || "").trim();
   const region = String(formData.get("region") || "").trim();
   const codigoPostal = String(formData.get("codigo_postal") || "").trim() || null;
+  const housingType = String(formData.get("housing_type") || "casa").trim();
+  const deptoNumero = String(formData.get("depto_numero") || "").trim() || null;
 
   if (!calle || !numero || !comuna || !ciudad || !region) {
     return { error: "Completa calle, número, comuna, ciudad y región." };
+  }
+  if (housingType !== "casa" && housingType !== "departamento") {
+    return { error: "Tipo de vivienda inválido." };
+  }
+  if (housingType === "departamento" && !deptoNumero) {
+    return { error: "Indicá el número de departamento." };
   }
 
   // Sección 16: 10 requests/min por usuario — evita abusar de la cuota
@@ -78,6 +86,8 @@ export async function saveAddress(
       ciudad,
       region,
       codigo_postal: codigoPostal,
+      housing_type: housingType,
+      depto_numero: housingType === "departamento" ? deptoNumero : null,
       lat: geocoded.lat,
       lng: geocoded.lng,
       geocoded_at: new Date().toISOString(),

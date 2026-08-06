@@ -5,6 +5,7 @@ import { formatCLP } from "@/lib/format";
 import { getClearanceDiscounts, applyClearanceDiscount } from "@/lib/catalog/clearance";
 import { AddToCartForm } from "@/components/storefront/AddToCartForm";
 import { RedeemPointsButton } from "@/components/storefront/RedeemPointsButton";
+import { ProductReviews } from "@/components/storefront/ProductReviews";
 
 export default async function ProductoDetallePage({
   params,
@@ -60,6 +61,13 @@ export default async function ProductoDetallePage({
     : new Map<string, number>();
   const clearancePct = clearanceDiscounts.get(product.id);
   const discountedPrice = applyClearanceDiscount(product.price, clearancePct);
+
+  const { data: reviews } = await supabase
+    .from("product_reviews")
+    .select("id, rating, comment, created_at, profile:profiles!product_reviews_user_id_fkey(full_name)")
+    .eq("product_id", product.id)
+    .eq("status", "approved")
+    .order("created_at", { ascending: false });
 
   return (
     <div className="mx-auto grid max-w-4xl grid-cols-1 gap-8 px-6 py-8 sm:grid-cols-2">
@@ -134,6 +142,11 @@ export default async function ProductoDetallePage({
             )}
           </div>
         )}
+      </div>
+
+      <div className="sm:col-span-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/50">Reseñas</h2>
+        <ProductReviews reviews={reviews ?? []} />
       </div>
     </div>
   );

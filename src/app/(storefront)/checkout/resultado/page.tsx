@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { confirmPayment } from "@/lib/mercadopago/confirm-payment";
+import { formatCLP } from "@/lib/format";
 import { ClearCartOnSuccess } from "@/components/storefront/ClearCartOnSuccess";
 
 export default async function CheckoutResultadoPage({
@@ -33,12 +34,12 @@ export default async function CheckoutResultadoPage({
   // acá solo interesa el id real del pedido para mostrar su estado.
   const cleanOrderId = orderId?.split(":")[0];
 
-  let order: { id: string; status: string; total: number } | null = null;
+  let order: { id: string; status: string; total: number; delivery_method: string } | null = null;
   if (cleanOrderId) {
     const supabase = await createClient();
     const { data } = await supabase
       .from("orders")
-      .select("id, status, total")
+      .select("id, status, total, delivery_method")
       .eq("id", cleanOrderId)
       .maybeSingle();
     order = data;
@@ -53,6 +54,36 @@ export default async function CheckoutResultadoPage({
           <ClearCartOnSuccess />
           <h1 className="text-xl font-semibold text-gold">¡Gracias por tu compra!</h1>
           <p className="mt-2 text-sm text-foreground/70">Tu pedido fue confirmado.</p>
+
+          <div className="mt-6 space-y-2 rounded-lg border border-charcoal-border bg-charcoal-light p-4 text-left text-sm">
+            <div className="flex justify-between">
+              <span className="text-foreground/60">Código de pedido</span>
+              <span className="font-mono text-xs text-gold-dark">{order!.id.slice(0, 8).toUpperCase()}</span>
+            </div>
+            {paymentId && (
+              <div className="flex justify-between">
+                <span className="text-foreground/60">Transacción Mercado Pago</span>
+                <span className="font-mono text-xs text-foreground/80">{paymentId}</span>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-charcoal-border pt-2">
+              <span className="text-foreground/60">Total pagado</span>
+              <span className="font-semibold text-gold">{formatCLP(order!.total)}</span>
+            </div>
+          </div>
+
+          <p className="mt-4 text-xs text-foreground/50">
+            {order!.delivery_method === "pickup"
+              ? "Te enviamos por email el código para validar el retiro en tienda."
+              : "Te enviamos por email el código de confirmación que le vas a dar al repartidor."}
+          </p>
+
+          <Link
+            href={`/pedido/${order!.id}`}
+            className="mt-4 inline-block text-sm text-gold-hover underline"
+          >
+            Ver el seguimiento de mi pedido
+          </Link>
         </>
       ) : mpStatus === "pending" || mpStatus === "in_process" ? (
         <>

@@ -23,6 +23,9 @@ export type Store = {
   id: string;
   name: string;
   contact_address: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  social_links: { instagram?: string; facebook?: string; whatsapp?: string } | null;
   max_delivery_radius_km: number;
   min_order_amount: number | null;
   free_shipping_min_amount: number | null;
@@ -86,6 +89,58 @@ export function StoreCard({ store, zones }: { store: Store; zones: ShippingZone[
             className="mt-1 w-full rounded-md border border-charcoal-border bg-background px-2 py-1 text-sm"
           />
         </label>
+
+        <label className="text-xs text-foreground/60">
+          Teléfono de contacto
+          <input
+            name="contact_phone"
+            type="tel"
+            defaultValue={store.contact_phone ?? ""}
+            className="mt-1 w-full rounded-md border border-charcoal-border bg-background px-2 py-1 text-sm"
+          />
+        </label>
+        <label className="text-xs text-foreground/60">
+          Email de contacto
+          <input
+            name="contact_email"
+            type="email"
+            defaultValue={store.contact_email ?? ""}
+            className="mt-1 w-full rounded-md border border-charcoal-border bg-background px-2 py-1 text-sm"
+          />
+        </label>
+        <div />
+
+        <label className="text-xs text-foreground/60">
+          Instagram (URL)
+          <input
+            name="social_instagram"
+            type="url"
+            placeholder="https://instagram.com/..."
+            defaultValue={store.social_links?.instagram ?? ""}
+            className="mt-1 w-full rounded-md border border-charcoal-border bg-background px-2 py-1 text-sm"
+          />
+        </label>
+        <label className="text-xs text-foreground/60">
+          Facebook (URL)
+          <input
+            name="social_facebook"
+            type="url"
+            placeholder="https://facebook.com/..."
+            defaultValue={store.social_links?.facebook ?? ""}
+            className="mt-1 w-full rounded-md border border-charcoal-border bg-background px-2 py-1 text-sm"
+          />
+        </label>
+        <label className="text-xs text-foreground/60">
+          WhatsApp (URL wa.me)
+          <input
+            name="social_whatsapp"
+            type="url"
+            placeholder="https://wa.me/56912345678"
+            defaultValue={store.social_links?.whatsapp ?? ""}
+            className="mt-1 w-full rounded-md border border-charcoal-border bg-background px-2 py-1 text-sm"
+          />
+        </label>
+
         <button
           type="submit"
           disabled={settingsPending}

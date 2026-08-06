@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { saveAddress, type CheckoutState } from "@/lib/checkout/actions";
 import { deleteAddress } from "@/lib/account/actions";
 import { FormMessage } from "@/components/auth/AuthCard";
+import { RegionComunaFields } from "@/components/storefront/RegionComunaFields";
 
 type Address = {
   id: string;
@@ -14,12 +15,15 @@ type Address = {
   comuna: string;
   ciudad: string;
   region: string;
+  housing_type: string | null;
+  depto_numero: string | null;
 };
 
 export function AddressManager({ addresses }: { addresses: Address[] }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState<CheckoutState, FormData>(saveAddress, null);
   const [showForm, setShowForm] = useState(addresses.length === 0);
+  const [housingType, setHousingType] = useState<"casa" | "departamento">("casa");
 
   // Mismo motivo que en CheckoutForm (Fase 4): revalidatePath() en la Server
   // Action no empuja props nuevos a este client component ya montado.
@@ -41,7 +45,9 @@ export function AddressManager({ addresses }: { addresses: Address[] }) {
           >
             <span>
               {addr.label && <span className="text-gold-dark">{addr.label}: </span>}
-              {addr.calle} {addr.numero}, {addr.comuna}, {addr.ciudad}
+              {addr.calle} {addr.numero}
+              {addr.housing_type === "departamento" && addr.depto_numero ? `, depto. ${addr.depto_numero}` : ""}
+              , {addr.comuna}, {addr.ciudad}
             </span>
             <form action={deleteAddress.bind(null, addr.id)}>
               <button type="submit" className="text-xs text-red-400 hover:underline">
@@ -74,6 +80,28 @@ export function AddressManager({ addresses }: { addresses: Address[] }) {
               placeholder="Etiqueta (ej. Casa)"
               className="col-span-2 rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
             />
+            <div className="col-span-2 flex gap-3 text-sm">
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="housing_type"
+                  value="casa"
+                  checked={housingType === "casa"}
+                  onChange={() => setHousingType("casa")}
+                />
+                Casa
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="housing_type"
+                  value="departamento"
+                  checked={housingType === "departamento"}
+                  onChange={() => setHousingType("departamento")}
+                />
+                Departamento
+              </label>
+            </div>
             <input
               name="calle"
               placeholder="Calle"
@@ -86,21 +114,18 @@ export function AddressManager({ addresses }: { addresses: Address[] }) {
               required
               className="rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
             />
-            <input
-              name="comuna"
-              placeholder="Comuna"
-              required
-              className="rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
-            />
+            {housingType === "departamento" && (
+              <input
+                name="depto_numero"
+                placeholder="N.º de departamento"
+                required
+                className="col-span-2 rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
+              />
+            )}
+            <RegionComunaFields />
             <input
               name="ciudad"
               placeholder="Ciudad"
-              required
-              className="rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
-            />
-            <input
-              name="region"
-              placeholder="Región"
               required
               className="rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
             />

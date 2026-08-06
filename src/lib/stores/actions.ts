@@ -75,8 +75,16 @@ export async function updateStoreSettings(
   const maxRadius = parseOptionalNumber(formData.get("max_delivery_radius_km"));
   const minOrder = parseOptionalNumber(formData.get("min_order_amount"));
   const freeShipping = parseOptionalNumber(formData.get("free_shipping_min_amount"));
+  const contactPhone = String(formData.get("contact_phone") || "").trim() || null;
+  const contactEmail = String(formData.get("contact_email") || "").trim() || null;
+  const instagram = String(formData.get("social_instagram") || "").trim() || null;
+  const facebook = String(formData.get("social_facebook") || "").trim() || null;
+  const whatsapp = String(formData.get("social_whatsapp") || "").trim() || null;
 
   if (maxRadius === null) return { error: "El radio máximo de entrega es obligatorio." };
+
+  const socialLinks =
+    instagram || facebook || whatsapp ? { instagram, facebook, whatsapp } : null;
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -85,11 +93,15 @@ export async function updateStoreSettings(
       max_delivery_radius_km: maxRadius,
       min_order_amount: minOrder,
       free_shipping_min_amount: freeShipping,
+      contact_phone: contactPhone,
+      contact_email: contactEmail,
+      social_links: socialLinks,
     })
     .eq("id", storeId);
   if (error) return { error: "No se pudo actualizar la sucursal." };
 
   revalidatePath("/admin/configuracion/sucursales");
+  revalidatePath("/");
   return { success: "Sucursal actualizada." };
 }
 

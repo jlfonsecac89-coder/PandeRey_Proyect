@@ -44,7 +44,7 @@ export async function createBanner(
     return { error: "No se pudo crear el banner." };
   }
 
-  revalidatePath("/admin/banners");
+  revalidatePath("/admin/configuracion/banners");
   revalidatePath("/");
   return { success: `Banner "${title}" creado.` };
 }
@@ -53,7 +53,7 @@ export async function toggleBannerActive(bannerId: string, isActive: boolean) {
   await requireRole(["admin", "marketing"]);
   const supabase = await createClient();
   await supabase.from("banners").update({ is_active: isActive }).eq("id", bannerId);
-  revalidatePath("/admin/banners");
+  revalidatePath("/admin/configuracion/banners");
   revalidatePath("/");
 }
 
@@ -62,6 +62,6 @@ export async function deleteBanner(bannerId: string, storagePath: string) {
   const supabase = await createClient();
   await supabase.storage.from("banners").remove([storagePath]);
   await supabase.from("banners").delete().eq("id", bannerId);
-  revalidatePath("/admin/banners");
+  revalidatePath("/admin/configuracion/banners");
   revalidatePath("/");
 }

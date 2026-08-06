@@ -8,8 +8,19 @@ import { requireRole } from "@/lib/auth/rbac";
 import { logAction } from "@/lib/audit/log-action";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit/limiter";
 import { TERMS_VERSION } from "@/lib/legal/terms";
+import { encryptFieldForStorage } from "@/lib/crypto/encrypt-field";
+import { isValidRut, cleanRut } from "@/lib/rut";
 
 export type ActionState = { error?: string; success?: string } | null;
+
+// `next` viaja en un campo de formulario (o querystring) que en teoría
+// cualquiera puede manipular — sin este chequeo, un link armado con
+// next=https://sitio-malicioso.cl redirigiría ahí tras un login/registro
+// legítimo (open redirect). Solo se acepta una ruta relativa propia.
+function safeNextPath(next: string): string | null {
+  if (!next.startsWith("/") || next.startsWith("//")) return null;
+  return next;
+}
 
 function validatePassword(password: string): string | null {
   if (password.length < 10) {
@@ -29,6 +40,11 @@ export async function signUp(
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
   const acceptedTerms = formData.get("accept_terms") === "on";
+  const rutRaw = String(formData.get("rut") || "").trim();
+  const phone = String(formData.get("phone") || "").trim() || null;
+  const gender = String(formData.get("gender") || "").trim() || null;
+  const birthDate = String(formData.get("birth_date") || "").trim() || null;
+  const next = String(formData.get("next") || "").trim();
 
   if (!fullName || !email || !password) {
     return { error: "Completa todos los campos." };
@@ -38,6 +54,11 @@ export async function signUp(
   }
   const passwordError = validatePassword(password);
   if (passwordError) return { error: passwordError };
+  // RUT es opcional, pero si se ingresa tiene que ser válido — nunca se
+  // confía en la validación del cliente (sección 04 del blueprint).
+  if (rutRaw && !isValidRut(rutRaw)) {
+    return { error: "El RUT ingresado no es válido." };
+  }
 
   // Sección 16: 10 intentos/hora por IP.
   const ip = await getClientIp();
@@ -46,18 +67,42 @@ export async function signUp(
     return { error: "Demasiados intentos de registro. Probá de nuevo más tarde." };
   }
 
+  const safeNext = safeNextPath(next);
+  const callbackUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`);
+  if (safeNext) callbackUrl.searchParams.set("next", safeNext);
+
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: { full_name: fullName },
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      emailRedirectTo: callbackUrl.toString(),
     },
   });
 
   if (error) return { error: error.message };
   if (!data.user) return { error: "No se pudo crear la cuenta. Intenta de nuevo." };
+
+  // rut_encrypted está en la lista de columnas protegidas de
+  // protect_profile_columns (igual que role/is_active) — un cliente no
+  // puede tocarlo con su propia sesión ni siquiera en su propia fila, así
+  // que este set inicial se hace con el cliente admin, mismo patrón que
+  // changePasswordFirstLogin. phone/gender/birth_date sí podrían ir con la
+  // sesión del usuario, pero se agrupan en la misma llamada para no
+  // depender de dos escrituras separadas justo después de crear la cuenta.
+  if (rutRaw || phone || gender || birthDate) {
+    const admin = createAdminClient();
+    await admin
+      .from("profiles")
+      .update({
+        rut_encrypted: rutRaw ? encryptFieldForStorage(cleanRut(rutRaw)) : null,
+        phone,
+        gender,
+        birth_date: birthDate,
+      })
+      .eq("id", data.user.id);
+  }
 
   await supabase.from("terms_acceptances").insert({
     user_id: data.user.id,
@@ -91,7 +136,8 @@ export async function signIn(
 
   if (error || !data.user) return { error: "Email o contraseña incorrectos." };
 
-  if (next) redirect(next);
+  const safeNext = safeNextPath(next);
+  if (safeNext) redirect(safeNext);
 
   const { data: profile } = await supabase
     .from("profiles")

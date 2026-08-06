@@ -12,7 +12,7 @@ export default async function CheckoutPage() {
   const [{ data: addresses }, { data: stores }] = await Promise.all([
     supabase
       .from("addresses")
-      .select("id, label, calle, numero, comuna, ciudad, region")
+      .select("id, label, calle, numero, comuna, ciudad, region, housing_type, depto_numero")
       .eq("user_id", profile.id)
       .order("created_at", { ascending: false }),
     supabase

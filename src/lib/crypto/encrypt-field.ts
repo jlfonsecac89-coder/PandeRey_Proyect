@@ -33,3 +33,17 @@ export function decryptField(packed: Buffer): string {
   decipher.setAuthTag(authTag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
 }
+
+// PostgREST (la API que usa supabase-js) representa `bytea` como texto en
+// formato hex de Postgres ("\x1a2b...") tanto al escribir como al leer — un
+// Buffer de Node no se serializa así solo con JSON.stringify (usaría su
+// toJSON por defecto, {type:"Buffer",data:[...]}, que Postgres no entiende
+// como bytea). Estos wrappers son el único punto de conversión.
+export function encryptFieldForStorage(plaintext: string): string {
+  return `\\x${encryptField(plaintext).toString("hex")}`;
+}
+
+export function decryptFieldFromStorage(pgBytea: string): string {
+  const hex = pgBytea.startsWith("\\x") ? pgBytea.slice(2) : pgBytea;
+  return decryptField(Buffer.from(hex, "hex"));
+}

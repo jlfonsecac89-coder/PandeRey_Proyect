@@ -13,13 +13,14 @@ const NAV_ITEMS: { href: string; label: string; roles: Profile["role"][] }[] = [
   { href: "/admin/departamentos", label: "Departamentos", roles: ["admin"] },
   { href: "/admin/categorias", label: "Categorías", roles: ["admin"] },
   { href: "/admin/colecciones", label: "Colecciones", roles: ["admin", "marketing"] },
-  { href: "/admin/banners", label: "Banners", roles: ["admin", "marketing"] },
   { href: "/admin/promociones", label: "Promociones", roles: ["admin", "marketing"] },
   { href: "/admin/analisis-ofertas", label: "Análisis de ofertas", roles: ["admin", "marketing"] },
   { href: "/admin/canje-de-puntos", label: "Canje de puntos", roles: ["admin", "marketing"] },
+  { href: "/admin/resenas", label: "Reseñas", roles: ["admin", "marketing"] },
   { href: "/admin/clientes", label: "Clientes", roles: ["admin", "marketing"] },
   { href: "/admin/configuracion/usuarios", label: "Usuarios", roles: ["admin"] },
   { href: "/admin/configuracion/sucursales", label: "Sucursales", roles: ["admin"] },
+  { href: "/admin/configuracion/banners", label: "Banners", roles: ["admin", "marketing"] },
 ];
 
 // Capa 2 (sección 10): vuelve a verificar el rol acá, además de lo que ya
