@@ -36,8 +36,8 @@ type Store = {
 
 type Step = "direccion" | "entrega" | "programar" | "pago";
 const STEPS: { key: Step; label: string }[] = [
-  { key: "direccion", label: "Dirección" },
   { key: "entrega", label: "Entrega" },
+  { key: "direccion", label: "Dirección" },
   { key: "programar", label: "Fecha y hora" },
   { key: "pago", label: "Pago" },
 ];
@@ -57,7 +57,7 @@ export function CheckoutForm({
   const { items, hydrated, subtotal } = useCart();
   const [couponCode, setCouponCode] = useState("");
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
-  const [step, setStep] = useState<Step>("direccion");
+  const [step, setStep] = useState<Step>("entrega");
 
   useEffect(() => {
     if (hydrated && items.length === 0) router.replace("/carrito");
@@ -107,10 +107,10 @@ export function CheckoutForm({
     }
   }, [addressState, router]);
 
-  // Chequeo automático de cobertura: apenas hay sucursal + dirección
-  // elegidas (paso "Dirección") se dispara solo, sin esperar a que el
-  // cliente elija "Despacho a domicilio" — así, cuando llega al paso
-  // "Entrega", ya sabe si esa opción sirve o no.
+  // Chequeo automático de cobertura: la sucursal se elige en el paso
+  // "Entrega" y la dirección en el paso "Dirección" — apenas están las dos,
+  // se dispara solo (sin esperar a que el cliente confirme nada), así el
+  // paso "Dirección" ya puede mostrar si el despacho tiene cobertura.
   useEffect(() => {
     if (!storeId || !addressId) return;
     const fd = new FormData();
@@ -131,8 +131,13 @@ export function CheckoutForm({
   const estimatedPointsDiscount = Math.floor(pointsToRedeem * pointsToClpRate);
   const total = Math.max(totalBeforeDiscounts - estimatedPointsDiscount, 0);
 
-  const canLeaveDireccion = !!storeId && !!addressId && !addingAddress;
-  const canLeaveEntrega = deliveryMethod === "pickup" || (!!shippingQuote && !shippingError);
+  // Paso 1 (Entrega): solo hace falta la sucursal — la dirección todavía no
+  // se pidió, así que acá no se puede validar cobertura/costo de despacho.
+  const canLeaveEntrega = !!storeId;
+  // Paso 2 (Dirección): con la sucursal y el método de entrega ya elegidos,
+  // acá sí se conoce si el despacho tiene cobertura.
+  const canLeaveDireccion =
+    !!addressId && !addingAddress && (deliveryMethod === "pickup" || (!!shippingQuote && !shippingError));
 
   if (!hydrated || items.length === 0) return null;
 
@@ -166,8 +171,8 @@ export function CheckoutForm({
           })}
         </ol>
 
-        {/* Paso 1: dirección */}
-        {step === "direccion" && (
+        {/* Paso 1: tipo de entrega */}
+        {step === "entrega" && (
           <div className="mt-6 space-y-6">
             <section>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">Sucursal</h2>
@@ -201,11 +206,58 @@ export function CheckoutForm({
 
             <section>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">
+                Método de entrega
+              </h2>
+              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setDeliveryMethod("pickup")}
+                  className={`rounded-md border p-4 text-left text-sm ${deliveryMethod === "pickup" ? "border-gold text-gold" : "border-charcoal-border text-foreground-muted"}`}
+                >
+                  <span className="block font-medium">Retiro en tienda</span>
+                  <span className="mt-1 block text-xs text-foreground-muted">Sin costo de envío.</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeliveryMethod("shipping")}
+                  className={`rounded-md border p-4 text-left text-sm ${deliveryMethod === "shipping" ? "border-gold text-gold" : "border-charcoal-border text-foreground-muted"}`}
+                >
+                  <span className="block font-medium">Despacho a domicilio</span>
+                  <span className="mt-1 block text-xs text-foreground-muted">
+                    En el próximo paso pedimos tu dirección para calcular el envío.
+                  </span>
+                </button>
+              </div>
+            </section>
+
+            {selectedStore?.min_order_amount != null && subtotal < selectedStore.min_order_amount && (
+              <p className="text-sm text-burgundy-hover">
+                El pedido mínimo para esta sucursal es {formatCLP(selectedStore.min_order_amount)}.
+              </p>
+            )}
+
+            <button
+              type="button"
+              disabled={!canLeaveEntrega}
+              onClick={() => setStep("direccion")}
+              className="w-full rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover disabled:opacity-50"
+            >
+              Continuar
+            </button>
+          </div>
+        )}
+
+        {/* Paso 2: dirección */}
+        {step === "direccion" && (
+          <div className="mt-6 space-y-6">
+            <section>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">
                 Tu dirección
               </h2>
               <p className="mt-1 text-xs text-foreground-muted">
-                La necesitamos para saber si podemos despacharte a domicilio — si preferís retirar en tienda,
-                igual queda guardada para la próxima.
+                {deliveryMethod === "shipping"
+                  ? "La necesitamos para calcular el costo y la cobertura del despacho."
+                  : "Elegiste retiro en tienda — igual la guardamos para la próxima."}
               </p>
 
               {!addingAddress && addresses.length > 0 && (
@@ -331,75 +383,42 @@ export function CheckoutForm({
               )}
             </section>
 
-            {selectedStore?.min_order_amount != null && subtotal < selectedStore.min_order_amount && (
-              <p className="text-sm text-burgundy-hover">
-                El pedido mínimo para esta sucursal es {formatCLP(selectedStore.min_order_amount)}.
-              </p>
-            )}
-
-            <button
-              type="button"
-              disabled={!canLeaveDireccion}
-              onClick={() => setStep("entrega")}
-              className="w-full rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover disabled:opacity-50"
-            >
-              Continuar
-            </button>
-          </div>
-        )}
-
-        {/* Paso 2: entrega */}
-        {step === "entrega" && (
-          <div className="mt-6 space-y-6">
-            <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">
-                Método de entrega
-              </h2>
-              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setDeliveryMethod("pickup")}
-                  className={`rounded-md border p-4 text-left text-sm ${deliveryMethod === "pickup" ? "border-gold text-gold" : "border-charcoal-border text-foreground-muted"}`}
-                >
-                  <span className="block font-medium">Retiro en tienda</span>
-                  <span className="mt-1 block text-xs text-foreground-muted">Sin costo de envío.</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => shippingQuote && !shippingError && setDeliveryMethod("shipping")}
-                  disabled={!!shippingError}
-                  className={`rounded-md border p-4 text-left text-sm disabled:cursor-not-allowed disabled:opacity-60 ${deliveryMethod === "shipping" ? "border-gold text-gold" : "border-charcoal-border text-foreground-muted"}`}
-                >
-                  <span className="block font-medium">Despacho a domicilio</span>
+            {deliveryMethod === "shipping" && (
+              <section>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">
+                  Cobertura de despacho
+                </h2>
+                <div className="mt-2 rounded-md border border-charcoal-border p-3 text-sm">
                   {shippingPending && (
-                    <span className="mt-1 block text-xs text-foreground-muted">Verificando cobertura...</span>
+                    <span className="block text-xs text-foreground-muted">Verificando cobertura...</span>
                   )}
                   {shippingQuote && (
-                    <span className="mt-1 block text-xs text-gold-hover">
+                    <span className="block text-xs text-gold-hover">
                       Envío {formatCLP(shippingQuote.shippingCost)}
                       {shippingQuote.distanceKm != null ? ` · ${shippingQuote.distanceKm.toFixed(1)} km` : ""}
                     </span>
                   )}
                   {shippingError && (
-                    <span className="mt-1 block text-xs text-burgundy-hover">
-                      Fuera del rango de cobertura de esta sucursal.
+                    <span className="block text-xs text-burgundy-hover">
+                      Fuera del rango de cobertura de esta sucursal — volvé a &quot;Entrega&quot; para elegir
+                      retiro en tienda.
                     </span>
                   )}
-                </button>
-              </div>
-            </section>
+                </div>
+              </section>
+            )}
 
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setStep("direccion")}
+                onClick={() => setStep("entrega")}
                 className="rounded-full border border-charcoal-border px-5 py-2.5 text-sm text-foreground-muted transition hover:border-gold-dark hover:text-gold"
               >
                 Atrás
               </button>
               <button
                 type="button"
-                disabled={!canLeaveEntrega}
+                disabled={!canLeaveDireccion}
                 onClick={() => setStep("programar")}
                 className="flex-1 rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover disabled:opacity-50"
               >
@@ -548,7 +567,7 @@ export function CheckoutForm({
               <span className="text-foreground-muted">IVA (19%)</span>
               <span className="text-foreground">{formatCLP(splitIva(subtotal).iva)}</span>
             </div>
-            {/* El envío recién se muestra una vez que el paso de entrega lo
+            {/* El envío recién se muestra una vez que el paso de dirección lo
                 calculó — antes de eso no se conoce, así que no se inventa un
                 valor provisorio. */}
             {deliveryMethod === "shipping" && shippingKnown && (
@@ -603,7 +622,7 @@ export function CheckoutForm({
             </div>
             <p className="text-right text-xs text-foreground-muted/70">
               IVA incluido
-              {deliveryMethod === "shipping" && !shippingKnown ? " · envío se calcula en el paso de entrega" : ""}
+              {deliveryMethod === "shipping" && !shippingKnown ? " · envío se calcula en el paso de dirección" : ""}
             </p>
           </div>
         </div>
