@@ -28,7 +28,7 @@ export function NewsletterForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-md bg-gold px-4 py-2 text-sm font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+        className="w-full rounded-md bg-gold px-4 py-2 text-sm font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
       >
         {pending ? "Enviando..." : "Suscribirme"}
       </button>

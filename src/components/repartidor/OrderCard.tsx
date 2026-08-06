@@ -85,7 +85,7 @@ export function OrderCard({ order }: { order: RepartidorOrder }) {
             <button
               type="submit"
               disabled={inRoutePending}
-              className="w-full rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+              className="w-full rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
             >
               {inRoutePending ? "..." : "Salir en camino"}
             </button>
@@ -98,7 +98,7 @@ export function OrderCard({ order }: { order: RepartidorOrder }) {
             <button
               type="submit"
               disabled={atAddressPending}
-              className="w-full rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+              className="w-full rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
             >
               {atAddressPending ? "..." : "Ubicación alcanzada"}
             </button>
@@ -118,7 +118,7 @@ export function OrderCard({ order }: { order: RepartidorOrder }) {
               <button
                 type="submit"
                 disabled={codePending || order.delivery_code_locked}
-                className="rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+                className="rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
               >
                 Confirmar
               </button>
@@ -154,7 +154,7 @@ export function OrderCard({ order }: { order: RepartidorOrder }) {
             <button
               type="submit"
               disabled={issuePending}
-              className="w-full rounded-md bg-red-500/80 px-3 py-1.5 text-xs font-medium text-background hover:bg-red-500 disabled:opacity-50"
+              className="w-full rounded-md bg-red-500/80 px-3 py-1.5 text-xs font-medium text-ink hover:bg-red-500 disabled:opacity-50"
             >
               {issuePending ? "..." : "Confirmar problema"}
             </button>

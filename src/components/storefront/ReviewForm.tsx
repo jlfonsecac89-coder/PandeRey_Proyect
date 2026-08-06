@@ -56,7 +56,7 @@ export function ReviewForm({
       <button
         type="submit"
         disabled={pending || rating === 0}
-        className="mt-2 rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+        className="mt-2 rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
       >
         {pending ? "Enviando..." : "Enviar reseña"}
       </button>

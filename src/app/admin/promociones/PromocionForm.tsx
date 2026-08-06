@@ -157,7 +157,7 @@ export function PromocionForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-gold px-4 py-1.5 text-sm font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+          className="rounded-md bg-gold px-4 py-1.5 text-sm font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
         >
           {pending ? "Creando..." : "Crear promoción"}
         </button>

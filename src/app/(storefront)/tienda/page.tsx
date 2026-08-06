@@ -256,7 +256,7 @@ export default async function TiendaPage({
             <Link
               key={product.id}
               href={`/tienda/${product.slug}`}
-              className="group overflow-hidden rounded-xl border border-charcoal-border bg-background-elevated shadow-card transition hover:-translate-y-0.5 hover:border-gold-dark"
+              className="group overflow-hidden rounded-2xl border border-charcoal-border bg-background-elevated shadow-card transition hover:-translate-y-1 hover:border-gold-dark"
             >
               <div className="relative aspect-square overflow-hidden bg-background">
                 {imagePath ? (
@@ -267,8 +267,14 @@ export default async function TiendaPage({
                     className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-foreground-muted/25">
-                    <DepartmentIcon name="" className="h-10 w-10" />
+                  <div
+                    className="flex h-full items-center justify-center text-gold-dark/35"
+                    style={{
+                      background:
+                        "radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--color-gold) 12%, transparent), transparent 70%)",
+                    }}
+                  >
+                    <DepartmentIcon name={product.name} className="h-10 w-10" />
                   </div>
                 )}
                 <div className="absolute left-2 top-2 flex flex-col gap-1">
@@ -278,14 +284,14 @@ export default async function TiendaPage({
                     </span>
                   )}
                   {product.is_special_event && (
-                    <span className="rounded-full bg-gold px-2 py-0.5 text-[10px] font-medium text-background shadow-card">
+                    <span className="rounded-full bg-gold px-2 py-0.5 text-[10px] font-medium text-ink shadow-card">
                       Edición limitada
                     </span>
                   )}
                 </div>
               </div>
               <div className="p-3.5">
-                <p className="text-sm text-foreground">{product.name}</p>
+                <p className="font-display text-[15px] font-medium leading-snug text-foreground">{product.name}</p>
                 <div className="mt-1.5 flex items-center justify-between gap-2">
                   {clearancePct ? (
                     <p className="text-sm font-semibold text-gold">

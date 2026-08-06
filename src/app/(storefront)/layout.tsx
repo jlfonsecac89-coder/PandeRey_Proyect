@@ -35,6 +35,12 @@ export default async function StorefrontLayout({ children }: { children: React.R
                 Tienda
               </Link>
               <Link
+                href="/seguimiento"
+                className="rounded-md px-3 py-1.5 text-sm text-foreground-muted transition hover:text-gold"
+              >
+                Seguimiento
+              </Link>
+              <Link
                 href={profile ? "/cuenta" : "/auth/login"}
                 className="rounded-md px-3 py-1.5 text-sm text-foreground-muted transition hover:text-gold"
               >

@@ -81,8 +81,14 @@ export default async function ProductoDetallePage({
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-foreground-muted/25">
-            <DepartmentIcon name="" className="h-16 w-16" />
+          <div
+            className="flex h-full items-center justify-center text-gold-dark/40"
+            style={{
+              background:
+                "radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--color-gold) 14%, transparent), transparent 70%)",
+            }}
+          >
+            <DepartmentIcon name={product.name} className="h-16 w-16" />
           </div>
         )}
       </div>

@@ -104,7 +104,7 @@ export function CookieConsentBanner() {
               type="button"
               disabled={saving}
               onClick={() => decide(analytics, marketing)}
-              className="rounded-md bg-gold px-4 py-1.5 text-sm font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+              className="rounded-md bg-gold px-4 py-1.5 text-sm font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
             >
               Guardar preferencias
             </button>
@@ -114,7 +114,7 @@ export function CookieConsentBanner() {
                 type="button"
                 disabled={saving}
                 onClick={() => decide(true, true)}
-                className="rounded-md bg-gold px-4 py-1.5 text-sm font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+                className="rounded-md bg-gold px-4 py-1.5 text-sm font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
               >
                 Aceptar todas
               </button>

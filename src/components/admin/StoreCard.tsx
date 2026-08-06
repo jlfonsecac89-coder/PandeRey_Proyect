@@ -144,7 +144,7 @@ export function StoreCard({ store, zones }: { store: Store; zones: ShippingZone[
         <button
           type="submit"
           disabled={settingsPending}
-          className="col-span-3 rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+          className="col-span-3 rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
         >
           {settingsPending ? "Guardando..." : "Guardar"}
         </button>
@@ -192,7 +192,7 @@ export function StoreCard({ store, zones }: { store: Store; zones: ShippingZone[
           <button
             type="submit"
             disabled={zonePending}
-            className="rounded-md bg-gold px-2 py-1 font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+            className="rounded-md bg-gold px-2 py-1 font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
           >
             Agregar
           </button>

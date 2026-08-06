@@ -317,7 +317,7 @@ export function CheckoutForm({
                 <button
                   type="submit"
                   disabled={addressPending}
-                  className="rounded-md bg-gold px-4 py-1.5 text-sm font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+                  className="rounded-md bg-gold px-4 py-1.5 text-sm font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
                 >
                   {addressPending ? "Ubicando..." : "Guardar dirección"}
                 </button>
@@ -446,7 +446,7 @@ export function CheckoutForm({
               !storeId ||
               (deliveryMethod === "shipping" && !addressId)
             }
-            className="w-full rounded-full bg-gold px-5 py-3 text-sm font-semibold text-background shadow-card transition hover:bg-gold-hover disabled:opacity-50"
+            className="w-full rounded-full bg-gold px-5 py-3 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover disabled:opacity-50"
           >
             {checkoutPending ? "Redirigiendo a Mercado Pago..." : "Pagar con Mercado Pago"}
           </button>

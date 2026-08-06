@@ -15,7 +15,8 @@ export default async function DireccionesPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-gold">Mis direcciones</h1>
+      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Envíos</p>
+      <h1 className="mt-1 font-display text-2xl font-medium text-foreground">Mis direcciones</h1>
       <div className="mt-4">
         <AddressManager addresses={addresses ?? []} />
       </div>

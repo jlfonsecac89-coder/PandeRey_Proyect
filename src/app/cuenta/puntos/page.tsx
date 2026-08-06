@@ -27,39 +27,39 @@ export default async function PuntosPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-gold">Mis puntos</h1>
-      <div className="mt-2 rounded-lg border border-charcoal-border bg-charcoal-light p-4">
-        <p className="text-sm text-foreground/60">Saldo actual</p>
-        <p className="text-2xl font-bold text-gold">{profile.points_balance} puntos</p>
-        <p className="text-xs text-foreground/50">
+      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Fidelización</p>
+      <h1 className="mt-1 font-display text-2xl font-medium text-foreground">Mis puntos</h1>
+
+      <div className="mt-4 rounded-2xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+        <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Saldo actual</p>
+        <p className="mt-1 font-display text-3xl font-medium text-gold">{profile.points_balance} puntos</p>
+        <p className="mt-1 text-xs text-foreground-muted">
           Equivalen a {formatCLP(profile.points_balance * rate)} de descuento en tu próxima compra.
         </p>
       </div>
 
-      <h2 className="mt-6 text-sm font-semibold uppercase tracking-wide text-foreground/50">
-        Historial
-      </h2>
-      <ul className="mt-2 space-y-2">
+      <h2 className="mt-8 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Historial</h2>
+      <ul className="mt-3 space-y-2">
         {(ledger ?? []).map((entry) => (
           <li
             key={entry.id}
-            className="flex items-center justify-between rounded-md border border-charcoal-border bg-charcoal-light p-3 text-sm"
+            className="flex items-center justify-between rounded-xl border border-charcoal-border bg-background-elevated p-3.5 text-sm shadow-card"
           >
             <div>
-              <p className="text-foreground/90">{TYPE_LABELS[entry.type] ?? entry.type}</p>
-              {entry.description && <p className="text-xs text-foreground/50">{entry.description}</p>}
-              <p className="text-xs text-foreground/40">
+              <p className="text-foreground">{TYPE_LABELS[entry.type] ?? entry.type}</p>
+              {entry.description && <p className="text-xs text-foreground-muted">{entry.description}</p>}
+              <p className="text-xs text-foreground-muted/70">
                 {new Date(entry.created_at).toLocaleDateString("es-CL")}
               </p>
             </div>
-            <p className={entry.points >= 0 ? "text-gold" : "text-red-400"}>
+            <p className={entry.points >= 0 ? "font-semibold text-gold" : "font-semibold text-burgundy"}>
               {entry.points >= 0 ? "+" : ""}
               {entry.points}
             </p>
           </li>
         ))}
         {(ledger ?? []).length === 0 && (
-          <p className="text-sm text-foreground/50">Todavía no tenés movimientos de puntos.</p>
+          <p className="text-sm text-foreground-muted">Todavía no tenés movimientos de puntos.</p>
         )}
       </ul>
     </div>

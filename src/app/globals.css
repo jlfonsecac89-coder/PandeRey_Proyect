@@ -1,34 +1,43 @@
 @import "tailwindcss";
 
-/* Identidad Pan de Rey — panadería artesanal de posicionamiento premium
-   ("Rey"). Paleta cálida oscura (horno, madera, oro viejo) en vez de un
-   dorado sobre negro genérico: fondo casi-negro con temperatura cálida,
-   crema suave para texto, un dorado más profundo (no el ámbar brillante
-   típico de dashboards oscuros) y un burdeos como segundo acento para no
-   apoyarse solo en el dorado en toda la interfaz. */
+/* Identidad Pan de Rey — panadería artesanal, cálida y amigable: fondo
+   claro tipo pergamino (harina, madera clara, luz de panadería de barrio)
+   en vez del negro premium de la primera pasada — la referencia que pidió
+   el cliente (maricaro-store.vercel.app) usa exactamente este registro:
+   claro, suave, con tarjetas blancas y acentos cálidos. Dorado se mantiene
+   como acento de marca (crest/corona del logo); se suma terracota (color
+   de la corteza del pan) como segundo acento para variar. Burdeos queda
+   como banda oscura de contraste (footer). */
 :root {
-  --background: #12100C;
-  --background-elevated: #1D1811;
-  --foreground: #F1E9D8;
-  --foreground-muted: #B8AC94;
+  --background: #FBF3E6;
+  --background-elevated: #FFFFFF;
+  --background-alt: #F4E6D2;
+  --foreground: #2E2013;
+  --foreground-muted: #7C6B54;
 
-  --color-gold: #C6A036;
-  --color-gold-hover: #E2C468;
+  --color-ink: #211609; /* texto fijo y oscuro para usar SOBRE botones de color, sin depender de --background */
+
+  --color-gold: #B4872A;
+  --color-gold-hover: #C89A3E;
   --color-gold-dark: #8C6D2F;
-  --color-charcoal-light: #1D1811;
-  --color-charcoal-border: rgba(226, 196, 104, 0.14);
-  --color-glass-fill: rgba(29, 24, 17, 0.78);
-  --color-burgundy: #7A2E2E;
-  --color-burgundy-hover: #9C4444;
+  --color-charcoal-light: #FFFFFF;
+  --color-charcoal-border: rgba(46, 32, 19, 0.12);
+  --color-glass-fill: rgba(251, 243, 230, 0.85);
+  --color-burgundy: #6B2A2A;
+  --color-burgundy-hover: #8C3A3A;
+  --color-terracotta: #C1512F;
+  --color-terracotta-hover: #D66B45;
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 12px 28px -12px rgba(0, 0, 0, 0.6);
+  --shadow-card: 0 1px 2px rgba(46, 32, 19, 0.06), 0 14px 28px -14px rgba(46, 32, 19, 0.22);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-background-elevated: var(--background-elevated);
+  --color-background-alt: var(--background-alt);
   --color-foreground: var(--foreground);
   --color-foreground-muted: var(--foreground-muted);
+  --color-ink: var(--color-ink);
   --color-gold: var(--color-gold);
   --color-gold-hover: var(--color-gold-hover);
   --color-gold-dark: var(--color-gold-dark);
@@ -37,6 +46,8 @@
   --color-glass-fill: var(--color-glass-fill);
   --color-burgundy: var(--color-burgundy);
   --color-burgundy-hover: var(--color-burgundy-hover);
+  --color-terracotta: var(--color-terracotta);
+  --color-terracotta-hover: var(--color-terracotta-hover);
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
   --font-mono: var(--font-geist-mono);

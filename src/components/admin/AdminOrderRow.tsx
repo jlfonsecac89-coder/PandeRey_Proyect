@@ -121,7 +121,7 @@ export function AdminOrderRow({
               <button
                 type="submit"
                 disabled={readyPending}
-                className="rounded-md bg-gold px-2 py-1 text-xs font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+                className="rounded-md bg-gold px-2 py-1 text-xs font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
               >
                 Marcar preparado
               </button>
@@ -145,7 +145,7 @@ export function AdminOrderRow({
               <button
                 type="submit"
                 disabled={assignPending}
-                className="rounded-md bg-gold px-2 py-1 text-xs font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+                className="rounded-md bg-gold px-2 py-1 text-xs font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
               >
                 Asignar
               </button>
@@ -159,7 +159,7 @@ export function AdminOrderRow({
               <button
                 type="submit"
                 disabled={pickupPending}
-                className="rounded-md bg-gold px-2 py-1 text-xs font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+                className="rounded-md bg-gold px-2 py-1 text-xs font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
               >
                 Confirmar retiro
               </button>
@@ -172,7 +172,7 @@ export function AdminOrderRow({
               <button
                 type="submit"
                 disabled={returnPending}
-                className="rounded-md bg-gold px-2 py-1 text-xs font-medium text-background hover:bg-gold-hover disabled:opacity-50"
+                className="rounded-md bg-gold px-2 py-1 text-xs font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
               >
                 Confirmar devolución
               </button>

@@ -4,14 +4,7 @@ import { getCurrentProfile } from "@/lib/auth/session";
 import { signOut } from "@/lib/auth/actions";
 import { CartProvider } from "@/lib/cart/CartContext";
 import { Logo } from "@/components/storefront/Logo";
-
-const NAV_ITEMS = [
-  { href: "/cuenta", label: "Resumen" },
-  { href: "/cuenta/pedidos", label: "Mis pedidos" },
-  { href: "/cuenta/direcciones", label: "Direcciones" },
-  { href: "/cuenta/puntos", label: "Puntos" },
-  { href: "/cuenta/datos", label: "Mis datos" },
-];
+import { CuentaNav } from "@/components/storefront/CuentaNav";
 
 export default async function CuentaLayout({ children }: { children: React.ReactNode }) {
   const profile = await getCurrentProfile();
@@ -35,19 +28,7 @@ export default async function CuentaLayout({ children }: { children: React.React
             </div>
           </div>
         </header>
-        <nav className="border-b border-charcoal-border">
-          <div className="mx-auto flex max-w-4xl flex-wrap gap-1 px-6 py-2">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="rounded-full px-3.5 py-1.5 text-sm text-foreground-muted transition hover:bg-gold/10 hover:text-gold"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        </nav>
+        <CuentaNav />
         <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-8">{children}</main>
       </div>
     </CartProvider>

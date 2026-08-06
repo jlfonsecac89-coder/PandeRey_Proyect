@@ -29,41 +29,32 @@ function WhatsappIcon({ className }: { className?: string }) {
   );
 }
 
-export function SocialIcons({ links, className }: { links: SocialLinks; className?: string }) {
+export function SocialIcons({
+  links,
+  className,
+  linkClassName,
+}: {
+  links: SocialLinks;
+  className?: string;
+  linkClassName?: string;
+}) {
   if (!links || (!links.instagram && !links.facebook && !links.whatsapp)) return null;
+  const linkClass = linkClassName ?? "text-foreground/60 hover:text-gold";
 
   return (
     <div className={`flex items-center gap-3 ${className ?? ""}`}>
       {links.instagram && (
-        <a
-          href={links.instagram}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Instagram"
-          className="text-foreground/60 hover:text-gold"
-        >
+        <a href={links.instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className={linkClass}>
           <InstagramIcon className="h-5 w-5" />
         </a>
       )}
       {links.facebook && (
-        <a
-          href={links.facebook}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Facebook"
-          className="text-foreground/60 hover:text-gold"
-        >
+        <a href={links.facebook} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className={linkClass}>
           <FacebookIcon className="h-5 w-5" />
         </a>
       )}
       {links.whatsapp && (
-        <a
-          href={links.whatsapp}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="WhatsApp"
-          className="text-foreground/60 hover:text-gold"
-        >
+        <a href={links.whatsapp} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" className={linkClass}>
           <WhatsappIcon className="h-5 w-5" />
         </a>
       )}

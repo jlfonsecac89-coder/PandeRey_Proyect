@@ -122,7 +122,7 @@ export function AddToCartForm({
       <button
         type="submit"
         disabled={missingRequired}
-        className="rounded-full bg-gold px-6 py-2.5 text-sm font-semibold text-background shadow-card transition hover:bg-gold-hover disabled:opacity-50"
+        className="rounded-full bg-gold px-6 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover disabled:opacity-50"
       >
         Agregar al carrito
       </button>

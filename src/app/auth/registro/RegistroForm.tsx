@@ -138,7 +138,7 @@ export function RegistroForm({ next }: { next?: string }) {
         <button
           type="submit"
           disabled={pending || rutError}
-          className="w-full rounded-full bg-gold px-3 py-2.5 text-sm font-semibold text-background shadow-card transition hover:bg-gold-hover disabled:opacity-50"
+          className="w-full rounded-full bg-gold px-3 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover disabled:opacity-50"
         >
           {pending ? "Creando cuenta..." : "Crear cuenta"}
         </button>

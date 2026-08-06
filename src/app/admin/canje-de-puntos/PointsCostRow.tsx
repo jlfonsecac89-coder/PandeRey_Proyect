@@ -34,7 +34,7 @@ export function PointsCostRow({
           <button
             type="submit"
             disabled={pending}
-            className="rounded-md bg-charcoal-border px-2 py-1 text-xs hover:bg-gold hover:text-background disabled:opacity-50"
+            className="rounded-md bg-charcoal-border px-2 py-1 text-xs hover:bg-gold hover:text-ink disabled:opacity-50"
           >
             {pending ? "..." : "Guardar"}
           </button>

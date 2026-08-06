@@ -108,7 +108,7 @@ export default async function Home() {
           <div className="mt-3 flex gap-3">
             <Link
               href="/tienda"
-              className="rounded-full bg-gold px-6 py-2.5 text-sm font-semibold text-background shadow-card transition hover:bg-gold-hover"
+              className="rounded-full bg-gold px-6 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover"
             >
               Ver la tienda
             </Link>
@@ -119,6 +119,30 @@ export default async function Home() {
               Visítanos
             </a>
           </div>
+
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs text-foreground-muted">
+            <span className="flex items-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-gold-dark">
+                <path d="M4 10 12 4l8 6v9a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1v-9Z" />
+              </svg>
+              Retiro en tienda
+            </span>
+            <span className="flex items-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-gold-dark">
+                <path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" />
+                <circle cx="7.5" cy="18" r="1.5" />
+                <circle cx="17.5" cy="18" r="1.5" />
+              </svg>
+              Despacho a domicilio
+            </span>
+            <span className="flex items-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-gold-dark">
+                <path d="M4 13c0-4.5 3.5-8 8-8s8 3.5 8 8-3 6-8 6-8-1.5-8-6Z" />
+                <path d="M8 12c1-1.5 2.5-2 4-2s3 .5 4 2" />
+              </svg>
+              100% artesanal
+            </span>
+          </div>
         </div>
       </div>
 
@@ -127,16 +151,59 @@ export default async function Home() {
       )}
 
       {/* Historia */}
-      <section className="mx-auto max-w-3xl px-6 text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Nuestra historia</p>
-        <h2 className="mt-2 font-display text-3xl font-medium text-foreground">Hecho a mano, todos los días</h2>
-        <div className="mx-auto mt-4 h-px w-12 bg-gold-dark/60" />
-        <p className="mt-6 text-[15px] leading-relaxed text-foreground-muted">
-          En {store?.name ?? "Pan de Rey"} amasamos, horneamos y decoramos cada producto en nuestro propio obrador —
-          sin atajos industriales. Empezamos con pan del día para el barrio y fuimos sumando pastelería y café a
-          medida que nuestros vecinos nos lo pedían. Seguimos siendo el mismo taller artesanal de siempre: masas de
-          fermentación lenta, relleno y coberturas a elección, y tortas hechas a pedido para cada celebración.
-        </p>
+      <section className="mx-auto max-w-5xl px-6">
+        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 sm:items-center">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Nuestra historia</p>
+            <h2 className="mt-2 font-display text-3xl font-medium text-foreground">Hecho a mano, todos los días</h2>
+            <div className="mt-4 h-px w-12 bg-gold-dark/60" />
+            <p className="mt-6 text-[15px] leading-relaxed text-foreground-muted">
+              En {store?.name ?? "Pan de Rey"} amasamos, horneamos y decoramos cada producto en nuestro propio
+              obrador — sin atajos industriales. Empezamos con pan del día para el barrio y fuimos sumando
+              pastelería y café a medida que nuestros vecinos nos lo pedían.
+            </p>
+          </div>
+          <div className="space-y-6">
+            {[
+              {
+                title: "Ingredientes reales",
+                text: "Harinas, mantequilla y fruta de verdad — sin mezclas industriales ni atajos.",
+                icon: (
+                  <path d="M4 13c0-4.5 3.5-8 8-8s8 3.5 8 8-3 6-8 6-8-1.5-8-6Z" />
+                ),
+              },
+              {
+                title: "Horneado diario",
+                text: "Cada partida sale del horno el mismo día que se vende, nunca de un depósito.",
+                icon: (
+                  <>
+                    <path d="M5 9h11v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9Z" />
+                    <path d="M16 10h2a2 2 0 0 1 0 4h-2" />
+                  </>
+                ),
+              },
+              {
+                title: "Hecho a pedido",
+                text: "Relleno, cobertura y tamaño a elección en tortas y productos de celebración.",
+                icon: (
+                  <path d="M4 20h16M5 20v-6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6M4 12l1.5-4h13L20 12" />
+                ),
+              },
+            ].map((item) => (
+              <div key={item.title} className="flex gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gold/10">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5 text-gold-dark">
+                    {item.icon}
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-display text-base font-medium text-foreground">{item.title}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-foreground-muted">{item.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* Especialidades por departamento */}
@@ -178,14 +245,19 @@ export default async function Home() {
             </Link>
           </div>
           <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {bestSellers.map((product) => {
+            {bestSellers.map((product, index) => {
               const imagePath = firstImagePath(product.images);
               return (
                 <Link
                   key={product.id}
                   href={`/tienda/${product.slug}`}
-                  className="group overflow-hidden rounded-xl border border-charcoal-border bg-background-elevated shadow-card transition hover:-translate-y-0.5 hover:border-gold-dark"
+                  className="group relative overflow-hidden rounded-2xl border border-charcoal-border bg-background-elevated shadow-card transition hover:-translate-y-1 hover:border-gold-dark"
                 >
+                  {index < 3 && (
+                    <span className="absolute left-2 top-2 z-10 rounded-full bg-terracotta px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white shadow-card">
+                      Más vendido
+                    </span>
+                  )}
                   <div className="aspect-square overflow-hidden bg-background">
                     {imagePath ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -195,14 +267,20 @@ export default async function Home() {
                         className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center text-foreground-muted/30">
-                        <DepartmentIcon name="" className="h-10 w-10" />
+                      <div
+                        className="flex h-full items-center justify-center text-gold-dark/35"
+                        style={{
+                          background:
+                            "radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--color-gold) 12%, transparent), transparent 70%)",
+                        }}
+                      >
+                        <DepartmentIcon name={product.name} className="h-10 w-10" />
                       </div>
                     )}
                   </div>
-                  <div className="p-3">
-                    <p className="text-sm text-foreground">{product.name}</p>
-                    <p className="mt-0.5 text-sm font-semibold text-gold">{formatCLP(product.price)}</p>
+                  <div className="p-3.5">
+                    <p className="font-display text-[15px] font-medium leading-snug text-foreground">{product.name}</p>
+                    <p className="mt-1 text-sm font-semibold text-gold">{formatCLP(product.price)}</p>
                   </div>
                 </Link>
               );

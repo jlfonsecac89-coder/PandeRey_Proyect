@@ -29,7 +29,7 @@ function ValorForm({ productId, groupId }: { productId: string; groupId: string 
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-charcoal-border px-2 py-1 text-xs hover:bg-gold hover:text-background"
+        className="rounded-md bg-charcoal-border px-2 py-1 text-xs hover:bg-gold hover:text-ink"
       >
         + valor
       </button>
@@ -91,7 +91,7 @@ export function VariantesSection({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-charcoal-border px-3 py-1.5 text-sm hover:bg-gold hover:text-background"
+          className="rounded-md bg-charcoal-border px-3 py-1.5 text-sm hover:bg-gold hover:text-ink"
         >
           + grupo
         </button>

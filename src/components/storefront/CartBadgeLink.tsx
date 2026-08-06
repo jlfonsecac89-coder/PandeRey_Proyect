@@ -13,7 +13,7 @@ export function CartBadgeLink() {
     >
       Carrito
       {itemCount > 0 && (
-        <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-xs font-semibold text-background">
+        <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-xs font-semibold text-ink">
           {itemCount}
         </span>
       )}
