@@ -1,6 +1,7 @@
 import "server-only";
 import { Preference } from "mercadopago";
 import { getMercadoPagoClient } from "./client";
+import { getSiteUrl } from "@/lib/site-url";
 
 export type PreferenceItemInput = {
   id: string;
@@ -19,7 +20,7 @@ export async function createOrderPreference(params: {
   const client = getMercadoPagoClient();
   const preference = new Preference(client);
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL!;
+  const siteUrl = await getSiteUrl();
   const items = [...params.items];
   if (params.shippingCost > 0) {
     items.push({ id: "envio", title: "Costo de envío", quantity: 1, unit_price: params.shippingCost });

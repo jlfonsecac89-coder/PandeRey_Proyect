@@ -1,34 +1,34 @@
 @import "tailwindcss";
 
-/* Identidad Pan de Rey — panadería artesanal, cálida y amigable: fondo
-   claro tipo pergamino (harina, madera clara, luz de panadería de barrio)
-   en vez del negro premium de la primera pasada — la referencia que pidió
-   el cliente (maricaro-store.vercel.app) usa exactamente este registro:
-   claro, suave, con tarjetas blancas y acentos cálidos. Dorado se mantiene
-   como acento de marca (crest/corona del logo); se suma terracota (color
-   de la corteza del pan) como segundo acento para variar. Burdeos queda
-   como banda oscura de contraste (footer). */
+/* Identidad Pan de Rey — la marca real es el escudo negro con corona y
+   trigo dorados (public/logo.png): negro, dorado y blanco, sin más colores
+   compitiendo por atención. Página en negro cálido (igual que el fondo del
+   escudo), tarjetas en blanco puro para separar contenido, dorado como
+   único acento. `--color-charcoal-light` se mantiene igual a
+   `--background-elevated` (blanco) a propósito: muchos componentes más
+   viejos todavía usan `bg-charcoal-light` como superficie de tarjeta, y
+   así heredan el mismo blanco sin tener que tocar archivo por archivo.
+   Burdeos se conserva SOLO como color semántico de error/zona de riesgo
+   (no es un acento de marca). */
 :root {
-  --background: #FBF3E6;
+  --background: #0D0C0A;
   --background-elevated: #FFFFFF;
-  --background-alt: #F4E6D2;
-  --foreground: #2E2013;
-  --foreground-muted: #7C6B54;
+  --background-alt: #17140F;
+  --foreground: #F5F1E6;
+  --foreground-muted: #B2A996;
 
-  --color-ink: #211609; /* texto fijo y oscuro para usar SOBRE botones de color, sin depender de --background */
+  --color-ink: #14110A; /* texto fijo y oscuro para usar SOBRE botones de color, sin depender de --background */
 
-  --color-gold: #B4872A;
-  --color-gold-hover: #C89A3E;
-  --color-gold-dark: #8C6D2F;
+  --color-gold: #D4AF37;
+  --color-gold-hover: #E8C462;
+  --color-gold-dark: #A8841F;
   --color-charcoal-light: #FFFFFF;
-  --color-charcoal-border: rgba(46, 32, 19, 0.12);
-  --color-glass-fill: rgba(251, 243, 230, 0.85);
+  --color-charcoal-border: rgba(212, 175, 55, 0.22);
+  --color-glass-fill: rgba(13, 12, 10, 0.85);
   --color-burgundy: #6B2A2A;
   --color-burgundy-hover: #8C3A3A;
-  --color-terracotta: #C1512F;
-  --color-terracotta-hover: #D66B45;
 
-  --shadow-card: 0 1px 2px rgba(46, 32, 19, 0.06), 0 14px 28px -14px rgba(46, 32, 19, 0.22);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 36px -16px rgba(0, 0, 0, 0.55);
 }
 
 @theme inline {
@@ -46,8 +46,6 @@
   --color-glass-fill: var(--color-glass-fill);
   --color-burgundy: var(--color-burgundy);
   --color-burgundy-hover: var(--color-burgundy-hover);
-  --color-terracotta: var(--color-terracotta);
-  --color-terracotta-hover: var(--color-terracotta-hover);
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
   --font-mono: var(--font-geist-mono);
@@ -62,4 +60,36 @@ body {
 
 .shadow-card {
   box-shadow: var(--shadow-card);
+}
+
+/* El sitio mezcla texto directo sobre la página negra con texto dentro de
+   tarjetas blancas (`bg-background-elevated` / `bg-charcoal-light`, mismo
+   color). Un solo `--foreground`/`--color-gold` no puede leerse bien sobre
+   los dos fondos a la vez, así que dentro de esas tarjetas se redeclaran a
+   variantes oscuras — Tailwind ya genera `.text-foreground`/`.text-gold`
+   como `color: var(--color-foreground)` / `var(--color-gold)`, y por ser
+   variables CSS (no clases), heredan este valor redeclarado sin tocar cada
+   componente que las usa. */
+.bg-background-elevated,
+.bg-charcoal-light {
+  /* Hay que pisar CADA variable por duplicado: Tailwind genera `.text-foreground`
+     como `color: var(--foreground)`, pero para las variantes con opacidad
+     (`.text-foreground/70`) genera `color-mix(in oklab, var(--foreground) 70%, ...)`
+     usando el nombre SIN el prefijo "color-" (la indirección real de
+     `@theme inline`) — así que si solo se pisa `--color-foreground`, las
+     variantes `/NN` (que en este sitio son casi todas) se quedan con el
+     valor claro de :root. --color-gold no tiene este problema porque nunca
+     tuvo esa capa de indirección (se declaró igual en los dos lados). */
+  --foreground: #1E1912;
+  --color-foreground: #1E1912;
+  --foreground-muted: #6E6350;
+  --color-foreground-muted: #6E6350;
+  --color-gold: #9C7B1E;
+  --color-gold-hover: #B4922B;
+  /* Redeclarar la variable no alcanza para texto SIN clase `text-*` propia
+     (ej. un <button> sin color explícito): ese hereda el `color` ya
+     calculado en <body> (blanco), no vuelve a evaluar la variable. Fijar
+     `color` acá, sobre el contenedor mismo, hace que herede correctamente
+     hacia abajo. */
+  color: var(--color-foreground);
 }

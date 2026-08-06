@@ -10,6 +10,7 @@ import { checkRateLimit, getClientIp } from "@/lib/rate-limit/limiter";
 import { TERMS_VERSION } from "@/lib/legal/terms";
 import { encryptFieldForStorage } from "@/lib/crypto/encrypt-field";
 import { isValidRut, cleanRut } from "@/lib/rut";
+import { getSiteUrl } from "@/lib/site-url";
 
 export type ActionState = { error?: string; success?: string } | null;
 
@@ -68,7 +69,8 @@ export async function signUp(
   }
 
   const safeNext = safeNextPath(next);
-  const callbackUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`);
+  const siteUrl = await getSiteUrl();
+  const callbackUrl = new URL(`${siteUrl}/auth/callback`);
   if (safeNext) callbackUrl.searchParams.set("next", safeNext);
 
   const supabase = await createClient();
@@ -153,9 +155,10 @@ export async function signIn(
 
 export async function signInWithGoogle() {
   const supabase = await createClient();
+  const siteUrl = await getSiteUrl();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback` },
+    options: { redirectTo: `${siteUrl}/auth/callback` },
   });
 
   if (error || !data.url) redirect("/auth/login?error=google");
@@ -187,8 +190,9 @@ export async function requestPasswordReset(
   }
 
   const supabase = await createClient();
+  const siteUrl = await getSiteUrl();
   await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/actualizar-password`,
+    redirectTo: `${siteUrl}/auth/actualizar-password`,
   });
 
   // Nunca revelamos si el email existe o no (mismo principio anti-enumeración

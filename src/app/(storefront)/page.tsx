@@ -254,7 +254,7 @@ export default async function Home() {
                   className="group relative overflow-hidden rounded-2xl border border-charcoal-border bg-background-elevated shadow-card transition hover:-translate-y-1 hover:border-gold-dark"
                 >
                   {index < 3 && (
-                    <span className="absolute left-2 top-2 z-10 rounded-full bg-terracotta px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white shadow-card">
+                    <span className="absolute left-2 top-2 z-10 rounded-full bg-gold px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink shadow-card">
                       Más vendido
                     </span>
                   )}
