@@ -1,9 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// Vercel Cron llama esta ruta cada minuto (vercel.json) con
-// `Authorization: Bearer $CRON_SECRET` — cualquier otro caller se rechaza,
-// para que no sea un endpoint público que dispare transiciones de pedidos.
+// Vercel Cron llama esta ruta con `Authorization: Bearer $CRON_SECRET` —
+// cualquier otro caller se rechaza, para que no sea un endpoint público que
+// dispare transiciones de pedidos.
+//
+// Debería correr cada minuto para que la transición a 'preparing' sea casi
+// inmediata, pero el plan Hobby de Vercel solo permite crons de hasta una
+// corrida diaria (bloquea el deploy si no) — vercel.json lo deja en
+// "0 9 * * *" como paliativo hasta contratar el plan Pro o mover el disparo
+// a un servicio externo (ej. cron-job.org) que le pegue a esta misma ruta
+// cada minuto. Mientras tanto, un pedido puede tardar hasta 24h en
+// transicionar automáticamente si nadie lo mueve manualmente desde admin.
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const authHeader = request.headers.get("authorization");

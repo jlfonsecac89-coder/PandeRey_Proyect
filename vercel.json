@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/order-sla",
-      "schedule": "* * * * *"
+      "schedule": "0 9 * * *"
     },
     {
       "path": "/api/cron/rfm-recompute",
