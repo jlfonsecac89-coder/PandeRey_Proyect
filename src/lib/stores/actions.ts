@@ -33,6 +33,16 @@ function parseBusinessHours(formData: FormData): DaySchedule[] {
   return schedule;
 }
 
+// Horario por defecto de una sucursal nueva — todos los días 10:00-19:00.
+// Admin lo puede cambiar de inmediato desde StoreCard; sin esto, una
+// sucursal recién creada queda sin horario y el checkout no puede validar
+// nada hasta que alguien entre a configurarlo a mano.
+const DEFAULT_BUSINESS_HOURS: DaySchedule[] = WEEK_DAYS.map(({ day }) => ({
+  day,
+  open: "10:00",
+  close: "19:00",
+}));
+
 export type StoreActionState = { error?: string; success?: string } | null;
 
 function parseOptionalNumber(raw: FormDataEntryValue | null): number | null {
@@ -86,6 +96,7 @@ export async function createStore(
     contact_address: address,
     contact_phone: contactPhone,
     contact_email: contactEmail,
+    business_hours: DEFAULT_BUSINESS_HOURS,
   });
   if (error) return { error: "No se pudo crear la sucursal." };
 

@@ -169,14 +169,14 @@ export function StoreCard({ store, zones }: { store: Store; zones: ShippingZone[
                   <input
                     type="time"
                     name={`hours_from_${day}`}
-                    defaultValue={entry?.open ?? "09:00"}
+                    defaultValue={entry?.open ?? "10:00"}
                     className="rounded-md border border-charcoal-border bg-background px-2 py-1"
                   />
                   <span className="text-foreground/40">a</span>
                   <input
                     type="time"
                     name={`hours_to_${day}`}
-                    defaultValue={entry?.close ?? "20:00"}
+                    defaultValue={entry?.close ?? "19:00"}
                     className="rounded-md border border-charcoal-border bg-background px-2 py-1"
                   />
                 </div>

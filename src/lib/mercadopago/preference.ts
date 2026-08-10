@@ -49,13 +49,19 @@ export async function createOrderPreference(params: {
   const preference = new Preference(client);
 
   const siteUrl = await getSiteUrl();
-  const items = [...params.items];
+  // `products.price` y `product_option_values.price_delta` son
+  // numeric(12,2) en la base — un precio cargado con centavos (o un cálculo
+  // de opciones que no cierre en un entero) manda un unit_price fraccionado
+  // a Mercado Pago, que para CLP (moneda sin decimales) lo rechaza. Se
+  // redondea acá, en el único lugar por el que pasa todo ítem antes de
+  // llegar a la API, para no tener que auditar cada punto que arma precios.
+  const items = [...params.items].map((item) => ({ ...item, unit_price: Math.round(item.unit_price) }));
   if (params.shippingCost > 0) {
-    items.push({ id: "envio", title: "Costo de envío", quantity: 1, unit_price: params.shippingCost });
+    items.push({ id: "envio", title: "Costo de envío", quantity: 1, unit_price: Math.round(params.shippingCost) });
   }
   const finalItems =
     params.discountTotal && params.discountTotal > 0
-      ? applyProportionalDiscount(items, params.discountTotal)
+      ? applyProportionalDiscount(items, Math.round(params.discountTotal))
       : items;
 
   const resultUrl = `${siteUrl}/checkout/resultado?order=${params.orderId}`;

@@ -20,6 +20,19 @@ import type { CartItem } from "@/lib/cart/types";
 
 export type CheckoutState = { error?: string; success?: string; addressId?: string } | null;
 
+// El SDK de Mercado Pago no tira un Error normal cuando la API responde con
+// un status != 2xx — tira directamente el cuerpo JSON de la respuesta
+// (`throw await response.json()`, ver mercadopago/dist/utils/restClient).
+// Sentry.captureException igual lo captura, pero sin extraer estos campos a
+// mano el mensaje real (`cause`/`message` de la API) queda enterrado.
+function describeMpError(err: unknown): Record<string, unknown> {
+  if (err && typeof err === "object") {
+    const e = err as Record<string, unknown>;
+    return { message: e.message, error: e.error, status: e.status, cause: e.cause };
+  }
+  return { raw: String(err) };
+}
+
 export type ShippingPreviewState =
   | { error: string }
   | { ok: true; distanceKm: number | null; shippingCost: number }
@@ -568,7 +581,7 @@ export async function createCheckoutPreference(
     // Antes esto se tragaba el error real y solo quedaba el mensaje
     // genérico — sin poder saber en Sentry/logs si fue un token inválido,
     // un ítem rechazado por la API de MP, etc.
-    Sentry.captureException(err, { extra: { orderId: order.id } });
+    Sentry.captureException(err, { extra: { orderId: order.id, mpError: describeMpError(err) } });
     return { error: "No se pudo iniciar el pago con Mercado Pago." };
   }
 
@@ -627,7 +640,7 @@ export async function payResendShipping(orderId: string): Promise<CheckoutState>
       shippingCost: 0,
     });
   } catch (err) {
-    Sentry.captureException(err, { extra: { orderId } });
+    Sentry.captureException(err, { extra: { orderId, mpError: describeMpError(err) } });
     return { error: "No se pudo iniciar el pago con Mercado Pago." };
   }
 

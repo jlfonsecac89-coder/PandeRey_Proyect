@@ -60,6 +60,60 @@ const STEPS: { key: Step; label: string }[] = [
 const inputClass =
   "w-full rounded-lg border border-charcoal-border bg-background px-3 py-2 text-sm outline-none transition focus:border-gold";
 
+type StepStatus = "done" | "active" | "upcoming";
+
+// Encabezado de cada sección del acordeón — un paso ya completado se ve
+// como una fila compacta con lo que el cliente eligió (y un link para
+// volver a editarlo); el paso activo muestra su número resaltado arriba
+// del formulario completo; los pasos futuros quedan apagados, solo para
+// que se vea cuánto falta.
+function StepHeader({
+  index,
+  label,
+  status,
+  summary,
+  onEdit,
+}: {
+  index: number;
+  label: string;
+  status: StepStatus;
+  summary?: string;
+  onEdit?: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2.5">
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors ${
+            status === "active"
+              ? "border-gold bg-gold text-ink"
+              : status === "done"
+                ? "border-gold-dark bg-gold-dark/15 text-gold-dark"
+                : "border-charcoal-border text-foreground-muted"
+          }`}
+        >
+          {status === "done" ? <Check className="h-3.5 w-3.5" /> : index + 1}
+        </span>
+        <div>
+          <p
+            className={`text-sm font-semibold uppercase tracking-wide ${
+              status === "upcoming" ? "text-foreground-muted/50" : "text-foreground"
+            }`}
+          >
+            {label}
+          </p>
+          {status === "done" && summary && <p className="text-xs text-foreground-muted">{summary}</p>}
+        </div>
+      </div>
+      {status === "done" && onEdit && (
+        <button type="button" onClick={onEdit} className="shrink-0 text-xs text-gold-hover underline">
+          Editar
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function CheckoutForm({
   addresses,
   stores,
@@ -178,50 +232,49 @@ export function CheckoutForm({
   const canLeaveDireccion =
     !!addressId && !addingAddress && (deliveryMethod === "pickup" || (!!shippingQuote && !shippingError));
 
+  // Estado de cada sección del acordeón: "done" (ya pasada, se muestra
+  // colapsada con resumen), "active" (la que está resolviendo ahora mismo,
+  // con el formulario completo) o "upcoming" (todavía no llegó).
+  function statusFor(key: Step): StepStatus {
+    const idx = visibleSteps.findIndex((s) => s.key === key);
+    if (idx === -1 || idx > activeStepIndex) return "upcoming";
+    return idx < activeStepIndex ? "done" : "active";
+  }
+
+  const selectedAddress = addresses.find((a) => a.id === addressId) ?? null;
+  const entregaSummary = selectedStore
+    ? `${deliveryMethod === "pickup" ? "Retiro en tienda" : "Despacho a domicilio"} · ${selectedStore.name}`
+    : "";
+  const direccionSummary = selectedAddress
+    ? `${selectedAddress.calle} ${selectedAddress.numero}, ${selectedAddress.comuna}`
+    : "";
+  const programarSummary =
+    scheduledDate && !Number.isNaN(scheduledDate.getTime())
+      ? new Intl.DateTimeFormat("es-CL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(
+          scheduledDate,
+        )
+      : "";
+
   if (!hydrated || items.length === 0) return null;
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_380px]">
       {/* Columna izquierda: proceso por etapas */}
       <div className="rounded-2xl border border-charcoal-border bg-background-elevated p-6 shadow-card sm:p-8">
-        <ol className="flex items-center">
-          {visibleSteps.map((s, i) => {
-            const isActive = i === activeStepIndex;
-            const isDone = i < activeStepIndex;
-            const isLast = i === visibleSteps.length - 1;
-            return (
-              <li key={s.key} className={`flex items-center ${isLast ? "" : "flex-1"}`}>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors ${
-                      isActive
-                        ? "border-gold bg-gold text-ink"
-                        : isDone
-                          ? "border-gold-dark bg-gold-dark/15 text-gold-dark"
-                          : "border-charcoal-border text-foreground-muted"
-                    }`}
-                  >
-                    {isDone ? <Check className="h-3.5 w-3.5" /> : i + 1}
-                  </span>
-                  <span
-                    className={`hidden text-xs sm:inline ${
-                      isActive ? "font-semibold text-foreground" : isDone ? "text-gold-dark" : "text-foreground-muted"
-                    }`}
-                  >
-                    {s.label}
-                  </span>
-                </div>
-                {!isLast && (
-                  <span className={`mx-3 h-px flex-1 ${isDone ? "bg-gold-dark" : "bg-charcoal-border"}`} />
-                )}
-              </li>
-            );
-          })}
-        </ol>
-
-        {/* Paso 1: tipo de entrega */}
+        {/* Paso 1: tipo de entrega — el acordeón muestra cada sección
+            colapsada (con resumen) una vez resuelta; la activa se despliega
+            entera y las que faltan quedan apagadas, sin contenido. */}
+        <div className="border-b border-charcoal-border pb-5">
+          <StepHeader
+            index={visibleSteps.findIndex((s) => s.key === "entrega")}
+            label="Entrega"
+            status={statusFor("entrega")}
+            summary={entregaSummary}
+            onEdit={() => setStep("entrega")}
+          />
+        </div>
         {step === "entrega" && (
-          <div className="mt-6 space-y-6">
+          <div className="mt-5 space-y-6 border-b border-charcoal-border pb-6">
             <section>
               <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-foreground-muted">
                 <Store className="h-4 w-4 text-gold-dark" />
@@ -328,9 +381,20 @@ export function CheckoutForm({
           </div>
         )}
 
-        {/* Paso 2: dirección (solo despacho a domicilio) */}
+        {/* Paso 2: dirección (solo aparece con despacho a domicilio) */}
+        {deliveryMethod === "shipping" && (
+          <div className="border-b border-charcoal-border pb-5 pt-5">
+            <StepHeader
+              index={visibleSteps.findIndex((s) => s.key === "direccion")}
+              label="Dirección"
+              status={statusFor("direccion")}
+              summary={direccionSummary}
+              onEdit={() => setStep("direccion")}
+            />
+          </div>
+        )}
         {step === "direccion" && (
-          <div className="mt-6 space-y-6">
+          <div className="mt-5 space-y-6 border-b border-charcoal-border pb-6">
             <section>
               <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-foreground-muted">
                 <MapPin className="h-4 w-4 text-gold-dark" />
@@ -505,8 +569,17 @@ export function CheckoutForm({
         )}
 
         {/* Paso 3: programar */}
+        <div className="border-b border-charcoal-border pb-5 pt-5">
+          <StepHeader
+            index={visibleSteps.findIndex((s) => s.key === "programar")}
+            label="Fecha y hora"
+            status={statusFor("programar")}
+            summary={programarSummary}
+            onEdit={() => setStep("programar")}
+          />
+        </div>
         {step === "programar" && (
-          <div className="mt-6 space-y-6">
+          <div className="mt-5 space-y-6 border-b border-charcoal-border pb-6">
             <section>
               <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-foreground-muted">
                 <CalendarClock className="h-4 w-4 text-gold-dark" />
@@ -561,8 +634,16 @@ export function CheckoutForm({
         )}
 
         {/* Paso 4: pago */}
+        <div className="pb-5 pt-5">
+          <StepHeader
+            index={visibleSteps.findIndex((s) => s.key === "pago")}
+            label="Pago"
+            status={statusFor("pago")}
+            onEdit={() => setStep("pago")}
+          />
+        </div>
         {step === "pago" && (
-          <div className="mt-6 space-y-6">
+          <div className="mt-5 space-y-6">
             <section>
               <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-foreground-muted">
                 <CreditCard className="h-4 w-4 text-gold-dark" />
