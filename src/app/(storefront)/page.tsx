@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Wheat, ChefHat, Award, Store as StoreIcon, Truck, Sparkles } from "lucide-react";
+import { Wheat, ChefHat, Award, Store as StoreIcon, Truck, Sparkles, Croissant, Sandwich, Soup } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/format";
 import { formatBusinessHours, type BusinessHours } from "@/lib/stores/schedule";
@@ -110,9 +110,28 @@ export default async function Home() {
   const publicBannerBaseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/banners`;
   const publicProductBaseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images`;
 
+  // Hero armado como un único "slide" — mismo shape que necesitaría cada
+  // item de un carrusel (eyebrow/título/subtítulo/CTAs) para que, si más
+  // adelante se agregan más banners, alcance con mapear un array de estos
+  // en vez de tener que rediseñar el bloque.
+  const heroSlide = {
+    eyebrow: "Pedidos online, horneado del día",
+    title: (
+      <>
+        Horneado con oficio,
+        <br />
+        <span className="text-gold">todos los días</span>
+      </>
+    ),
+    subtitle:
+      "Pan, pastelería y café de elaboración artesanal — pedí online con retiro en tienda o despacho a domicilio.",
+  };
+
   return (
     <div className="space-y-24 pb-24">
-      {/* Hero */}
+      {/* Hero — ver `heroSlide` arriba: la estructura ya está lista para
+          volverse un carrusel (bastaría con un array de slides + un
+          controlador de índice envolviendo este mismo bloque). */}
       <div className="relative overflow-hidden">
         <DotPattern
           glow
@@ -128,23 +147,18 @@ export default async function Home() {
         <div className="relative flex flex-col items-center justify-center gap-5 px-6 pb-6 pt-20 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-charcoal-border bg-background-alt px-4 py-1.5 text-xs">
             <Sparkles className="h-3.5 w-3.5 text-gold" />
-            <AnimatedGradientText colorFrom="#D4AF37" colorTo="#F5F1E6" className="font-medium">
-              Pedidos online, horneado del día
+            <AnimatedGradientText colorFrom="#FAF290" colorTo="#F5F1E6" className="font-medium">
+              {heroSlide.eyebrow}
             </AnimatedGradientText>
           </div>
 
           <h1 className="max-w-2xl font-display text-5xl font-medium leading-[1.1] text-foreground sm:text-6xl">
-            Horneado con oficio,
-            <br />
-            <span className="text-gold">todos los días</span>
+            {heroSlide.title}
           </h1>
-          <p className="max-w-md text-[15px] leading-relaxed text-foreground-muted">
-            Pan, pastelería y café de elaboración artesanal — pedí online con retiro en tienda o despacho a
-            domicilio.
-          </p>
+          <p className="max-w-md text-[15px] leading-relaxed text-foreground-muted">{heroSlide.subtitle}</p>
           <div className="mt-3 flex gap-3">
             <Button size="lg" className="rounded-full px-6" render={<Link href="/tienda" />} nativeButton={false}>
-              Ver la tienda
+              Pedir ahora
             </Button>
             <Button
               variant="outline"
@@ -206,18 +220,64 @@ export default async function Home() {
 
       {/* Historia */}
       <section className="mx-auto max-w-5xl px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Nuestra historia</p>
-          <h2 className="mt-2 font-display text-3xl font-medium text-foreground">Hecho a mano, todos los días</h2>
-          <div className="mx-auto mt-4 h-px w-12 bg-gold-dark/60" />
-          <p className="mt-6 text-[15px] leading-relaxed text-foreground-muted">
-            En {store?.name ?? "Pan de Rey"} amasamos, horneamos y decoramos cada producto en nuestro propio
-            obrador — sin atajos industriales. Empezamos con pan del día para el barrio y fuimos sumando
-            pastelería y café a medida que nuestros vecinos nos lo pedían.
-          </p>
+        <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Nuestra historia</p>
+            <h2 className="mt-2 font-display text-3xl font-medium text-foreground">Hecho a mano, todos los días</h2>
+            <div className="mt-4 h-px w-12 bg-gold-dark/60" />
+            <p className="mt-6 text-[15px] leading-relaxed text-foreground-muted">
+              En {store?.name ?? "Pan de Rey"} amasamos, horneamos y decoramos cada producto en nuestro propio
+              obrador — sin atajos industriales. Empezamos con pan del día para el barrio y fuimos sumando
+              pastelería y café a medida que nuestros vecinos nos lo pedían.
+            </p>
+            <p className="mt-4 text-[15px] leading-relaxed text-foreground-muted">
+              El mismo cariño con el que se amasa un pan de casa, todos los días, para que cada visita se sienta
+              como llegar a la mesa familiar.
+            </p>
+          </div>
+
+          {/* Mosaico asimétrico — una foto grande + dos apiladas, en vez de
+              una grilla pareja, para que la sección respire y no se sienta
+              como "otro bloque más" en el scroll. Placeholders con degradé
+              dorado hasta que se carguen fotos reales del obrador. */}
+          <div className="grid h-[22rem] grid-cols-2 gap-4 sm:h-[26rem]">
+            <div
+              className="relative col-span-1 row-span-2 overflow-hidden rounded-2xl border border-charcoal-border shadow-card"
+              style={{
+                background:
+                  "radial-gradient(120% 100% at 20% 0%, color-mix(in srgb, var(--color-gold) 22%, transparent), var(--background-alt) 70%)",
+              }}
+            >
+              <span className="absolute bottom-3 left-3 text-xs font-medium uppercase tracking-wide text-foreground-muted/80">
+                El obrador
+              </span>
+            </div>
+            <div
+              className="relative overflow-hidden rounded-2xl border border-charcoal-border shadow-card"
+              style={{
+                background:
+                  "radial-gradient(120% 120% at 80% 100%, color-mix(in srgb, var(--color-gold) 18%, transparent), var(--background-alt) 70%)",
+              }}
+            >
+              <span className="absolute bottom-3 left-3 text-xs font-medium uppercase tracking-wide text-foreground-muted/80">
+                Recién horneado
+              </span>
+            </div>
+            <div
+              className="relative overflow-hidden rounded-2xl border border-charcoal-border shadow-card"
+              style={{
+                background:
+                  "radial-gradient(120% 120% at 20% 100%, color-mix(in srgb, var(--color-gold) 18%, transparent), var(--background-alt) 70%)",
+              }}
+            >
+              <span className="absolute bottom-3 left-3 text-xs font-medium uppercase tracking-wide text-foreground-muted/80">
+                Nuestro equipo
+              </span>
+            </div>
+          </div>
         </div>
 
-        <BentoGrid className="mt-10 auto-rows-[16rem] grid-cols-1 sm:grid-cols-3">
+        <BentoGrid className="mt-14 auto-rows-[16rem] grid-cols-1 sm:grid-cols-3">
           <BentoCard
             name="Ingredientes reales"
             description="Harinas, mantequilla y fruta de verdad — sin mezclas industriales ni atajos."
@@ -272,12 +332,70 @@ export default async function Home() {
         </BentoGrid>
       </section>
 
-      {/* Especialidades por departamento */}
+      {/* Especialidades — la fusión venezolano-chilena que define la marca */}
+      <section className="mx-auto max-w-5xl px-6">
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Especialidades</p>
+          <h2 className="mt-2 font-display text-3xl font-medium text-foreground">Dos hornos, una misma casa</h2>
+          <p className="mt-4 text-[15px] leading-relaxed text-foreground-muted">
+            Traemos las recetas con las que crecimos en Venezuela y las horneamos con el mismo respeto por la
+            tradición panadera que encontramos en Chile — dos culturas del pan, en la misma vitrina.
+          </p>
+        </div>
+
+        <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-3">
+          {[
+            {
+              icon: Sandwich,
+              badge: "Raíces venezolanas",
+              name: "Pan de Jamón",
+              description:
+                "El pan de las fiestas en Caracas, horneado todo el año — masa suave enrollada con jamón, pasas y aceitunas.",
+            },
+            {
+              icon: Croissant,
+              badge: "Raíces venezolanas",
+              name: "Cachitos",
+              description:
+                "La merienda de toda infancia venezolana: hojaldre dorado relleno de jamón, recién salido del horno.",
+            },
+            {
+              icon: Soup,
+              badge: "Alma chilena",
+              name: "Marraqueta Pan de Rey",
+              description:
+                "Crocante por fuera, tibia por dentro — horneada como manda la tradición chilena, el pan de cada mesa.",
+            },
+          ].map((item) => (
+            <div
+              key={item.name}
+              className="group rounded-2xl border border-charcoal-border/70 bg-background-alt p-6 shadow-card transition hover:-translate-y-0.5 hover:border-gold-dark/60"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gold/10">
+                <item.icon className="h-6 w-6 text-gold-dark transition group-hover:text-gold" />
+              </div>
+              <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-dark">
+                {item.badge}
+              </p>
+              <p className="mt-1.5 font-display text-lg font-medium text-foreground">{item.name}</p>
+              <p className="mt-2 text-sm leading-relaxed text-foreground-muted">{item.description}</p>
+              <Link
+                href="/tienda"
+                className="mt-4 inline-block text-xs font-medium text-gold-hover opacity-80 transition hover:text-gold hover:opacity-100"
+              >
+                Ver en la tienda →
+              </Link>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Categorías por departamento */}
       {departments && departments.length > 0 && (
         <section className="mx-auto max-w-5xl px-6">
           <div className="text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Especialidades</p>
-            <h2 className="mt-2 font-display text-3xl font-medium text-foreground">Lo que hacemos mejor</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Catálogo</p>
+            <h2 className="mt-2 font-display text-3xl font-medium text-foreground">Explorá por categoría</h2>
           </div>
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
             {departments.map((dept) => (
