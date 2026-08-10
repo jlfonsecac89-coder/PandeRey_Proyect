@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Wheat, ChefHat, Award, Store as StoreIcon, Truck, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/format";
+import { formatBusinessHours, type BusinessHours } from "@/lib/stores/schedule";
 import { renderStars } from "@/lib/reviews/stars";
 import { BannerCarousel } from "@/components/storefront/BannerCarousel";
 import { NewsletterForm } from "@/components/storefront/NewsletterForm";
@@ -437,6 +438,9 @@ export default async function Home() {
               <h2 className="mt-2 font-display text-3xl font-medium text-foreground">{store.name}</h2>
               {store.contact_address && (
                 <p className="mt-3 text-sm text-foreground-muted">{store.contact_address}</p>
+              )}
+              {store.business_hours && (
+                <p className="mt-1 text-sm text-foreground-muted">{formatBusinessHours(store.business_hours as BusinessHours)}</p>
               )}
               <div className="mt-5 flex flex-wrap items-center justify-center gap-5 text-sm">
                 {store.contact_phone && (

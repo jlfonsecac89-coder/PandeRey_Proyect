@@ -1,5 +1,6 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -7,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { geocodeAddress } from "@/lib/geo/geocode";
 import { METROPOLITANA_REGION_NAME, RM_COMUNAS } from "@/lib/geo/chile-regions";
+import { isWithinBusinessHours, formatBusinessHours, type BusinessHours } from "@/lib/stores/schedule";
 import { computeShipping } from "./shipping";
 import { createOrderPreference } from "@/lib/mercadopago/preference";
 import { formatCLP } from "@/lib/format";
@@ -272,7 +274,7 @@ export async function createCheckoutPreference(
   const { data: store } = await supabase
     .from("stores")
     .select(
-      "id, name, origin_lat, origin_lng, max_delivery_radius_km, min_order_amount, free_shipping_min_amount, social_links",
+      "id, name, origin_lat, origin_lng, max_delivery_radius_km, min_order_amount, free_shipping_min_amount, social_links, business_hours",
     )
     .eq("id", storeId)
     .eq("is_active", true)
@@ -281,6 +283,19 @@ export async function createCheckoutPreference(
 
   if (paymentMethod === "bank_transfer" && !store.social_links?.whatsapp) {
     return { error: "Esta sucursal todavía no tiene WhatsApp configurado para pagos por transferencia." };
+  }
+
+  // La fecha/hora de retiro o despacho es obligatoria y debe caer dentro del
+  // horario de atención de la sucursal — nunca se confía en la validación
+  // del cliente, se recalcula acá con los mismos datos.
+  if (!scheduledAtRaw) return { error: "Elegí una fecha y hora de retiro o despacho." };
+  const scheduledAtDate = new Date(scheduledAtRaw);
+  if (Number.isNaN(scheduledAtDate.getTime())) return { error: "Fecha/hora programada inválida." };
+  if (scheduledAtDate.getTime() < Date.now()) return { error: "Elegí una fecha y hora futura." };
+  if (!isWithinBusinessHours(store.business_hours as BusinessHours, scheduledAtDate)) {
+    return {
+      error: `Ese horario está fuera del horario de atención de la sucursal (${formatBusinessHours(store.business_hours as BusinessHours)}).`,
+    };
   }
 
   // Aceptación 4: mínimo de compra.
@@ -355,12 +370,7 @@ export async function createCheckoutPreference(
     return { error: "El descuento aplicado supera el total del pedido — reducí el cupón o los puntos usados." };
   }
 
-  let scheduledAtIso: string | null = null;
-  if (scheduledAtRaw) {
-    const parsed = new Date(scheduledAtRaw);
-    if (Number.isNaN(parsed.getTime())) return { error: "Fecha/hora programada inválida." };
-    scheduledAtIso = parsed.toISOString();
-  }
+  const scheduledAtIso = scheduledAtDate.toISOString();
 
   // Aceptación 2 de la Fase 3 (nunca conectada al checkout real hasta esta
   // pasada de hardening, Fase 9): un producto is_special_event no puede
@@ -554,7 +564,11 @@ export async function createCheckoutPreference(
       shippingCost: quote.shippingCost,
       discountTotal,
     });
-  } catch {
+  } catch (err) {
+    // Antes esto se tragaba el error real y solo quedaba el mensaje
+    // genérico — sin poder saber en Sentry/logs si fue un token inválido,
+    // un ítem rechazado por la API de MP, etc.
+    Sentry.captureException(err, { extra: { orderId: order.id } });
     return { error: "No se pudo iniciar el pago con Mercado Pago." };
   }
 
@@ -612,7 +626,8 @@ export async function payResendShipping(orderId: string): Promise<CheckoutState>
       items: [{ id: "reenvio", title: "Reenvío de pedido", quantity: 1, unit_price: extraShippingCost }],
       shippingCost: 0,
     });
-  } catch {
+  } catch (err) {
+    Sentry.captureException(err, { extra: { orderId } });
     return { error: "No se pudo iniciar el pago con Mercado Pago." };
   }
 

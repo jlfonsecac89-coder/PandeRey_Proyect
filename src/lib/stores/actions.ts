@@ -4,6 +4,34 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/rbac";
 import { geocodeAddress } from "@/lib/geo/geocode";
+import type { DaySchedule } from "@/lib/stores/schedule";
+
+const WEEK_DAYS = [
+  { day: 1, label: "Lunes" },
+  { day: 2, label: "Martes" },
+  { day: 3, label: "Miércoles" },
+  { day: 4, label: "Jueves" },
+  { day: 5, label: "Viernes" },
+  { day: 6, label: "Sábado" },
+  { day: 0, label: "Domingo" },
+] as const;
+
+// El formulario manda un checkbox `hours_open_{day}` + `hours_from_{day}`/
+// `hours_to_{day}` por cada día de la semana (ver StoreCard) — acá se arma
+// el jsonb que consume `isWithinBusinessHours` en el checkout. Un día sin
+// checkbox marcado queda afuera del array (= cerrado ese día).
+function parseBusinessHours(formData: FormData): DaySchedule[] {
+  const schedule: DaySchedule[] = [];
+  for (const { day } of WEEK_DAYS) {
+    if (formData.get(`hours_open_${day}`) !== "on") continue;
+    const from = String(formData.get(`hours_from_${day}`) || "").trim();
+    const to = String(formData.get(`hours_to_${day}`) || "").trim();
+    if (!/^\d{2}:\d{2}$/.test(from) || !/^\d{2}:\d{2}$/.test(to)) continue;
+    if (from >= to) continue;
+    schedule.push({ day, open: from, close: to });
+  }
+  return schedule;
+}
 
 export type StoreActionState = { error?: string; success?: string } | null;
 
@@ -80,6 +108,7 @@ export async function updateStoreSettings(
   const instagram = String(formData.get("social_instagram") || "").trim() || null;
   const facebook = String(formData.get("social_facebook") || "").trim() || null;
   const whatsapp = String(formData.get("social_whatsapp") || "").trim() || null;
+  const businessHours = parseBusinessHours(formData);
 
   if (maxRadius === null) return { error: "El radio máximo de entrega es obligatorio." };
 
@@ -96,6 +125,7 @@ export async function updateStoreSettings(
       contact_phone: contactPhone,
       contact_email: contactEmail,
       social_links: socialLinks,
+      business_hours: businessHours.length > 0 ? businessHours : null,
     })
     .eq("id", storeId);
   if (error) return { error: "No se pudo actualizar la sucursal." };

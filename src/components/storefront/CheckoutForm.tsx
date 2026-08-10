@@ -19,6 +19,7 @@ import { useCart } from "@/lib/cart/CartContext";
 import { cartItemUnitPrice } from "@/lib/cart/types";
 import { formatCLP, splitIva } from "@/lib/format";
 import { RegionComunaFields } from "./RegionComunaFields";
+import { isWithinBusinessHours, formatBusinessHours, type BusinessHours } from "@/lib/stores/schedule";
 import {
   createCheckoutPreference,
   previewShipping,
@@ -45,6 +46,7 @@ type StoreOption = {
   contact_address: string | null;
   min_order_amount: number | null;
   free_shipping_min_amount: number | null;
+  business_hours: BusinessHours;
 };
 
 type Step = "direccion" | "entrega" | "programar" | "pago";
@@ -86,6 +88,17 @@ export function CheckoutForm({
   const [scheduledAt, setScheduledAt] = useState("");
   const [housingType, setHousingType] = useState<"casa" | "departamento">("casa");
   const [paymentMethod, setPaymentMethod] = useState<"mercadopago" | "bank_transfer">("mercadopago");
+
+  // "Ahora" cambia en cada render — se fija una sola vez, después del
+  // montaje, para no desalinear el HTML de servidor y cliente ni recalcular
+  // el mínimo seleccionable mientras el cliente está eligiendo la hora.
+  const [minScheduledAt, setMinScheduledAt] = useState("");
+  useEffect(() => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMinScheduledAt(now.toISOString().slice(0, 16));
+  }, []);
 
   // Retiro en tienda no necesita dirección — el paso "Dirección" solo existe
   // en el recorrido cuando el cliente elige despacho a domicilio.
@@ -144,6 +157,11 @@ export function CheckoutForm({
   }, [storeId, addressId, subtotal]);
 
   const selectedStore = stores.find((s) => s.id === storeId) ?? null;
+  const scheduledDate = scheduledAt ? new Date(scheduledAt) : null;
+  const scheduledInPast = !!scheduledDate && !!minScheduledAt && scheduledAt < minScheduledAt;
+  const scheduledOutsideHours =
+    !!scheduledDate && !Number.isNaN(scheduledDate.getTime()) && !isWithinBusinessHours(selectedStore?.business_hours ?? null, scheduledDate);
+  const canLeavePrograma = !!scheduledDate && !scheduledInPast && !scheduledOutsideHours;
   const shippingQuote = shippingState && "ok" in shippingState ? shippingState : null;
   const shippingError = shippingState && "error" in shippingState ? shippingState.error : null;
   const shippingCost = shippingQuote?.shippingCost ?? 0;
@@ -495,14 +513,31 @@ export function CheckoutForm({
                 {deliveryMethod === "pickup" ? "Fecha y hora de retiro" : "Fecha y hora de despacho"}
               </h2>
               <p className="mt-1 text-xs text-foreground-muted">
-                Opcional — si no elegís, lo preparamos apenas se confirme el pago.
+                Elegí cuándo {deliveryMethod === "pickup" ? "vas a retirar" : "querés recibir"} tu pedido.
+                {selectedStore && (
+                  <>
+                    {" "}
+                    Horario de la tienda: <span className="text-foreground">{formatBusinessHours(selectedStore.business_hours)}</span>.
+                  </>
+                )}
               </p>
               <input
                 type="datetime-local"
+                required
                 value={scheduledAt}
+                min={minScheduledAt || undefined}
                 onChange={(e) => setScheduledAt(e.target.value)}
                 className={`mt-2 max-w-xs ${inputClass}`}
               />
+              {scheduledDate && !Number.isNaN(scheduledDate.getTime()) && scheduledInPast && (
+                <p className="mt-1.5 text-xs text-burgundy-hover">Elegí una fecha y hora futura.</p>
+              )}
+              {scheduledDate && !Number.isNaN(scheduledDate.getTime()) && !scheduledInPast && scheduledOutsideHours && (
+                <p className="mt-1.5 text-xs text-burgundy-hover">
+                  La tienda está cerrada en ese horario — elegí un momento dentro de{" "}
+                  {formatBusinessHours(selectedStore?.business_hours ?? null)}.
+                </p>
+              )}
             </section>
 
             <div className="flex gap-2">
@@ -515,8 +550,9 @@ export function CheckoutForm({
               </button>
               <button
                 type="button"
+                disabled={!canLeavePrograma}
                 onClick={() => setStep("pago")}
-                className="flex-1 rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover"
+                className="flex-1 rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover disabled:opacity-50"
               >
                 Continuar
               </button>

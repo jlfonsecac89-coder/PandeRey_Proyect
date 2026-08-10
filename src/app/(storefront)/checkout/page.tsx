@@ -17,7 +17,7 @@ export default async function CheckoutPage() {
       .order("created_at", { ascending: false }),
     supabase
       .from("stores")
-      .select("id, name, contact_address, min_order_amount, free_shipping_min_amount")
+      .select("id, name, contact_address, min_order_amount, free_shipping_min_amount, business_hours")
       .eq("is_active", true)
       .order("name"),
   ]);
