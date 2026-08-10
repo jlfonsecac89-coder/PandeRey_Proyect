@@ -127,12 +127,7 @@ export function AddressManager({ addresses }: { addresses: Address[] }) {
               name="ciudad"
               placeholder="Ciudad"
               required
-              className="rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
-            />
-            <input
-              name="codigo_postal"
-              placeholder="Código postal (opcional)"
-              className="rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
+              className="col-span-2 rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm"
             />
           </div>
           <button

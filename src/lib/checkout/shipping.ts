@@ -47,7 +47,7 @@ export async function computeShipping(params: {
   if (distanceKm > store.max_delivery_radius_km) {
     return {
       ok: false,
-      error: `Esa dirección está fuera del radio de entrega de esta sucursal (máx. ${store.max_delivery_radius_km} km, tu distancia: ${distanceKm.toFixed(1)} km).`,
+      error: `Esa dirección está fuera del rango de despacho de esta sucursal (máx. ${store.max_delivery_radius_km} km, tu distancia: ${distanceKm.toFixed(1)} km). Debe realizar retiro en tienda.`,
     };
   }
 

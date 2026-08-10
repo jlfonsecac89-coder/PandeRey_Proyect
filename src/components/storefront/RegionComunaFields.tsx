@@ -1,46 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { CHILE_REGIONS, getComunasForRegion } from "@/lib/geo/chile-regions";
+import { METROPOLITANA_REGION_NAME, RM_COMUNAS } from "@/lib/geo/chile-regions";
 
-// Selects encadenados: elegir región filtra las comunas disponibles. Sigue
-// enviando `name="region"`/`name="comuna"` como <select> normales — el
-// Server Action (saveAddress) no cambia, solo deja de recibir texto libre.
-export function RegionComunaFields({
-  defaultRegion = "",
-  defaultComuna = "",
-}: {
-  defaultRegion?: string;
-  defaultComuna?: string;
-}) {
-  const [region, setRegion] = useState(defaultRegion);
-  const comunas = getComunasForRegion(region);
-
+// El despacho a domicilio por ahora solo cubre la Región Metropolitana — no
+// tiene sentido pedirle al cliente que elija una región a la que no vamos a
+// poder despachar, así que ese campo queda fijo (oculto) y solo se pide la
+// comuna, ya filtrada a las que corresponden a esta región.
+export function RegionComunaFields({ defaultComuna = "" }: { defaultComuna?: string }) {
   return (
     <>
-      <div>
-        <label htmlFor="region" className="mb-1 block text-xs text-foreground/60">
-          Región
-        </label>
-        <select
-          id="region"
-          name="region"
-          required
-          value={region}
-          onChange={(e) => setRegion(e.target.value)}
-          className="w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm outline-none focus:border-gold"
-        >
-          <option value="" disabled>
-            Elegir región...
-          </option>
-          {CHILE_REGIONS.map((r) => (
-            <option key={r.name} value={r.name}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
+      <input type="hidden" name="region" value={METROPOLITANA_REGION_NAME} />
+      <div className="col-span-2">
         <label htmlFor="comuna" className="mb-1 block text-xs text-foreground/60">
           Comuna
         </label>
@@ -48,19 +18,19 @@ export function RegionComunaFields({
           id="comuna"
           name="comuna"
           required
-          disabled={!region}
           defaultValue={defaultComuna}
-          className="w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm outline-none focus:border-gold disabled:opacity-50"
+          className="w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm outline-none focus:border-gold"
         >
           <option value="" disabled>
-            {region ? "Elegir comuna..." : "Elegí una región primero"}
+            Elegir comuna...
           </option>
-          {comunas.map((c) => (
+          {RM_COMUNAS.map((c) => (
             <option key={c} value={c}>
               {c}
             </option>
           ))}
         </select>
+        <p className="mt-1 text-xs text-foreground/50">Por ahora despachamos solo en la Región Metropolitana.</p>
       </div>
     </>
   );

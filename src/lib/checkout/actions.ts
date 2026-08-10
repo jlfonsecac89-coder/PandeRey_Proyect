@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { geocodeAddress } from "@/lib/geo/geocode";
+import { METROPOLITANA_REGION_NAME, RM_COMUNAS } from "@/lib/geo/chile-regions";
 import { computeShipping } from "./shipping";
 import { createOrderPreference } from "@/lib/mercadopago/preference";
 import { formatCLP } from "@/lib/format";
@@ -37,7 +38,6 @@ export async function saveAddress(
   const comuna = String(formData.get("comuna") || "").trim();
   const ciudad = String(formData.get("ciudad") || "").trim();
   const region = String(formData.get("region") || "").trim();
-  const codigoPostal = String(formData.get("codigo_postal") || "").trim() || null;
   const housingType = String(formData.get("housing_type") || "casa").trim();
   const deptoNumero = String(formData.get("depto_numero") || "").trim() || null;
 
@@ -49,6 +49,12 @@ export async function saveAddress(
   }
   if (housingType === "departamento" && !deptoNumero) {
     return { error: "Indicá el número de departamento." };
+  }
+  // Por ahora solo se despacha en la Región Metropolitana — el formulario ya
+  // no deja elegir otra región/comuna, pero se revalida acá igual, nunca se
+  // confía en lo que manda el cliente.
+  if (region !== METROPOLITANA_REGION_NAME || !RM_COMUNAS.includes(comuna)) {
+    return { error: "Por ahora solo hacemos despacho dentro de la Región Metropolitana." };
   }
 
   // Sección 16: 10 requests/min por usuario — evita abusar de la cuota
@@ -85,7 +91,6 @@ export async function saveAddress(
       comuna,
       ciudad,
       region,
-      codigo_postal: codigoPostal,
       housing_type: housingType,
       depto_numero: housingType === "departamento" ? deptoNumero : null,
       lat: geocoded.lat,

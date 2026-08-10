@@ -399,3 +399,9 @@ export const CHILE_REGIONS: { name: string; comunas: string[] }[] = [
 export function getComunasForRegion(regionName: string): string[] {
   return CHILE_REGIONS.find((r) => r.name === regionName)?.comunas ?? [];
 }
+
+// El despacho a domicilio por ahora solo cubre la Región Metropolitana — el
+// resto del dataset se conserva (por si se habilitan más regiones más
+// adelante) pero el formulario de direcciones solo ofrece esta.
+export const METROPOLITANA_REGION_NAME = "Metropolitana de Santiago";
+export const RM_COMUNAS = getComunasForRegion(METROPOLITANA_REGION_NAME);
