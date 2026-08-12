@@ -42,11 +42,11 @@ export function CartDrawer() {
         role="dialog"
         aria-label="Carrito de compra"
         aria-hidden={!isOpen}
-        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col bg-background-elevated shadow-card transition-transform duration-300 ${
+        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col border-l border-white/10 bg-background/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-charcoal-border px-5 py-4">
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <p className="font-display text-lg font-medium text-foreground">Tu carrito</p>
           <div className="flex items-center gap-3">
             {items.length > 0 && (
@@ -83,7 +83,7 @@ export function CartDrawer() {
             <ul className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
               {items.map((item) => (
                 <li key={item.key} className="flex gap-3">
-                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-charcoal-border bg-background">
+                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-background-alt">
                     {item.imagePath ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -112,7 +112,7 @@ export function CartDrawer() {
                           type="button"
                           onClick={() => setQuantity(item.key, item.quantity - 1)}
                           aria-label="Restar unidad"
-                          className="flex h-6 w-6 items-center justify-center rounded-full border border-charcoal-border text-foreground-muted hover:border-gold-dark hover:text-gold"
+                          className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 text-foreground-muted hover:border-gold-dark hover:text-gold"
                         >
                           −
                         </button>
@@ -121,7 +121,7 @@ export function CartDrawer() {
                           type="button"
                           onClick={() => setQuantity(item.key, item.quantity + 1)}
                           aria-label="Sumar unidad"
-                          className="flex h-6 w-6 items-center justify-center rounded-full border border-charcoal-border text-foreground-muted hover:border-gold-dark hover:text-gold"
+                          className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 text-foreground-muted hover:border-gold-dark hover:text-gold"
                         >
                           +
                         </button>
@@ -145,7 +145,7 @@ export function CartDrawer() {
               ))}
             </ul>
 
-            <div className="border-t border-charcoal-border px-5 py-4">
+            <div className="border-t border-white/10 px-5 py-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-foreground-muted">Subtotal</span>
                 <span className="text-lg font-semibold text-gold">{formatCLP(subtotal)}</span>

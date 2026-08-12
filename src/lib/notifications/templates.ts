@@ -5,7 +5,7 @@ function wrap(title: string, bodyHtml: string): string {
     <div style="background:#0B0B0B;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#F5F5DC;">
       <div style="max-width:480px;margin:0 auto;background:#161616;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:24px;">
         <p style="text-transform:uppercase;letter-spacing:0.2em;font-size:11px;color:#A3835B;margin:0 0 8px;">Pan de Rey</p>
-        <h1 style="font-size:20px;color:#FAF290;margin:0 0 16px;">${title}</h1>
+        <h1 style="font-size:20px;color:#D4AF37;margin:0 0 16px;">${title}</h1>
         ${bodyHtml}
       </div>
     </div>
@@ -33,7 +33,7 @@ export function purchaseConfirmedTemplate(params: {
           }
         </p>
         <p style="font-size:13px;color:#F5F5DC;opacity:0.7;">Guardá este código — te lo van a pedir al momento de la entrega:</p>
-        <p style="font-size:28px;letter-spacing:0.15em;color:#FAF290;font-weight:bold;text-align:center;margin:16px 0;">${deliveryConfirmationCode}</p>
+        <p style="font-size:28px;letter-spacing:0.15em;color:#D4AF37;font-weight:bold;text-align:center;margin:16px 0;">${deliveryConfirmationCode}</p>
       `,
     ),
   };

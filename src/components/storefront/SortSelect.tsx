@@ -29,7 +29,7 @@ export function SortSelect({
       <select
         value={current}
         onChange={(e) => router.push(buildHref(e.target.value))}
-        className="rounded-md border border-charcoal-border bg-background-elevated px-2 py-1.5 text-sm text-foreground outline-none focus:border-gold-dark"
+        className="rounded-md border border-white/10 bg-background-alt/60 px-2 py-1.5 text-sm text-foreground outline-none focus:border-gold-dark"
       >
         {options.map((opt) => (
           <option key={opt.key} value={opt.key}>

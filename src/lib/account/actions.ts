@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { logAction } from "@/lib/audit/log-action";
+import { isValidRut, cleanRut } from "@/lib/rut";
+import { encryptFieldForStorage } from "@/lib/crypto/encrypt-field";
 
 export type AccountActionState = { error?: string; success?: string } | null;
 
@@ -18,17 +20,30 @@ export async function updateProfileInfo(
 
   const fullName = String(formData.get("full_name") || "").trim();
   const phone = String(formData.get("phone") || "").trim() || null;
+  const rutRaw = String(formData.get("rut") || "").trim();
+  const gender = String(formData.get("gender") || "").trim() || null;
+  const birthDate = String(formData.get("birth_date") || "").trim() || null;
 
   if (!fullName) return { error: "El nombre no puede estar vacío." };
+  if (rutRaw && !isValidRut(rutRaw)) return { error: "El RUT ingresado no es válido." };
 
-  // self_update_profile (RLS) permite que el cliente edite su propia fila,
-  // pero el trigger protect_profile_columns bloquea cualquier intento de
-  // tocar role/points_balance/etc — acá solo se envían full_name/phone, que
-  // sí están permitidos.
-  const supabase = await createClient();
-  const { error } = await supabase
+  // rut_encrypted está protegido por protect_profile_columns (mismo motivo
+  // que en el registro, sección 11 — un cliente no puede tocarlo con su
+  // propia sesión ni siquiera en su propia fila), así que esta actualización
+  // completa se hace con el cliente admin en vez de partirla en dos
+  // llamadas. El email NO se incluye acá a propósito: es la identidad de la
+  // cuenta y cambiarlo requiere su propio flujo de verificación aparte, no
+  // un campo más de este formulario.
+  const admin = createAdminClient();
+  const { error } = await admin
     .from("profiles")
-    .update({ full_name: fullName, phone })
+    .update({
+      full_name: fullName,
+      phone,
+      gender,
+      birth_date: birthDate,
+      rut_encrypted: rutRaw ? encryptFieldForStorage(cleanRut(rutRaw)) : null,
+    })
     .eq("id", profile.id);
 
   if (error) return { error: "No se pudo actualizar tus datos." };

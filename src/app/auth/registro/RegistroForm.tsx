@@ -25,7 +25,7 @@ export function RegistroForm({ next }: { next?: string }) {
             type="text"
             required
             autoComplete="name"
-            className="w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm outline-none focus:border-gold"
+            className="w-full rounded-lg border border-white/10 bg-background px-3 py-2.5 text-sm outline-none transition-colors focus:border-gold"
           />
         </div>
         <div>
@@ -38,7 +38,7 @@ export function RegistroForm({ next }: { next?: string }) {
             type="email"
             required
             autoComplete="email"
-            className="w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm outline-none focus:border-gold"
+            className="w-full rounded-lg border border-white/10 bg-background px-3 py-2.5 text-sm outline-none transition-colors focus:border-gold"
           />
         </div>
         <div>
@@ -52,7 +52,7 @@ export function RegistroForm({ next }: { next?: string }) {
             required
             minLength={10}
             autoComplete="new-password"
-            className="w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm outline-none focus:border-gold"
+            className="w-full rounded-lg border border-white/10 bg-background px-3 py-2.5 text-sm outline-none transition-colors focus:border-gold"
           />
           <p className="mt-1 text-xs text-foreground/40">
             Mínimo 10 caracteres, con al menos una letra y un número.
@@ -72,9 +72,9 @@ export function RegistroForm({ next }: { next?: string }) {
               value={rut}
               onChange={(e) => setRut(e.target.value)}
               onBlur={() => rut && isValidRut(rut) && setRut(formatRut(rut))}
-              className="w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm outline-none focus:border-gold"
+              className="w-full rounded-lg border border-white/10 bg-background px-3 py-2.5 text-sm outline-none transition-colors focus:border-gold"
             />
-            {rutError && <p className="mt-1 text-xs text-red-400">RUT inválido.</p>}
+            {rutError && <p className="mt-1 text-xs text-burgundy-hover">RUT inválido.</p>}
           </div>
           <div>
             <label htmlFor="phone" className="mb-1 block text-sm text-foreground/70">
@@ -86,7 +86,7 @@ export function RegistroForm({ next }: { next?: string }) {
               type="tel"
               placeholder="+56 9 1234 5678"
               autoComplete="tel"
-              className="w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm outline-none focus:border-gold"
+              className="w-full rounded-lg border border-white/10 bg-background px-3 py-2.5 text-sm outline-none transition-colors focus:border-gold"
             />
           </div>
         </div>
@@ -100,7 +100,7 @@ export function RegistroForm({ next }: { next?: string }) {
               id="gender"
               name="gender"
               defaultValue=""
-              className="w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm outline-none focus:border-gold"
+              className="w-full rounded-lg border border-white/10 bg-background px-3 py-2.5 text-sm outline-none transition-colors focus:border-gold"
             >
               <option value="">Prefiero no decir</option>
               <option value="femenino">Femenino</option>
@@ -116,7 +116,7 @@ export function RegistroForm({ next }: { next?: string }) {
               id="birth_date"
               name="birth_date"
               type="date"
-              className="w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm outline-none focus:border-gold"
+              className="w-full rounded-lg border border-white/10 bg-background px-3 py-2.5 text-sm outline-none transition-colors focus:border-gold"
             />
           </div>
         </div>
@@ -138,7 +138,7 @@ export function RegistroForm({ next }: { next?: string }) {
         <button
           type="submit"
           disabled={pending || rutError}
-          className="w-full rounded-full bg-gold px-3 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover disabled:opacity-50"
+          className="w-full rounded-lg bg-gold px-3 py-3 text-xs font-bold uppercase tracking-widest text-ink transition-all duration-200 hover:bg-gold-hover active:scale-95 disabled:opacity-50"
         >
           {pending ? "Creando cuenta..." : "Crear cuenta"}
         </button>

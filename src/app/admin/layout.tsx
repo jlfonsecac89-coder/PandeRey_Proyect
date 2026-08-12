@@ -22,7 +22,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="flex min-h-full">
       <aside className="flex w-64 shrink-0 flex-col border-r border-charcoal-border bg-background-elevated">
         <div className="border-b border-charcoal-border px-5 py-5">
-          <Link href="/admin">
+          {/* El logo es blanco puro sin fondo propio — sobre este sidebar
+              blanco quedaría invisible, así que va sobre una placa oscura,
+              igual que en el header de la tienda. */}
+          <Link href="/admin" className="inline-flex rounded-lg bg-background p-2">
             <Logo iconClassName="h-11 w-11" />
           </Link>
           <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-gold-dark">Panel administrativo</p>

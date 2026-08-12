@@ -1,5 +1,6 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -13,6 +14,41 @@ import { isValidRut, cleanRut } from "@/lib/rut";
 import { getSiteUrl } from "@/lib/site-url";
 
 export type ActionState = { error?: string; success?: string } | null;
+
+// Supabase Auth devuelve sus errores en inglés y con jerga técnica ("email
+// rate limit exceeded", "User already registered"). Mostrárselos tal cual a
+// un cliente no le dice qué hacer, así que se traducen a algo accionable.
+// El de rate limit de email es el más importante: no es culpa del cliente
+// sino del proveedor de correo del sitio, y sin este mensaje parece que el
+// formulario está roto sin motivo.
+function friendlyAuthError(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("email rate limit") || m.includes("rate limit exceeded")) {
+    return "No pudimos enviarte el email de confirmación en este momento. Volvé a intentar en unos minutos o escribinos para activar tu cuenta.";
+  }
+  if (m.includes("already registered") || m.includes("already been registered")) {
+    return "Ya existe una cuenta con ese email. Probá iniciar sesión o recuperar tu contraseña.";
+  }
+  if (m.includes("invalid login credentials")) {
+    return "Email o contraseña incorrectos.";
+  }
+  if (m.includes("email not confirmed")) {
+    return "Tenés que confirmar tu email antes de iniciar sesión. Revisá tu bandeja de entrada y el correo no deseado.";
+  }
+  if (m.includes("password should be") || m.includes("weak password")) {
+    return "La contraseña es demasiado débil. Usá al menos 10 caracteres, con letras y números.";
+  }
+  if (m.includes("error sending") || m.includes("smtp") || m.includes("could not send email")) {
+    return "No pudimos enviar el email en este momento. Intentá de nuevo en unos minutos.";
+  }
+  // Supabase a veces devuelve errores sin texto útil para el usuario (ej.
+  // AuthRetryableFetchError con cuerpo "{}" cuando el proveedor SMTP
+  // rechaza el envío) — mostrar eso tal cual confunde más que ayuda.
+  if (!message.trim() || message.trim() === "{}") {
+    return "Ocurrió un error inesperado. Intentá de nuevo en unos minutos.";
+  }
+  return message;
+}
 
 // `next` viaja en un campo de formulario (o querystring) que en teoría
 // cualquiera puede manipular — sin este chequeo, un link armado con
@@ -70,8 +106,12 @@ export async function signUp(
 
   const safeNext = safeNextPath(next);
   const siteUrl = await getSiteUrl();
-  const callbackUrl = new URL(`${siteUrl}/auth/callback`);
-  if (safeNext) callbackUrl.searchParams.set("next", safeNext);
+  // El link de confirmación de registro, igual que el de recuperación de
+  // contraseña, entrega el token en el fragmento de la URL — no puede pasar
+  // por /auth/callback (ruta de servidor, nunca ve el fragmento). Se
+  // resuelve del lado del cliente en /auth/confirmar.
+  const confirmUrl = new URL(`${siteUrl}/auth/confirmar`);
+  if (safeNext) confirmUrl.searchParams.set("next", safeNext);
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -79,11 +119,11 @@ export async function signUp(
     password,
     options: {
       data: { full_name: fullName },
-      emailRedirectTo: callbackUrl.toString(),
+      emailRedirectTo: confirmUrl.toString(),
     },
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyAuthError(error.message) };
   if (!data.user) return { error: "No se pudo crear la cuenta. Intenta de nuevo." };
 
   // rut_encrypted está en la lista de columnas protegidas de
@@ -93,8 +133,8 @@ export async function signUp(
   // changePasswordFirstLogin. phone/gender/birth_date sí podrían ir con la
   // sesión del usuario, pero se agrupan en la misma llamada para no
   // depender de dos escrituras separadas justo después de crear la cuenta.
+  const admin = createAdminClient();
   if (rutRaw || phone || gender || birthDate) {
-    const admin = createAdminClient();
     await admin
       .from("profiles")
       .update({
@@ -106,11 +146,29 @@ export async function signUp(
       .eq("id", data.user.id);
   }
 
-  await supabase.from("terms_acceptances").insert({
+  // Con la confirmación de email activada, signUp NO devuelve sesión — la
+  // sesión del usuario todavía no existe, así que este insert hecho con
+  // `supabase` (anon + RLS) era rechazado y fallaba en silencio: la tabla
+  // quedaba vacía aunque el cliente sí hubiera aceptado los términos. Como
+  // es un registro con valor legal (sección 11: hay que poder demostrar qué
+  // versión aceptó y cuándo), se escribe con el cliente admin y se verifica
+  // el error en vez de descartarlo.
+  const { error: termsError } = await admin.from("terms_acceptances").insert({
     user_id: data.user.id,
     terms_version: TERMS_VERSION,
   });
+  if (termsError) {
+    Sentry.captureException(termsError, {
+      extra: { context: "terms_acceptances_insert", userId: data.user.id },
+    });
+  }
 
+  // Si el proyecto tiene desactivada la confirmación por email, signUp
+  // devuelve sesión activa y mandar al cliente a "revisá tu correo" lo deja
+  // esperando un email que nunca va a llegar.
+  if (data.session) {
+    redirect(safeNext ?? "/");
+  }
   redirect("/auth/verificar-email");
 }
 
@@ -136,6 +194,14 @@ export async function signIn(
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
+  // "Email sin confirmar" se distingue a propósito de "credenciales
+  // incorrectas": si se devuelve el mensaje genérico, el cliente cree que
+  // erró la contraseña y la reintenta para siempre sin enterarse nunca de
+  // que solo le falta confirmar el correo. El resto de los errores sí
+  // quedan con el mensaje genérico (no revelar si el email existe).
+  if (error?.message?.toLowerCase().includes("email not confirmed")) {
+    return { error: friendlyAuthError(error.message) };
+  }
   if (error || !data.user) return { error: "Email o contraseña incorrectos." };
 
   const safeNext = safeNextPath(next);
@@ -197,9 +263,23 @@ export async function requestPasswordReset(
 
   const supabase = await createClient();
   const siteUrl = await getSiteUrl();
-  await supabase.auth.resetPasswordForEmail(email, {
+  // El link de recuperación de Supabase entrega el token en el fragmento de
+  // la URL (#access_token=...&type=recovery), no como "?code=" — por eso NO
+  // puede pasar por /auth/callback (ruta de servidor: nunca ve el fragmento,
+  // solo el navegador lo lee). ActualizarForm.tsx es quien establece la
+  // sesión leyendo ese hash del lado del cliente.
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${siteUrl}/auth/actualizar-password`,
   });
+
+  // Al cliente se le sigue mostrando siempre el mismo mensaje (para no
+  // revelar si el email existe), pero antes el error se descartaba por
+  // completo: si el envío fallaba —por ejemplo por el límite de correos del
+  // proveedor— no quedaba rastro en ningún lado y desde afuera parecía que
+  // el mail simplemente no llegaba nunca.
+  if (error) {
+    Sentry.captureException(error, { extra: { context: "resetPasswordForEmail" } });
+  }
 
   // Nunca revelamos si el email existe o no (mismo principio anti-enumeración
   // del rate limit de login, sección 16) — siempre el mismo mensaje.

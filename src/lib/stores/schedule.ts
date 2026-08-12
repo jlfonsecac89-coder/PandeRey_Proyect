@@ -52,6 +52,89 @@ export function isWithinBusinessHours(hours: BusinessHours, date: Date): boolean
   return minutesOfDay >= toMinutes(entry.open) && minutesOfDay < toMinutes(entry.close);
 }
 
+// Despacho puede tener un horario propio (`delivery_schedule`) — si Admin no
+// lo configuró explícitamente, se usa el mismo horario que retiro
+// (`business_hours`) en vez de dejar el despacho sin horario disponible.
+export function resolveSchedule(
+  businessHours: BusinessHours,
+  deliverySchedule: BusinessHours,
+  deliveryMethod: "pickup" | "shipping",
+): BusinessHours {
+  if (deliveryMethod === "shipping" && deliverySchedule && deliverySchedule.length > 0) {
+    return deliverySchedule;
+  }
+  return businessHours;
+}
+
+const SLOT_MINUTES = 15;
+
+// Genera los horarios agendables (cada 15 min) para un día puntual, dentro
+// del rango open-close configurado para ese día de la semana. `dayEntry` ya
+// viene resuelto (retiro o despacho) — esta función no sabe de esa distinción.
+export function slotsForDay(dayEntry: DaySchedule | null): string[] {
+  if (!dayEntry) return [];
+  const openMinutes = toMinutes(dayEntry.open);
+  const closeMinutes = toMinutes(dayEntry.close);
+  const slots: string[] = [];
+  for (let m = openMinutes; m < closeMinutes; m += SLOT_MINUTES) {
+    const h = Math.floor(m / 60)
+      .toString()
+      .padStart(2, "0");
+    const mm = (m % 60).toString().padStart(2, "0");
+    slots.push(`${h}:${mm}`);
+  }
+  return slots;
+}
+
+// Diferencia (en minutos) entre UTC y hora de Chile para el instante dado —
+// Chile cambió de regla de horario de verano varias veces en los últimos
+// años, así que en vez de asumir un offset fijo (-3 o -4), se lo pregunta a
+// Intl para ese instante puntual: formatea la misma fecha "como si fuera"
+// UTC y "como si fuera" Chile (sin offset en el string), y la diferencia
+// entre ambas lecturas es el offset real vigente en ese momento.
+function chileOffsetMinutes(date: Date): number {
+  const asUtc = new Date(date.toLocaleString("en-US", { timeZone: "UTC" }));
+  const asChile = new Date(date.toLocaleString("en-US", { timeZone: CHILE_TZ }));
+  return (asChile.getTime() - asUtc.getTime()) / 60000;
+}
+
+// Convierte "año-mes-día hora:minuto en hora de Chile" a un instante UTC
+// real — necesario para armar el `scheduled_at` que se guarda en la base
+// (siempre UTC) a partir de un día+slot que el cliente eligió en la grilla.
+export function chileWallTimeToUtc(y: number, m: number, d: number, hh: number, mm: number): Date {
+  const naiveUtcGuess = new Date(Date.UTC(y, m - 1, d, hh, mm));
+  const offsetMinutes = chileOffsetMinutes(naiveUtcGuess);
+  return new Date(naiveUtcGuess.getTime() - offsetMinutes * 60000);
+}
+
+// Año/mes/día de un instante, en hora de Chile — para armar la lista de
+// "próximos días agendables" a partir de "ahora" sin depender de la zona
+// horaria del servidor.
+export function chileDateYmd(date: Date): { y: number; m: number; d: number; day: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: CHILE_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "long",
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
+  const weekday = parts.find((p) => p.type === "weekday")?.value ?? "Sunday";
+  return { y: get("year"), m: get("month"), d: get("day"), day: WEEKDAY_INDEX[weekday] ?? 0 };
+}
+
+// Suma días de calendario a un año/mes/día — aritmética pura de fechas
+// (sin hora/zona), así que no hay que preocuparse por DST acá.
+export function addDaysToYmd(y: number, m: number, d: number, days: number): { y: number; m: number; d: number } {
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1, d: dt.getUTCDate() };
+}
+
+export function weekdayFromYmd(y: number, m: number, d: number): number {
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
 const DAY_ABBR = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]; // lunes a domingo, para mostrar en orden natural
 

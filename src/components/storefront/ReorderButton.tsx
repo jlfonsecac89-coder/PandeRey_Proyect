@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { RefreshCw } from "lucide-react";
 import { useCart } from "@/lib/cart/CartContext";
 import { getReorderItems } from "@/lib/orders/actions";
 
@@ -43,13 +44,14 @@ export function ReorderButton({ orderId }: { orderId: string }) {
         type="button"
         onClick={handleClick}
         disabled={isPending}
-        className="rounded-md border border-gold-dark px-3 py-1.5 text-xs text-gold-hover hover:border-gold disabled:opacity-50"
+        className="flex h-10 items-center justify-center gap-2 rounded-xl border border-gold bg-gold px-4 text-[11px] font-bold uppercase tracking-widest text-ink shadow-lg shadow-gold/10 transition-all duration-200 hover:bg-gold-hover active:scale-95 disabled:opacity-50"
       >
+        <RefreshCw className={`h-3.5 w-3.5 ${isPending ? "animate-spin" : ""}`} />
         {isPending ? "Agregando..." : "Repetir pedido"}
       </button>
       {unavailable && (
-        <div className="mt-2 text-xs text-foreground/60">
-          <p className="text-red-400">Ya no están disponibles: {unavailable.join(", ")}.</p>
+        <div className="mt-2 text-xs text-foreground-muted">
+          <p className="text-burgundy-hover">Ya no están disponibles: {unavailable.join(", ")}.</p>
           {addedCount > 0 && (
             <button type="button" onClick={() => router.push("/carrito")} className="mt-1 underline">
               Ver el resto en el carrito

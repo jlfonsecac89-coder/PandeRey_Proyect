@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { formatCLP } from "@/lib/format";
 import { getClearanceDiscounts, getClearanceProductIds, applyClearanceDiscount } from "@/lib/catalog/clearance";
-import { DepartmentIcon } from "@/components/storefront/DepartmentIcon";
 import { SortSelect } from "@/components/storefront/SortSelect";
 import { TiendaSidebarLayout } from "@/components/storefront/TiendaSidebarLayout";
+import { ProductGridCard, type ProductGridCardData } from "@/components/storefront/ProductGridCard";
 
 type ProductImage = { storage_path: string; sort_order: number };
 type ProductRow = {
@@ -15,6 +14,7 @@ type ProductRow = {
   is_gluten_free: boolean;
   is_special_event: boolean;
   images: ProductImage[];
+  option_groups: { is_required: boolean }[];
 };
 
 type SearchParams = {
@@ -138,7 +138,7 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
   let query = supabase
     .from("products")
     .select(
-      "id, name, slug, price, is_gluten_free, is_special_event, images:product_images(storage_path, sort_order)",
+      "id, name, slug, price, is_gluten_free, is_special_event, images:product_images(storage_path, sort_order), option_groups:product_option_groups(is_required)",
     )
     .eq("is_active", true);
 
@@ -206,14 +206,59 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
     (precio ? 1 : 0) +
     (singluten ? 1 : 0);
 
+  const gridProducts: ProductGridCardData[] = (products as ProductRow[] | null ?? []).map((product) => {
+    const clearancePct = clearanceDiscounts.get(product.id);
+    return {
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      price: product.price,
+      discountedPrice: applyClearanceDiscount(product.price, clearancePct),
+      clearancePct,
+      isGlutenFree: product.is_gluten_free,
+      isSpecialEvent: product.is_special_event,
+      imagePath: firstImagePath(product.images),
+      canQuickAdd: !product.option_groups.some((g) => g.is_required),
+    };
+  });
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Catálogo</p>
       <h1 className="mt-1 font-display text-3xl font-medium text-foreground">Tienda</h1>
 
+      {/* Pills de departamento — atajo horizontal a lo mismo que ya existe
+          en el sidebar ("Departamento"), calcado del filtro por categorías
+          de la referencia (íconos + pill dorada cuando está activa). */}
+      <div className="mt-6 -mx-6 flex gap-3 overflow-x-auto px-6 pb-2 [mask-image:linear-gradient(to_right,white_92%,transparent_100%)]">
+        <Link
+          href={buildHref({ departamento: undefined, categoria: undefined })}
+          className={`shrink-0 whitespace-nowrap rounded-full px-5 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${
+            !departamento
+              ? "bg-gold text-ink shadow-[0_4px_20px_rgba(212,175,55,0.25)]"
+              : "border border-white/5 bg-background-alt/60 text-foreground-muted hover:text-foreground"
+          }`}
+        >
+          Todas
+        </Link>
+        {(departments ?? []).map((d) => (
+          <Link
+            key={d.id}
+            href={buildHref({ departamento: d.slug, categoria: undefined })}
+            className={`shrink-0 whitespace-nowrap rounded-full px-5 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${
+              departamento === d.slug
+                ? "bg-gold text-ink shadow-[0_4px_20px_rgba(212,175,55,0.25)]"
+                : "border border-white/5 bg-background-alt/60 text-foreground-muted hover:text-foreground"
+            }`}
+          >
+            {d.name}
+          </Link>
+        ))}
+      </div>
+
       <TiendaSidebarLayout
         sidebar={
-        <aside className="space-y-6 rounded-2xl border border-charcoal-border bg-background-elevated p-5 shadow-card lg:sticky lg:top-24 lg:self-start">
+        <aside className="space-y-6 rounded-2xl border border-white/5 bg-background-alt/60 p-5 backdrop-blur-sm lg:sticky lg:top-24 lg:self-start">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Filtros</p>
             {activeFilterCount > 0 && (
@@ -223,38 +268,8 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
             )}
           </div>
 
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Departamento</p>
-            <ul className="mt-2 space-y-1">
-              <li>
-                <Link
-                  href={buildHref({ departamento: undefined, categoria: undefined })}
-                  className={`block rounded-md px-2 py-1 text-sm transition ${
-                    !departamento ? "bg-gold/10 font-medium text-gold" : "text-foreground-muted hover:text-gold"
-                  }`}
-                >
-                  Todas
-                </Link>
-              </li>
-              {(departments ?? []).map((d) => (
-                <li key={d.id}>
-                  <Link
-                    href={buildHref({ departamento: d.slug, categoria: undefined })}
-                    className={`block rounded-md px-2 py-1 text-sm transition ${
-                      departamento === d.slug
-                        ? "bg-gold/10 font-medium text-gold"
-                        : "text-foreground-muted hover:text-gold"
-                    }`}
-                  >
-                    {d.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
           {currentDept && categoriesInDept.length > 0 && (
-            <div className="border-t border-charcoal-border pt-4">
+            <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Categoría</p>
               <ul className="mt-2 space-y-1">
                 <li>
@@ -285,7 +300,7 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
             </div>
           )}
 
-          <div className="border-t border-charcoal-border pt-4">
+          <div className="border-t border-white/5 pt-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Precio</p>
             <ul className="mt-2 space-y-1">
               <li>
@@ -313,7 +328,7 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
             </ul>
           </div>
 
-          <div className="space-y-1 border-t border-charcoal-border pt-4">
+          <div className="space-y-1 border-t border-white/5 pt-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Otros</p>
             <Link
               href={buildHref({ filtro: filtro === "ofertas" ? undefined : "ofertas" })}
@@ -322,7 +337,7 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
               }`}
             >
               <span
-                className={`flex h-4 w-4 items-center justify-center rounded border ${filtro === "ofertas" ? "border-burgundy bg-burgundy" : "border-charcoal-border"}`}
+                className={`flex h-4 w-4 items-center justify-center rounded border ${filtro === "ofertas" ? "border-burgundy bg-burgundy" : "border-white/15"}`}
               >
                 {filtro === "ofertas" && <span className="h-2 w-2 rounded-sm bg-white" />}
               </span>
@@ -335,7 +350,7 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
               }`}
             >
               <span
-                className={`flex h-4 w-4 items-center justify-center rounded border ${filtro === "evento" ? "border-gold bg-gold" : "border-charcoal-border"}`}
+                className={`flex h-4 w-4 items-center justify-center rounded border ${filtro === "evento" ? "border-gold bg-gold" : "border-white/15"}`}
               >
                 {filtro === "evento" && <span className="h-2 w-2 rounded-sm bg-ink" />}
               </span>
@@ -348,7 +363,7 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
               }`}
             >
               <span
-                className={`flex h-4 w-4 items-center justify-center rounded border ${singluten === "1" ? "border-gold bg-gold" : "border-charcoal-border"}`}
+                className={`flex h-4 w-4 items-center justify-center rounded border ${singluten === "1" ? "border-gold bg-gold" : "border-white/15"}`}
               >
                 {singluten === "1" && <span className="h-2 w-2 rounded-sm bg-ink" />}
               </span>
@@ -362,8 +377,8 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
         <div>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-foreground-muted">
-              {(products ?? []).length} producto{(products ?? []).length === 1 ? "" : "s"} encontrado
-              {(products ?? []).length === 1 ? "" : "s"}
+              {gridProducts.length} producto{gridProducts.length === 1 ? "" : "s"} encontrado
+              {gridProducts.length === 1 ? "" : "s"}
             </p>
             <SortSelect
               current={orden ?? "nombre"}
@@ -373,73 +388,11 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
-            {(products as ProductRow[] | null ?? []).map((product) => {
-              const imagePath = firstImagePath(product.images);
-              const clearancePct = clearanceDiscounts.get(product.id);
-              const discountedPrice = applyClearanceDiscount(product.price, clearancePct);
-              return (
-                <Link
-                  key={product.id}
-                  href={`/tienda/${product.slug}`}
-                  className="group overflow-hidden rounded-2xl border border-charcoal-border bg-background-elevated shadow-card transition hover:-translate-y-1 hover:border-gold-dark"
-                >
-                  <div className="relative aspect-square overflow-hidden bg-background">
-                    {imagePath ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={`${publicBaseUrl}/${imagePath}`}
-                        alt={product.name}
-                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div
-                        className="flex h-full items-center justify-center text-gold-dark/35"
-                        style={{
-                          background:
-                            "radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--color-gold) 12%, transparent), transparent 70%)",
-                        }}
-                      >
-                        <DepartmentIcon name={product.name} className="h-10 w-10" />
-                      </div>
-                    )}
-                    <div className="absolute left-2 top-2 flex flex-col gap-1">
-                      {clearancePct && (
-                        <span className="rounded-full bg-burgundy px-2 py-0.5 text-[10px] font-medium text-foreground shadow-card">
-                          -{clearancePct}%
-                        </span>
-                      )}
-                      {product.is_special_event && (
-                        <span className="rounded-full bg-gold px-2 py-0.5 text-[10px] font-medium text-ink shadow-card">
-                          Edición limitada
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="p-3.5">
-                    <p className="font-display text-[15px] font-medium leading-snug text-foreground">{product.name}</p>
-                    <div className="mt-1.5 flex items-center justify-between gap-2">
-                      {clearancePct ? (
-                        <p className="text-sm font-semibold text-gold">
-                          {formatCLP(discountedPrice)}{" "}
-                          <span className="text-xs font-normal text-foreground-muted/60 line-through">
-                            {formatCLP(product.price)}
-                          </span>
-                        </p>
-                      ) : (
-                        <p className="text-sm font-semibold text-gold">{formatCLP(product.price)}</p>
-                      )}
-                      {product.is_gluten_free && (
-                        <span className="shrink-0 rounded-full border border-charcoal-border px-2 py-0.5 text-[10px] text-foreground-muted">
-                          Sin gluten
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-            {(products ?? []).length === 0 && (
-              <div className="col-span-full rounded-xl border border-dashed border-charcoal-border py-16 text-center">
+            {gridProducts.map((product) => (
+              <ProductGridCard key={product.id} product={product} publicBaseUrl={publicBaseUrl} />
+            ))}
+            {gridProducts.length === 0 && (
+              <div className="col-span-full rounded-xl border border-dashed border-white/10 py-16 text-center">
                 <p className="text-sm text-foreground-muted">No hay productos que coincidan con este filtro.</p>
               </div>
             )}

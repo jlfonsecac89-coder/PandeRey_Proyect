@@ -7,30 +7,32 @@
 /* Identidad Pan de Rey — escudo blanco puro (corona + espigas) sobre negro
    absoluto (public/logo.png): negro, dorado y blanco/gris claro, sin más
    colores compitiendo por atención. Página en negro profundo, tarjetas en
-   blanco puro para separar contenido, dorado corporativo (#FAF290) como
-   único acento — botones, hover, íconos, separadores. `--color-charcoal-light`
-   se mantiene igual a `--background-elevated` (blanco) a propósito: muchos
-   componentes más viejos todavía usan `bg-charcoal-light` como superficie de
-   tarjeta, y así heredan el mismo blanco sin tener que tocar archivo por
-   archivo. Burdeos se conserva SOLO como color semántico de error/zona de
-   riesgo (no es un acento de marca, no compite con la línea corporativa). */
+   blanco puro para separar contenido, dorado corporativo (#D4AF37, alineado
+   a la versión de referencia) como único acento — botones, hover, íconos,
+   separadores. `--color-charcoal-light` se mantiene igual a
+   `--background-elevated` (blanco) a propósito: muchos componentes más
+   viejos todavía usan `bg-charcoal-light` como superficie de tarjeta, y
+   así heredan el mismo blanco sin tener que tocar archivo por archivo.
+   Burdeos se conserva SOLO como color semántico de error/zona de riesgo
+   (no es un acento de marca, no compite con la línea corporativa). */
 :root {
-  --background: #0D0C0A;
+  --background: #0B0B0B;
   --background-elevated: #FFFFFF;
-  --background-alt: #17140F;
+  --background-alt: #161616;
   --foreground: #F5F1E6;
   --foreground-muted: #B2A996;
 
   --color-ink: #14110A; /* texto fijo y oscuro para usar SOBRE botones de color, sin depender de --background */
 
-  /* Dorado corporativo — #FAF290 es el valor exacto de marca; hover/dark son
-     variantes derivadas del mismo matiz (más clara para hover sobre fondo
-     negro, más oscura para texto legible sobre tarjetas blancas). */
-  --color-gold: #FAF290;
-  --color-gold-hover: #FFFAC2;
-  --color-gold-dark: #B7A63C;
+  /* Dorado corporativo — alineado al valor de la versión de referencia
+     (preview-e2e); hover/dark son las mismas variantes que usa esa
+     referencia (champán claro para hover, bronce oscuro para texto legible
+     sobre tarjetas blancas). */
+  --color-gold: #D4AF37;
+  --color-gold-hover: #E6CCA8;
+  --color-gold-dark: #A3835B;
   --color-charcoal-light: #FFFFFF;
-  --color-charcoal-border: rgba(250, 242, 144, 0.22);
+  --color-charcoal-border: rgba(212, 175, 55, 0.22);
   --color-glass-fill: rgba(13, 12, 10, 0.85);
   --color-burgundy: #6B2A2A;
   --color-burgundy-hover: #8C3A3A;
@@ -159,8 +161,8 @@ body {
   --color-foreground: #1E1912;
   --foreground-muted: #6E6350;
   --color-foreground-muted: #6E6350;
-  --color-gold: #8F7F1E;
-  --color-gold-hover: #A6942A;
+  --color-gold: #9C7B1E;
+  --color-gold-hover: #B4922B;
   /* Redeclarar la variable no alcanza para texto SIN clase `text-*` propia
      (ej. un <button> sin color explícito): ese hereda el `color` ya
      calculado en <body> (blanco), no vuelve a evaluar la variable. Fijar

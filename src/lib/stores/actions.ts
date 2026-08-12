@@ -16,16 +16,18 @@ const WEEK_DAYS = [
   { day: 0, label: "Domingo" },
 ] as const;
 
-// El formulario manda un checkbox `hours_open_{day}` + `hours_from_{day}`/
-// `hours_to_{day}` por cada día de la semana (ver StoreCard) — acá se arma
+// El formulario manda un checkbox `{prefix}open_{day}` + `{prefix}from_{day}`/
+// `{prefix}to_{day}` por cada día de la semana (ver StoreCard) — acá se arma
 // el jsonb que consume `isWithinBusinessHours` en el checkout. Un día sin
-// checkbox marcado queda afuera del array (= cerrado ese día).
-function parseBusinessHours(formData: FormData): DaySchedule[] {
+// checkbox marcado queda afuera del array (= cerrado ese día). El mismo
+// parser sirve para horario de retiro (`hours_`) y de despacho
+// (`delivery_hours_`) — son dos jsonb independientes en `stores`.
+function parseBusinessHours(formData: FormData, prefix = "hours_"): DaySchedule[] {
   const schedule: DaySchedule[] = [];
   for (const { day } of WEEK_DAYS) {
-    if (formData.get(`hours_open_${day}`) !== "on") continue;
-    const from = String(formData.get(`hours_from_${day}`) || "").trim();
-    const to = String(formData.get(`hours_to_${day}`) || "").trim();
+    if (formData.get(`${prefix}open_${day}`) !== "on") continue;
+    const from = String(formData.get(`${prefix}from_${day}`) || "").trim();
+    const to = String(formData.get(`${prefix}to_${day}`) || "").trim();
     if (!/^\d{2}:\d{2}$/.test(from) || !/^\d{2}:\d{2}$/.test(to)) continue;
     if (from >= to) continue;
     schedule.push({ day, open: from, close: to });
@@ -119,9 +121,14 @@ export async function updateStoreSettings(
   const instagram = String(formData.get("social_instagram") || "").trim() || null;
   const facebook = String(formData.get("social_facebook") || "").trim() || null;
   const whatsapp = String(formData.get("social_whatsapp") || "").trim() || null;
-  const businessHours = parseBusinessHours(formData);
+  const businessHours = parseBusinessHours(formData, "hours_");
+  const deliveryHours = parseBusinessHours(formData, "delivery_hours_");
+  const maxOrdersPerSlot = parseOptionalNumber(formData.get("max_orders_per_slot"));
 
   if (maxRadius === null) return { error: "El radio máximo de entrega es obligatorio." };
+  if (maxOrdersPerSlot === null || maxOrdersPerSlot < 1) {
+    return { error: "El máximo de pedidos por horario debe ser al menos 1." };
+  }
 
   const socialLinks =
     instagram || facebook || whatsapp ? { instagram, facebook, whatsapp } : null;
@@ -137,6 +144,11 @@ export async function updateStoreSettings(
       contact_email: contactEmail,
       social_links: socialLinks,
       business_hours: businessHours.length > 0 ? businessHours : null,
+      // Vacío = "usa el mismo horario que retiro" (fallback en schedule.ts),
+      // no "sin despacho nunca" — así una sucursal que no lo configura
+      // explícitamente no rompe el paso de agendar despacho.
+      delivery_schedule: deliveryHours.length > 0 ? deliveryHours : null,
+      max_orders_per_slot: maxOrdersPerSlot,
     })
     .eq("id", storeId);
   if (error) return { error: "No se pudo actualizar la sucursal." };

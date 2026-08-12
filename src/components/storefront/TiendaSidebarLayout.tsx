@@ -14,7 +14,7 @@ export function TiendaSidebarLayout({ sidebar, children }: { sidebar: ReactNode;
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="mb-4 flex items-center gap-2 rounded-full border border-charcoal-border px-4 py-1.5 text-sm text-foreground-muted transition hover:border-gold-dark hover:text-gold"
+        className="mb-4 flex items-center gap-2 rounded-full border border-white/10 bg-background-alt/60 px-4 py-1.5 text-sm text-foreground-muted transition hover:border-gold-dark hover:text-gold"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4">
           <path d="M4 6h16M7 12h10M10 18h4" />

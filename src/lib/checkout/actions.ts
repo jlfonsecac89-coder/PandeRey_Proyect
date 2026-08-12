@@ -6,9 +6,19 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentProfile } from "@/lib/auth/session";
-import { geocodeAddress } from "@/lib/geo/geocode";
+import { geocodeStreetAddress } from "@/lib/geo/geocode";
 import { METROPOLITANA_REGION_NAME, RM_COMUNAS } from "@/lib/geo/chile-regions";
-import { isWithinBusinessHours, formatBusinessHours, type BusinessHours } from "@/lib/stores/schedule";
+import {
+  formatBusinessHours,
+  resolveSchedule,
+  chileWallTimeToUtc,
+  chileDateYmd,
+  addDaysToYmd,
+  weekdayFromYmd,
+  slotsForDay,
+  type BusinessHours,
+  type DaySchedule,
+} from "@/lib/stores/schedule";
 import { computeShipping } from "./shipping";
 import { createOrderPreference } from "@/lib/mercadopago/preference";
 import { formatCLP } from "@/lib/format";
@@ -47,17 +57,22 @@ export async function saveAddress(
   const profile = await getCurrentProfile();
   if (!profile) redirect("/auth/login?next=/checkout");
 
+  const addressId = String(formData.get("address_id") || "").trim() || null;
   const label = String(formData.get("label") || "").trim() || null;
   const calle = String(formData.get("calle") || "").trim();
   const numero = String(formData.get("numero") || "").trim();
   const comuna = String(formData.get("comuna") || "").trim();
-  const ciudad = String(formData.get("ciudad") || "").trim();
+  // El despacho solo cubre la Región Metropolitana (Santiago es la única
+  // ciudad de esa región relevante acá) — pedirle "ciudad" como texto libre
+  // al cliente no aporta nada (nunca se usó para geocodificar) y sí puede
+  // meter inconsistencias ("stgo", vacío, mal escrito), así que queda fija.
+  const ciudad = "Santiago";
   const region = String(formData.get("region") || "").trim();
   const housingType = String(formData.get("housing_type") || "casa").trim();
   const deptoNumero = String(formData.get("depto_numero") || "").trim() || null;
 
-  if (!calle || !numero || !comuna || !ciudad || !region) {
-    return { error: "Completa calle, número, comuna, ciudad y región." };
+  if (!calle || !numero || !comuna || !region) {
+    return { error: "Completa calle, número, comuna y región." };
   }
   if (housingType !== "casa" && housingType !== "departamento") {
     return { error: "Tipo de vivienda inválido." };
@@ -77,15 +92,9 @@ export async function saveAddress(
   const { allowed } = await checkRateLimit("geocodificar", profile.id, 10, 60);
   if (!allowed) return { error: "Demasiados intentos. Esperá un minuto e intentá de nuevo." };
 
-  // OpenRouteService/Pelias geocodifica mucho mejor a nivel de número exacto
-  // con "calle número, comuna, Chile" — agregar ciudad/región duplica la
-  // comuna en la mayoría de las direcciones chilenas y degrada el match a
-  // nivel de calle en vez de punto exacto (confirmado empíricamente).
-  const fullAddressText = `${calle} ${numero}, ${comuna}, Chile`;
-
   let geocoded;
   try {
-    geocoded = await geocodeAddress(fullAddressText);
+    geocoded = await geocodeStreetAddress({ calle, numero, comuna });
   } catch {
     return { error: "El servicio de geocodificación no está disponible ahora mismo." };
   }
@@ -96,29 +105,43 @@ export async function saveAddress(
   }
 
   const supabase = await createClient();
-  const { data: created, error } = await supabase
-    .from("addresses")
-    .insert({
-      user_id: profile.id,
-      label,
-      calle,
-      numero,
-      comuna,
-      ciudad,
-      region,
-      housing_type: housingType,
-      depto_numero: housingType === "departamento" ? deptoNumero : null,
-      lat: geocoded.lat,
-      lng: geocoded.lng,
-      geocoded_at: new Date().toISOString(),
-    })
-    .select("id")
-    .single();
+  const addressPayload = {
+    label,
+    calle,
+    numero,
+    comuna,
+    ciudad,
+    region,
+    housing_type: housingType,
+    depto_numero: housingType === "departamento" ? deptoNumero : null,
+    lat: geocoded.lat,
+    lng: geocoded.lng,
+    geocoded_at: new Date().toISOString(),
+  };
 
-  if (error || !created) return { error: "No se pudo guardar la dirección." };
+  // address_id presente = se está editando una dirección existente en vez
+  // de crear una nueva (Mis direcciones tiene botón "Editar", no solo
+  // agregar) — el .eq("user_id", ...) es la única barrera contra que un
+  // cliente edite la dirección de otro pasando un id ajeno.
+  const { data: saved, error } = addressId
+    ? await supabase
+        .from("addresses")
+        .update(addressPayload)
+        .eq("id", addressId)
+        .eq("user_id", profile.id)
+        .select("id")
+        .single()
+    : await supabase
+        .from("addresses")
+        .insert({ user_id: profile.id, ...addressPayload })
+        .select("id")
+        .single();
+
+  if (error || !saved) return { error: "No se pudo guardar la dirección." };
 
   revalidatePath("/checkout");
-  return { success: "Dirección agregada.", addressId: created.id };
+  revalidatePath("/cuenta/direcciones");
+  return { success: addressId ? "Dirección actualizada." : "Dirección agregada.", addressId: saved.id };
 }
 
 // ---------- Previsualización de envío ----------
@@ -170,6 +193,98 @@ export async function previewShipping(
   if (!quote.ok) return { error: quote.error };
 
   return { ok: true, distanceKm: quote.distanceKm, shippingCost: quote.shippingCost };
+}
+
+// ---------- Días y horarios agendables (paso "Fecha y hora") ----------
+
+export type ScheduleSlot = { time: string; iso: string; available: boolean };
+export type ScheduleDayOption = { dateIso: string; label: string; slots: ScheduleSlot[] };
+
+const DAY_LABEL_FORMATTER = new Intl.DateTimeFormat("es-CL", {
+  timeZone: "America/Santiago",
+  weekday: "short",
+  day: "2-digit",
+  month: "short",
+});
+
+// Se llama desde el paso "Fecha y hora" del checkout cada vez que cambia la
+// sucursal, el método de entrega o el día elegido — arma hoy + 3 días
+// siguientes (nunca más, sección "no puede agendar con 15 días de
+// anticipación"), cada uno con sus slots de 15 min dentro del horario real
+// de la sucursal (retiro o despacho, según corresponda) y marca como
+// ocupados los que ya llegaron al tope de pedidos.
+export async function getScheduleOptions(
+  storeId: string,
+  deliveryMethod: "pickup" | "shipping",
+): Promise<ScheduleDayOption[]> {
+  const profile = await getCurrentProfile();
+  if (!profile) return [];
+
+  const supabase = await createClient();
+  const { data: store } = await supabase
+    .from("stores")
+    .select("id, business_hours, delivery_schedule, max_orders_per_slot")
+    .eq("id", storeId)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (!store) return [];
+
+  const resolvedSchedule = resolveSchedule(
+    store.business_hours as BusinessHours,
+    store.delivery_schedule as BusinessHours,
+    deliveryMethod,
+  );
+
+  const now = new Date();
+  const nowYmd = chileDateYmd(now);
+  const days: { y: number; m: number; d: number; day: number; dateIso: string }[] = [];
+  for (let offset = 0; offset <= 3; offset++) {
+    const { y, m, d } = addDaysToYmd(nowYmd.y, nowYmd.m, nowYmd.d, offset);
+    days.push({ y, m, d, day: weekdayFromYmd(y, m, d), dateIso: `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` });
+  }
+
+  // Cuenta cuántos pedidos ya hay por slot en la ventana completa de una
+  // sola consulta (en vez de una por slot) — con el cliente admin porque
+  // customer_select_own_orders (RLS) no deja ver pedidos de otros clientes.
+  const windowStart = chileWallTimeToUtc(days[0].y, days[0].m, days[0].d, 0, 0);
+  const windowEnd = chileWallTimeToUtc(days[days.length - 1].y, days[days.length - 1].m, days[days.length - 1].d, 23, 59);
+  const admin = createAdminClient();
+  const { data: existingOrders } = await admin
+    .from("orders")
+    .select("scheduled_at")
+    .eq("store_id", storeId)
+    .neq("status", "cancelled")
+    .gte("scheduled_at", windowStart.toISOString())
+    .lte("scheduled_at", windowEnd.toISOString());
+  const countBySlot = new Map<string, number>();
+  for (const o of existingOrders ?? []) {
+    if (!o.scheduled_at) continue;
+    countBySlot.set(o.scheduled_at, (countBySlot.get(o.scheduled_at) ?? 0) + 1);
+  }
+
+  const options: ScheduleDayOption[] = [];
+  for (const { y, m, d, day, dateIso } of days) {
+    const dayEntry = resolvedSchedule?.find((h) => h.day === day) ?? null;
+    const times = slotsForDay(dayEntry as DaySchedule | null);
+    const slots: ScheduleSlot[] = times.map((time) => {
+      const [hh, mm] = time.split(":").map(Number);
+      const slotDate = chileWallTimeToUtc(y, m, d, hh, mm);
+      const iso = slotDate.toISOString();
+      const isPast = slotDate.getTime() <= now.getTime();
+      const isFull = (countBySlot.get(iso) ?? 0) >= store.max_orders_per_slot;
+      return { time, iso, available: !isPast && !isFull };
+    });
+    if (slots.length === 0) continue; // sucursal cerrada ese día
+    options.push({ dateIso, label: DAY_LABEL_FORMATTER.format(slotDateForLabel(y, m, d)), slots });
+  }
+  return options;
+}
+
+// Mediodía UTC del día en cuestión — solo para formatear la etiqueta del
+// día (nombre + fecha), nunca se usa como hora real de ningún slot, así que
+// alcanza con un instante cualquiera dentro de ese día calendario.
+function slotDateForLabel(y: number, m: number, d: number): Date {
+  return new Date(Date.UTC(y, m - 1, d, 12, 0));
 }
 
 // ---------- Creación del pedido + preferencia de Mercado Pago ----------
@@ -287,7 +402,7 @@ export async function createCheckoutPreference(
   const { data: store } = await supabase
     .from("stores")
     .select(
-      "id, name, origin_lat, origin_lng, max_delivery_radius_km, min_order_amount, free_shipping_min_amount, social_links, business_hours",
+      "id, name, origin_lat, origin_lng, max_delivery_radius_km, min_order_amount, free_shipping_min_amount, social_links, business_hours, delivery_schedule, max_orders_per_slot",
     )
     .eq("id", storeId)
     .eq("is_active", true)
@@ -299,16 +414,55 @@ export async function createCheckoutPreference(
   }
 
   // La fecha/hora de retiro o despacho es obligatoria y debe caer dentro del
-  // horario de atención de la sucursal — nunca se confía en la validación
-  // del cliente, se recalcula acá con los mismos datos.
+  // horario de atención de la sucursal (retiro y despacho pueden tener
+  // horarios distintos), alineada a un slot de 15 minutos, dentro de la
+  // ventana de agendamiento (hoy + 3 días) y sin superar el cupo de pedidos
+  // de ese horario — nunca se confía en lo que eligió el cliente en la
+  // grilla, se recalcula todo acá con los mismos datos que armó esa grilla.
+  const resolvedSchedule = resolveSchedule(
+    store.business_hours as BusinessHours,
+    store.delivery_schedule as BusinessHours,
+    deliveryMethod,
+  );
   if (!scheduledAtRaw) return { error: "Elegí una fecha y hora de retiro o despacho." };
   const scheduledAtDate = new Date(scheduledAtRaw);
   if (Number.isNaN(scheduledAtDate.getTime())) return { error: "Fecha/hora programada inválida." };
   if (scheduledAtDate.getTime() < Date.now()) return { error: "Elegí una fecha y hora futura." };
-  if (!isWithinBusinessHours(store.business_hours as BusinessHours, scheduledAtDate)) {
+
+  const nowYmd = chileDateYmd(new Date());
+  const maxYmd = addDaysToYmd(nowYmd.y, nowYmd.m, nowYmd.d, 3);
+  const maxScheduledAt = chileWallTimeToUtc(maxYmd.y, maxYmd.m, maxYmd.d, 23, 59);
+  if (scheduledAtDate.getTime() > maxScheduledAt.getTime()) {
+    return { error: "Solo se puede agendar hasta 3 días desde hoy." };
+  }
+
+  const scheduledYmd = chileDateYmd(scheduledAtDate);
+  const dayEntry = resolvedSchedule?.find((h) => h.day === scheduledYmd.day) ?? null;
+  const daySlots = slotsForDay(dayEntry as DaySchedule | null);
+  const scheduledHhmm = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Santiago",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(scheduledAtDate);
+  if (!daySlots.includes(scheduledHhmm)) {
     return {
-      error: `Ese horario está fuera del horario de atención de la sucursal (${formatBusinessHours(store.business_hours as BusinessHours)}).`,
+      error: `Ese horario está fuera del horario de ${deliveryMethod === "pickup" ? "retiro" : "despacho"} de la sucursal (${formatBusinessHours(resolvedSchedule)}).`,
     };
+  }
+
+  // Cupo por horario (sección "no saturar al equipo") — se cuenta con el
+  // cliente admin porque customer_select_own_orders (RLS) no deja ver
+  // pedidos de otros clientes, y acá hace falta el total real del slot.
+  const adminForSlotCheck = createAdminClient();
+  const { count: slotCount } = await adminForSlotCheck
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("store_id", storeId)
+    .eq("scheduled_at", scheduledAtDate.toISOString())
+    .neq("status", "cancelled");
+  if ((slotCount ?? 0) >= store.max_orders_per_slot) {
+    return { error: "Ese horario ya está completo. Elegí otro horario cercano." };
   }
 
   // Aceptación 4: mínimo de compra.

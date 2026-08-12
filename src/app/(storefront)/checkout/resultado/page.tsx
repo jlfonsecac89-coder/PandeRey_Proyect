@@ -55,7 +55,7 @@ export default async function CheckoutResultadoPage({
           <h1 className="font-display text-2xl font-medium text-foreground">¡Gracias por tu compra!</h1>
           <p className="mt-2 text-sm text-foreground-muted">Tu pedido fue confirmado.</p>
 
-          <div className="mt-6 space-y-2 rounded-2xl border border-charcoal-border bg-background-elevated p-5 text-left text-sm shadow-card">
+          <div className="mt-6 space-y-2 rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-left text-sm shadow-card">
             <div className="flex justify-between">
               <span className="text-foreground-muted">Código de pedido</span>
               <span className="font-mono text-xs text-gold-dark">{order!.id.slice(0, 8).toUpperCase()}</span>

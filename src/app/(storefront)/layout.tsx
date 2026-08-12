@@ -30,6 +30,12 @@ export default async function StorefrontLayout({ children }: { children: React.R
             </Link>
             <nav className="flex items-center gap-1">
               <Link
+                href="/"
+                className="rounded-md px-3 py-1.5 text-sm text-foreground-muted transition hover:text-gold"
+              >
+                Inicio
+              </Link>
+              <Link
                 href="/tienda"
                 className="rounded-md px-3 py-1.5 text-sm text-foreground-muted transition hover:text-gold"
               >

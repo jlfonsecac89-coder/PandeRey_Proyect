@@ -41,6 +41,8 @@ export type Store = {
   min_order_amount: number | null;
   free_shipping_min_amount: number | null;
   business_hours: BusinessHours;
+  delivery_schedule: BusinessHours;
+  max_orders_per_slot: number;
   is_active: boolean;
 };
 
@@ -154,9 +156,7 @@ export function StoreCard({ store, zones }: { store: Store; zones: ShippingZone[
         </label>
 
         <div className="col-span-3">
-          <p className="text-xs text-foreground/60">
-            Horario de atención (retiro y despacho solo se pueden agendar dentro de este rango)
-          </p>
+          <p className="text-xs text-foreground/60">Horario de retiro en tienda</p>
           <div className="mt-1.5 space-y-1">
             {WEEK_DAYS.map(({ day, label }) => {
               const entry = store.business_hours?.find((h) => h.day === day) ?? null;
@@ -184,6 +184,52 @@ export function StoreCard({ store, zones }: { store: Store; zones: ShippingZone[
             })}
           </div>
         </div>
+
+        <div className="col-span-3">
+          <p className="text-xs text-foreground/60">
+            Horario de despacho a domicilio{" "}
+            <span className="text-foreground/40">(vacío = usa el mismo horario de retiro)</span>
+          </p>
+          <div className="mt-1.5 space-y-1">
+            {WEEK_DAYS.map(({ day, label }) => {
+              const entry = store.delivery_schedule?.find((h) => h.day === day) ?? null;
+              return (
+                <div key={day} className="flex items-center gap-2 text-xs">
+                  <label className="flex w-24 shrink-0 items-center gap-1.5">
+                    <input type="checkbox" name={`delivery_hours_open_${day}`} defaultChecked={!!entry} />
+                    {label}
+                  </label>
+                  <input
+                    type="time"
+                    name={`delivery_hours_from_${day}`}
+                    defaultValue={entry?.open ?? "10:00"}
+                    className="rounded-md border border-charcoal-border bg-background px-2 py-1"
+                  />
+                  <span className="text-foreground/40">a</span>
+                  <input
+                    type="time"
+                    name={`delivery_hours_to_${day}`}
+                    defaultValue={entry?.close ?? "19:00"}
+                    className="rounded-md border border-charcoal-border bg-background px-2 py-1"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <label className="text-xs text-foreground/60">
+          Máx. pedidos por horario
+          <input
+            name="max_orders_per_slot"
+            type="number"
+            min={1}
+            defaultValue={store.max_orders_per_slot}
+            className="mt-1 w-full rounded-md border border-charcoal-border bg-background px-2 py-1 text-sm"
+          />
+        </label>
+        <div />
+        <div />
 
         <button
           type="submit"

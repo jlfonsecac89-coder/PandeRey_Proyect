@@ -34,7 +34,9 @@ export function AuthCard({
         {subtitle && (
           <p className="text-center text-sm text-foreground-muted mb-6">{subtitle}</p>
         )}
-        <div className="mt-6 rounded-2xl border border-charcoal-border bg-background-elevated p-6 shadow-card">
+        {/* Tarjeta oscura como en la versión de referencia — antes era
+            blanca y rompía con el resto del sitio en negro. */}
+        <div className="mt-6 rounded-2xl border border-white/10 bg-background-alt/80 p-6 shadow-2xl backdrop-blur-sm sm:p-8">
           {children}
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { startTransition, useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Store,
@@ -19,13 +19,16 @@ import { useCart } from "@/lib/cart/CartContext";
 import { cartItemUnitPrice } from "@/lib/cart/types";
 import { formatCLP, splitIva } from "@/lib/format";
 import { RegionComunaFields } from "./RegionComunaFields";
-import { isWithinBusinessHours, formatBusinessHours, type BusinessHours } from "@/lib/stores/schedule";
+import { type BusinessHours } from "@/lib/stores/schedule";
 import {
   createCheckoutPreference,
   previewShipping,
   saveAddress,
+  getScheduleOptions,
   type CheckoutState,
   type ShippingPreviewState,
+  type ScheduleDayOption,
+  type ScheduleSlot,
 } from "@/lib/checkout/actions";
 
 type Address = {
@@ -62,56 +65,26 @@ const inputClass =
 
 type StepStatus = "done" | "active" | "upcoming";
 
-// Encabezado de cada sección del acordeón — un paso ya completado se ve
-// como una fila compacta con lo que el cliente eligió (y un link para
-// volver a editarlo); el paso activo muestra su número resaltado arriba
-// del formulario completo; los pasos futuros quedan apagados, solo para
-// que se vea cuánto falta.
-function StepHeader({
-  index,
-  label,
-  status,
-  summary,
-  onEdit,
-}: {
-  index: number;
-  label: string;
-  status: StepStatus;
-  summary?: string;
-  onEdit?: () => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <div className="flex items-center gap-2.5">
-        <span
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors ${
-            status === "active"
-              ? "border-gold bg-gold text-ink"
-              : status === "done"
-                ? "border-gold-dark bg-gold-dark/15 text-gold-dark"
-                : "border-charcoal-border text-foreground-muted"
-          }`}
-        >
-          {status === "done" ? <Check className="h-3.5 w-3.5" /> : index + 1}
-        </span>
-        <div>
-          <p
-            className={`text-sm font-semibold uppercase tracking-wide ${
-              status === "upcoming" ? "text-foreground-muted/50" : "text-foreground"
-            }`}
-          >
-            {label}
-          </p>
-          {status === "done" && summary && <p className="text-xs text-foreground-muted">{summary}</p>}
-        </div>
-      </div>
-      {status === "done" && onEdit && (
-        <button type="button" onClick={onEdit} className="shrink-0 text-xs text-gold-hover underline">
-          Editar
-        </button>
-      )}
-    </div>
-  );
+// Un día entero de slots sueltos de 15 min (hasta ~36 opciones) es difícil
+// de escanear — se agrupan en Mañana/Tarde/Noche, igual que un combo de
+// horarios de cualquier reserva online, para que la lista no se sienta
+// interminable.
+function groupSlotsByPeriod(slots: ScheduleSlot[]): { label: string; slots: ScheduleSlot[] }[] {
+  const groups = [
+    { label: "Mañana (antes de las 13:00)", from: 0, to: 13 * 60 },
+    { label: "Tarde (13:00 a 18:00)", from: 13 * 60, to: 18 * 60 },
+    { label: "Noche (después de las 18:00)", from: 18 * 60, to: 24 * 60 },
+  ];
+  return groups
+    .map((g) => ({
+      label: g.label,
+      slots: slots.filter((s) => {
+        const [h, m] = s.time.split(":").map(Number);
+        const minutes = h * 60 + m;
+        return minutes >= g.from && minutes < g.to;
+      }),
+    }))
+    .filter((g) => g.slots.length > 0);
 }
 
 export function CheckoutForm({
@@ -139,20 +112,19 @@ export function CheckoutForm({
   const [storeId, setStoreId] = useState(stores[0]?.id ?? "");
   const [addressId, setAddressId] = useState(addresses[0]?.id ?? "");
   const [addingAddress, setAddingAddress] = useState(addresses.length === 0);
-  const [scheduledAt, setScheduledAt] = useState("");
   const [housingType, setHousingType] = useState<"casa" | "departamento">("casa");
   const [paymentMethod, setPaymentMethod] = useState<"mercadopago" | "bank_transfer">("mercadopago");
 
-  // "Ahora" cambia en cada render — se fija una sola vez, después del
-  // montaje, para no desalinear el HTML de servidor y cliente ni recalcular
-  // el mínimo seleccionable mientras el cliente está eligiendo la hora.
-  const [minScheduledAt, setMinScheduledAt] = useState("");
-  useEffect(() => {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMinScheduledAt(now.toISOString().slice(0, 16));
-  }, []);
+  // Días/horarios agendables — se piden al servidor (getScheduleOptions)
+  // cada vez que cambia la sucursal o el método de entrega, porque el
+  // horario de retiro y de despacho pueden ser distintos y el tope de
+  // pedidos por slot depende de lo que ya haya reservado OTROS clientes
+  // (nunca se calcula esto en el navegador, solo se muestra lo que
+  // devuelve el servidor).
+  const [scheduleDays, setScheduleDays] = useState<ScheduleDayOption[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [selectedDayIso, setSelectedDayIso] = useState("");
+  const [selectedSlotIso, setSelectedSlotIso] = useState("");
 
   // Retiro en tienda no necesita dirección — el paso "Dirección" solo existe
   // en el recorrido cuando el cliente elige despacho a domicilio.
@@ -206,16 +178,34 @@ export function CheckoutForm({
     fd.set("delivery_method", "shipping");
     fd.set("address_id", addressId);
     fd.set("subtotal", String(subtotal));
-    shippingAction(fd);
+    startTransition(() => shippingAction(fd));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId, addressId, subtotal]);
 
+  // Días/horarios agendables — se recargan cuando cambia la sucursal o el
+  // método de entrega (cada uno puede tener su propio horario). La
+  // selección anterior se descarta porque puede ya no ser válida (otro
+  // horario, otro tope de pedidos).
+  useEffect(() => {
+    if (!storeId) return;
+    let cancelled = false;
+    setScheduleLoading(true);
+    setSelectedDayIso("");
+    setSelectedSlotIso("");
+    getScheduleOptions(storeId, deliveryMethod).then((days) => {
+      if (cancelled) return;
+      setScheduleDays(days);
+      setSelectedDayIso(days[0]?.dateIso ?? "");
+      setScheduleLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId, deliveryMethod]);
+
   const selectedStore = stores.find((s) => s.id === storeId) ?? null;
-  const scheduledDate = scheduledAt ? new Date(scheduledAt) : null;
-  const scheduledInPast = !!scheduledDate && !!minScheduledAt && scheduledAt < minScheduledAt;
-  const scheduledOutsideHours =
-    !!scheduledDate && !Number.isNaN(scheduledDate.getTime()) && !isWithinBusinessHours(selectedStore?.business_hours ?? null, scheduledDate);
-  const canLeavePrograma = !!scheduledDate && !scheduledInPast && !scheduledOutsideHours;
+  const selectedDay = scheduleDays.find((d) => d.dateIso === selectedDayIso) ?? null;
+  const canLeavePrograma = !!selectedSlotIso;
   const shippingQuote = shippingState && "ok" in shippingState ? shippingState : null;
   const shippingError = shippingState && "error" in shippingState ? shippingState.error : null;
   const shippingCost = shippingQuote?.shippingCost ?? 0;
@@ -241,40 +231,70 @@ export function CheckoutForm({
     return idx < activeStepIndex ? "done" : "active";
   }
 
-  const selectedAddress = addresses.find((a) => a.id === addressId) ?? null;
-  const entregaSummary = selectedStore
-    ? `${deliveryMethod === "pickup" ? "Retiro en tienda" : "Despacho a domicilio"} · ${selectedStore.name}`
-    : "";
-  const direccionSummary = selectedAddress
-    ? `${selectedAddress.calle} ${selectedAddress.numero}, ${selectedAddress.comuna}`
-    : "";
-  const programarSummary =
-    scheduledDate && !Number.isNaN(scheduledDate.getTime())
-      ? new Intl.DateTimeFormat("es-CL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(
-          scheduledDate,
-        )
-      : "";
-
   if (!hydrated || items.length === 0) return null;
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_380px]">
-      {/* Columna izquierda: proceso por etapas */}
-      <div className="rounded-2xl border border-charcoal-border bg-background-elevated p-6 shadow-card sm:p-8">
-        {/* Paso 1: tipo de entrega — el acordeón muestra cada sección
-            colapsada (con resumen) una vez resuelta; la activa se despliega
-            entera y las que faltan quedan apagadas, sin contenido. */}
-        <div className="border-b border-charcoal-border pb-5">
-          <StepHeader
-            index={visibleSteps.findIndex((s) => s.key === "entrega")}
-            label="Entrega"
-            status={statusFor("entrega")}
-            summary={entregaSummary}
-            onEdit={() => setStep("entrega")}
-          />
+      {/* Columna izquierda: wizard paso a paso — solo el paso activo se
+          renderiza (no todo el flujo apilado a la vez), así el cliente ve
+          únicamente lo que le corresponde completar en cada momento. */}
+      <div className="space-y-4">
+        {/* Barra de progreso — círculos+conector en una fila y las
+            etiquetas en otra debajo, alineadas por el mismo reparto
+            flex-1/last:flex-initial, así se ven siempre (también en
+            mobile) sin que el conector se rompa. */}
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            {visibleSteps.map((s, i) => {
+              const stepStatus = statusFor(s.key);
+              return (
+                <div key={s.key} className="flex flex-1 items-center last:flex-initial">
+                  <button
+                    type="button"
+                    disabled={stepStatus !== "done"}
+                    onClick={() => stepStatus === "done" && setStep(s.key)}
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                      stepStatus === "active"
+                        ? "bg-gold text-ink"
+                        : stepStatus === "done"
+                          ? "cursor-pointer bg-gold/20 text-gold"
+                          : "bg-white/5 text-foreground-muted"
+                    }`}
+                  >
+                    {stepStatus === "done" ? <Check className="h-4 w-4" /> : i + 1}
+                  </button>
+                  {i < visibleSteps.length - 1 && <div className="mx-2 h-px flex-1 bg-white/5 sm:mx-4" />}
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-1.5 flex items-start justify-between">
+            {visibleSteps.map((s) => {
+              const stepStatus = statusFor(s.key);
+              return (
+                <span
+                  key={s.key}
+                  className={`flex-1 text-center text-[9px] font-bold uppercase leading-tight tracking-wide last:flex-initial sm:text-[10px] sm:tracking-widest ${
+                    stepStatus === "active" ? "text-foreground" : "text-foreground-muted"
+                  }`}
+                >
+                  {s.label}
+                </span>
+              );
+            })}
+          </div>
         </div>
+
+        {/* Tarjeta del paso activo */}
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 shadow-card sm:p-8">
         {step === "entrega" && (
-          <div className="mt-5 space-y-6 border-b border-charcoal-border pb-6">
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold/10 text-xs font-bold text-gold">
+                {visibleSteps.findIndex((s) => s.key === "entrega") + 1}
+              </span>
+              <h2 className="font-display text-lg text-foreground">Entrega</h2>
+            </div>
             <section>
               <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-foreground-muted">
                 <Store className="h-4 w-4 text-gold-dark" />
@@ -381,20 +401,14 @@ export function CheckoutForm({
           </div>
         )}
 
-        {/* Paso 2: dirección (solo aparece con despacho a domicilio) */}
-        {deliveryMethod === "shipping" && (
-          <div className="border-b border-charcoal-border pb-5 pt-5">
-            <StepHeader
-              index={visibleSteps.findIndex((s) => s.key === "direccion")}
-              label="Dirección"
-              status={statusFor("direccion")}
-              summary={direccionSummary}
-              onEdit={() => setStep("direccion")}
-            />
-          </div>
-        )}
         {step === "direccion" && (
-          <div className="mt-5 space-y-6 border-b border-charcoal-border pb-6">
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold/10 text-xs font-bold text-gold">
+                {visibleSteps.findIndex((s) => s.key === "direccion") + 1}
+              </span>
+              <h2 className="font-display text-lg text-foreground">Dirección</h2>
+            </div>
             <section>
               <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-foreground-muted">
                 <MapPin className="h-4 w-4 text-gold-dark" />
@@ -490,8 +504,6 @@ export function CheckoutForm({
                     )}
 
                     <RegionComunaFields />
-
-                    <input name="ciudad" placeholder="Ciudad" required className={`col-span-2 ${inputClass}`} />
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -568,48 +580,90 @@ export function CheckoutForm({
           </div>
         )}
 
-        {/* Paso 3: programar */}
-        <div className="border-b border-charcoal-border pb-5 pt-5">
-          <StepHeader
-            index={visibleSteps.findIndex((s) => s.key === "programar")}
-            label="Fecha y hora"
-            status={statusFor("programar")}
-            summary={programarSummary}
-            onEdit={() => setStep("programar")}
-          />
-        </div>
         {step === "programar" && (
-          <div className="mt-5 space-y-6 border-b border-charcoal-border pb-6">
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold/10 text-xs font-bold text-gold">
+                {visibleSteps.findIndex((s) => s.key === "programar") + 1}
+              </span>
+              <h2 className="font-display text-lg text-foreground">Fecha y hora</h2>
+            </div>
             <section>
               <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-foreground-muted">
                 <CalendarClock className="h-4 w-4 text-gold-dark" />
                 {deliveryMethod === "pickup" ? "Fecha y hora de retiro" : "Fecha y hora de despacho"}
               </h2>
               <p className="mt-1 text-xs text-foreground-muted">
-                Elegí cuándo {deliveryMethod === "pickup" ? "vas a retirar" : "querés recibir"} tu pedido.
-                {selectedStore && (
-                  <>
-                    {" "}
-                    Horario de la tienda: <span className="text-foreground">{formatBusinessHours(selectedStore.business_hours)}</span>.
-                  </>
-                )}
+                Elegí cuándo {deliveryMethod === "pickup" ? "vas a retirar" : "querés recibir"} tu pedido — hasta 3
+                días desde hoy, en bloques de 15 minutos.
               </p>
-              <input
-                type="datetime-local"
-                required
-                value={scheduledAt}
-                min={minScheduledAt || undefined}
-                onChange={(e) => setScheduledAt(e.target.value)}
-                className={`mt-2 max-w-xs ${inputClass}`}
-              />
-              {scheduledDate && !Number.isNaN(scheduledDate.getTime()) && scheduledInPast && (
-                <p className="mt-1.5 text-xs text-burgundy-hover">Elegí una fecha y hora futura.</p>
+
+              {scheduleLoading && (
+                <p className="mt-3 text-xs text-foreground-muted">Cargando horarios disponibles...</p>
               )}
-              {scheduledDate && !Number.isNaN(scheduledDate.getTime()) && !scheduledInPast && scheduledOutsideHours && (
-                <p className="mt-1.5 text-xs text-burgundy-hover">
-                  La tienda está cerrada en ese horario — elegí un momento dentro de{" "}
-                  {formatBusinessHours(selectedStore?.business_hours ?? null)}.
+
+              {!scheduleLoading && scheduleDays.length === 0 && (
+                <p className="mt-3 text-xs text-burgundy-hover">
+                  Esta sucursal no tiene horario de {deliveryMethod === "pickup" ? "retiro" : "despacho"}{" "}
+                  configurado — no se puede agendar todavía.
                 </p>
+              )}
+
+              {!scheduleLoading && scheduleDays.length > 0 && (
+                <>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {scheduleDays.map((d) => (
+                      <button
+                        key={d.dateIso}
+                        type="button"
+                        onClick={() => {
+                          setSelectedDayIso(d.dateIso);
+                          setSelectedSlotIso("");
+                        }}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-medium capitalize transition ${
+                          selectedDayIso === d.dateIso
+                            ? "border-gold bg-gold/10 text-gold"
+                            : "border-charcoal-border text-foreground-muted hover:border-gold-dark/60"
+                        }`}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedDay && (
+                    <div className="mt-3">
+                      <label htmlFor="slot_select" className="mb-1 block text-xs text-foreground-muted">
+                        Horario
+                      </label>
+                      <select
+                        id="slot_select"
+                        value={selectedSlotIso}
+                        onChange={(e) => setSelectedSlotIso(e.target.value)}
+                        className={inputClass}
+                      >
+                        <option value="" disabled>
+                          Elegí un horario...
+                        </option>
+                        {groupSlotsByPeriod(selectedDay.slots).map((group) => (
+                          <optgroup key={group.label} label={group.label}>
+                            {group.slots.map((slot) => (
+                              <option key={slot.iso} value={slot.iso} disabled={!slot.available}>
+                                {slot.time}
+                                {!slot.available ? " — completo" : ""}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                      {selectedDay.slots.every((s) => !s.available) && (
+                        <p className="mt-1.5 text-xs text-burgundy-hover">
+                          No quedan horarios disponibles ese día — probá otro.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </section>
 
@@ -633,17 +687,14 @@ export function CheckoutForm({
           </div>
         )}
 
-        {/* Paso 4: pago */}
-        <div className="pb-5 pt-5">
-          <StepHeader
-            index={visibleSteps.findIndex((s) => s.key === "pago")}
-            label="Pago"
-            status={statusFor("pago")}
-            onEdit={() => setStep("pago")}
-          />
-        </div>
         {step === "pago" && (
-          <div className="mt-5 space-y-6">
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold/10 text-xs font-bold text-gold">
+                {visibleSteps.findIndex((s) => s.key === "pago") + 1}
+              </span>
+              <h2 className="font-display text-lg text-foreground">Pago</h2>
+            </div>
             <section>
               <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-foreground-muted">
                 <CreditCard className="h-4 w-4 text-gold-dark" />
@@ -697,11 +748,7 @@ export function CheckoutForm({
               <input type="hidden" name="delivery_method" value={deliveryMethod} />
               <input type="hidden" name="store_id" value={storeId} />
               <input type="hidden" name="address_id" value={deliveryMethod === "shipping" ? addressId : ""} />
-              <input
-                type="hidden"
-                name="scheduled_at"
-                value={scheduledAt ? new Date(scheduledAt).toISOString() : ""}
-              />
+              <input type="hidden" name="scheduled_at" value={selectedSlotIso} />
               <input type="hidden" name="coupon_code" value={couponCode} />
               <input type="hidden" name="points_to_redeem" value={pointsToRedeem} />
               <input type="hidden" name="payment_method" value={paymentMethod} />
@@ -731,11 +778,12 @@ export function CheckoutForm({
             </form>
           </div>
         )}
+        </div>
       </div>
 
       {/* Columna derecha: resumen, siempre visible */}
       <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-        <div className="rounded-2xl border border-charcoal-border bg-background-elevated p-6 shadow-card">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 shadow-card">
           <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-foreground-muted">
             <ClipboardList className="h-4 w-4 text-gold-dark" />
             Resumen del pedido

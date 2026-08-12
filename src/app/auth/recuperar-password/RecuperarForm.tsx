@@ -25,7 +25,7 @@ export function RecuperarForm() {
             type="email"
             required
             autoComplete="email"
-            className="w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm outline-none focus:border-gold"
+            className="w-full rounded-lg border border-white/10 bg-background px-3 py-2.5 text-sm outline-none transition-colors focus:border-gold"
           />
         </div>
         <button

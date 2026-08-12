@@ -11,7 +11,7 @@ export default async function SucursalesPage() {
     supabase
       .from("stores")
       .select(
-        "id, name, contact_address, contact_phone, contact_email, social_links, max_delivery_radius_km, min_order_amount, free_shipping_min_amount, business_hours, is_active",
+        "id, name, contact_address, contact_phone, contact_email, social_links, max_delivery_radius_km, min_order_amount, free_shipping_min_amount, business_hours, delivery_schedule, max_orders_per_slot, is_active",
       )
       .order("name"),
     supabase

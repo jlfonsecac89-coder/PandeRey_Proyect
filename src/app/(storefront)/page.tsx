@@ -133,21 +133,24 @@ export default async function Home() {
           volverse un carrusel (bastaría con un array de slides + un
           controlador de índice envolviendo este mismo bloque). */}
       <div className="relative overflow-hidden">
+        {/* Fondo negro real (igual al del escudo) — el glow dorado queda
+            bien sutil para que no lave el negro a un marrón/oliva, que fue
+            el problema reportado. */}
         <DotPattern
           glow
-          className="absolute inset-0 [mask-image:radial-gradient(60%_50%_at_50%_0%,white,transparent)] text-gold/70"
+          className="absolute inset-0 [mask-image:radial-gradient(60%_50%_at_50%_0%,white,transparent)] text-gold/40"
         />
         <div
-          className="pointer-events-none absolute inset-0 opacity-60"
+          className="pointer-events-none absolute inset-0 opacity-30"
           style={{
             background:
-              "radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, var(--color-gold) 16%, transparent), transparent 70%)",
+              "radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, var(--color-gold) 12%, transparent), transparent 70%)",
           }}
         />
         <div className="relative flex flex-col items-center justify-center gap-5 px-6 pb-6 pt-20 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-charcoal-border bg-background-alt px-4 py-1.5 text-xs">
             <Sparkles className="h-3.5 w-3.5 text-gold" />
-            <AnimatedGradientText colorFrom="#FAF290" colorTo="#F5F1E6" className="font-medium">
+            <AnimatedGradientText colorFrom="#D4AF37" colorTo="#F5F1E6" className="font-medium">
               {heroSlide.eyebrow}
             </AnimatedGradientText>
           </div>
@@ -156,14 +159,25 @@ export default async function Home() {
             {heroSlide.title}
           </h1>
           <p className="max-w-md text-[15px] leading-relaxed text-foreground-muted">{heroSlide.subtitle}</p>
-          <div className="mt-3 flex gap-3">
-            <Button size="lg" className="rounded-full px-6" render={<Link href="/tienda" />} nativeButton={false}>
+          <div className="mt-3 flex flex-col gap-4 sm:flex-row">
+            {/* Estilo de botón alineado a la versión de referencia:
+                esquinas cuadradas, uppercase con tracking amplio, texto
+                negro sobre dorado. Peso de fuente subido a bold (texto en
+                semibold se perdía, parecía un link suelto en vez de un
+                botón) + estado :active con escala hacia abajo, para que el
+                click se sienta "presionado" y no solo pase de una vez. */}
+            <Button
+              size="lg"
+              className="rounded-[2px] px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] shadow-xl shadow-gold/10 transition-all duration-200 hover:scale-105 active:scale-95 active:bg-gold-dark"
+              render={<Link href="/tienda" />}
+              nativeButton={false}
+            >
               Pedir ahora
             </Button>
             <Button
               variant="outline"
               size="lg"
-              className="rounded-full border-charcoal-border px-6 text-foreground-muted hover:border-gold-dark hover:text-gold"
+              className="rounded-[2px] border-white/30 bg-white/[0.03] px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] text-foreground transition-all duration-200 hover:scale-105 hover:border-gold/50 hover:bg-white/5 hover:text-gold active:scale-95 active:bg-white/10"
               render={<a href="#visitanos" />}
               nativeButton={false}
             >
