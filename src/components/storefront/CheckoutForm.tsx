@@ -13,7 +13,6 @@ import {
   ClipboardList,
   ShieldCheck,
   Tag,
-  Gift,
 } from "lucide-react";
 import { useCart } from "@/lib/cart/CartContext";
 import { cartItemUnitPrice } from "@/lib/cart/types";
@@ -25,10 +24,12 @@ import {
   previewShipping,
   saveAddress,
   getScheduleOptions,
+  previewCoupon,
   type CheckoutState,
   type ShippingPreviewState,
   type ScheduleDayOption,
   type ScheduleSlot,
+  type CouponPreviewResult,
 } from "@/lib/checkout/actions";
 
 type Address = {
@@ -90,18 +91,15 @@ function groupSlotsByPeriod(slots: ScheduleSlot[]): { label: string; slots: Sche
 export function CheckoutForm({
   addresses,
   stores,
-  pointsBalance,
-  pointsToClpRate,
 }: {
   addresses: Address[];
   stores: StoreOption[];
-  pointsBalance: number;
-  pointsToClpRate: number;
 }) {
   const router = useRouter();
   const { items, hydrated, subtotal } = useCart();
   const [couponCode, setCouponCode] = useState("");
-  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  const [couponPreview, setCouponPreview] = useState<CouponPreviewResult>(null);
+  const [couponPreviewLoading, setCouponPreviewLoading] = useState(false);
   const [step, setStep] = useState<Step>("entrega");
 
   useEffect(() => {
@@ -203,6 +201,53 @@ export function CheckoutForm({
     };
   }, [storeId, deliveryMethod]);
 
+  // Preview del cupón: se revalida con la misma lógica del cobro real cada
+  // vez que el cliente termina de escribir el código (con debounce, para no
+  // pegarle al servidor en cada tecla) — así el descuento se ve reflejado
+  // en el Total antes de pagar, no recién después.
+  useEffect(() => {
+    if (!couponCode.trim()) {
+      setCouponPreview(null);
+      setCouponPreviewLoading(false);
+      return;
+    }
+    // `cancelled` evita que una respuesta vieja (de una tecla anterior, o
+    // que tardó más que la siguiente) pise el resultado de la más reciente
+    // — sin esto, tipear rápido puede dejar en pantalla el resultado de un
+    // código que el cliente ya borró/cambió.
+    let cancelled = false;
+    setCouponPreviewLoading(true);
+    const timeout = setTimeout(() => {
+      previewCoupon(
+        couponCode,
+        subtotal,
+        items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: cartItemUnitPrice(item),
+        })),
+      )
+        .then((result) => {
+          if (cancelled) return;
+          setCouponPreview(result);
+          setCouponPreviewLoading(false);
+        })
+        .catch(() => {
+          // Si esto queda sin manejar, un solo error de red deja el estado
+          // en "Verificando..." para siempre (el .then nunca corre) —
+          // pasó de verdad, por eso el catch explícito.
+          if (cancelled) return;
+          setCouponPreview({ ok: false, error: "No pudimos validar el cupón. Probá de nuevo." });
+          setCouponPreviewLoading(false);
+        });
+    }, 500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [couponCode, subtotal]);
+
   const selectedStore = stores.find((s) => s.id === storeId) ?? null;
   const selectedDay = scheduleDays.find((d) => d.dateIso === selectedDayIso) ?? null;
   const canLeavePrograma = !!selectedSlotIso;
@@ -211,8 +256,8 @@ export function CheckoutForm({
   const shippingCost = shippingQuote?.shippingCost ?? 0;
   const shippingKnown = deliveryMethod === "pickup" || !!shippingQuote;
   const totalBeforeDiscounts = subtotal + (deliveryMethod === "shipping" ? shippingCost : 0);
-  const estimatedPointsDiscount = Math.floor(pointsToRedeem * pointsToClpRate);
-  const total = Math.max(totalBeforeDiscounts - estimatedPointsDiscount, 0);
+  const couponDiscount = couponPreview?.ok ? couponPreview.discountClp : 0;
+  const total = Math.max(totalBeforeDiscounts - couponDiscount, 0);
 
   // Paso 1 (Entrega): solo hace falta la sucursal — la dirección todavía no
   // se pidió, así que acá no se puede validar cobertura/costo de despacho.
@@ -650,7 +695,7 @@ export function CheckoutForm({
                             {group.slots.map((slot) => (
                               <option key={slot.iso} value={slot.iso} disabled={!slot.available}>
                                 {slot.time}
-                                {!slot.available ? " — completo" : ""}
+                                {slot.reason === "full" ? " — completo" : ""}
                               </option>
                             ))}
                           </optgroup>
@@ -750,7 +795,6 @@ export function CheckoutForm({
               <input type="hidden" name="address_id" value={deliveryMethod === "shipping" ? addressId : ""} />
               <input type="hidden" name="scheduled_at" value={selectedSlotIso} />
               <input type="hidden" name="coupon_code" value={couponCode} />
-              <input type="hidden" name="points_to_redeem" value={pointsToRedeem} />
               <input type="hidden" name="payment_method" value={paymentMethod} />
               {checkoutState?.error && <p className="mb-2 text-sm text-burgundy-hover">{checkoutState.error}</p>}
               <div className="flex gap-2">
@@ -823,8 +867,16 @@ export function CheckoutForm({
             )}
             <div className="flex justify-between font-medium">
               <span className="text-foreground">Subtotal</span>
-              <span className="text-foreground">{formatCLP(subtotal + (shippingKnown ? shippingCost : 0))}</span>
+              <span className="text-foreground">
+                {formatCLP(subtotal + (deliveryMethod === "shipping" && shippingKnown ? shippingCost : 0))}
+              </span>
             </div>
+            {couponPreview?.ok && (
+              <div className="flex justify-between text-gold-hover">
+                <span>Descuento ({couponCode.trim().toUpperCase()})</span>
+                <span>-{formatCLP(couponPreview.discountClp)}</span>
+              </div>
+            )}
           </div>
 
           <div className="mt-4 space-y-3 border-t border-charcoal-border pt-3">
@@ -840,32 +892,26 @@ export function CheckoutForm({
                 placeholder="Código (opcional)"
                 className={`mt-1 uppercase ${inputClass}`}
               />
+              {couponPreviewLoading && (
+                <p className="mt-1 text-xs text-foreground-muted">Verificando cupón...</p>
+              )}
+              {!couponPreviewLoading && couponPreview?.ok && (
+                <p className="mt-1 text-xs text-gold-hover">
+                  Cupón aplicado: -{formatCLP(couponPreview.discountClp)}
+                </p>
+              )}
+              {!couponPreviewLoading && couponPreview && !couponPreview.ok && (
+                <p className="mt-1 text-xs text-burgundy-hover">{couponPreview.error}</p>
+              )}
             </div>
-            {pointsBalance > 0 && (
-              <div>
-                <label className="flex items-center gap-1.5 text-xs text-foreground-muted">
-                  <Gift className="h-3.5 w-3.5" />
-                  Tenés {pointsBalance} puntos ({formatCLP(pointsBalance * pointsToClpRate)})
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={pointsBalance}
-                  value={pointsToRedeem || ""}
-                  onChange={(e) =>
-                    setPointsToRedeem(Math.min(pointsBalance, Math.max(0, Number(e.target.value) || 0)))
-                  }
-                  placeholder="Puntos a canjear"
-                  className={`mt-1 ${inputClass}`}
-                />
-              </div>
-            )}
           </div>
 
           <div className="mt-4 border-t border-charcoal-border pt-4">
             <div className="flex justify-between text-lg font-semibold">
               <span className="text-foreground">Total</span>
-              <span className="text-gold">{formatCLP(shippingKnown ? total : subtotal - estimatedPointsDiscount)}</span>
+              <span className="text-gold">
+                {formatCLP(shippingKnown ? total : Math.max(subtotal - couponDiscount, 0))}
+              </span>
             </div>
             <p className="text-right text-xs text-foreground-muted/70">
               IVA incluido

@@ -197,7 +197,7 @@ export async function previewShipping(
 
 // ---------- Días y horarios agendables (paso "Fecha y hora") ----------
 
-export type ScheduleSlot = { time: string; iso: string; available: boolean };
+export type ScheduleSlot = { time: string; iso: string; available: boolean; reason?: "full" };
 export type ScheduleDayOption = { dateIso: string; label: string; slots: ScheduleSlot[] };
 
 const DAY_LABEL_FORMATTER = new Intl.DateTimeFormat("es-CL", {
@@ -266,18 +266,58 @@ export async function getScheduleOptions(
   for (const { y, m, d, day, dateIso } of days) {
     const dayEntry = resolvedSchedule?.find((h) => h.day === day) ?? null;
     const times = slotsForDay(dayEntry as DaySchedule | null);
-    const slots: ScheduleSlot[] = times.map((time) => {
-      const [hh, mm] = time.split(":").map(Number);
-      const slotDate = chileWallTimeToUtc(y, m, d, hh, mm);
-      const iso = slotDate.toISOString();
-      const isPast = slotDate.getTime() <= now.getTime();
-      const isFull = (countBySlot.get(iso) ?? 0) >= store.max_orders_per_slot;
-      return { time, iso, available: !isPast && !isFull };
-    });
-    if (slots.length === 0) continue; // sucursal cerrada ese día
+    // Los horarios que ya pasaron ni se listan (no tiene sentido "elegir" un
+    // horario de hace una hora) — a diferencia de un slot lleno, que sí se
+    // muestra deshabilitado porque podría liberarse si alguien cancela.
+    const slots: ScheduleSlot[] = times
+      .map((time) => {
+        const [hh, mm] = time.split(":").map(Number);
+        const slotDate = chileWallTimeToUtc(y, m, d, hh, mm);
+        const iso = slotDate.toISOString();
+        const isPast = slotDate.getTime() <= now.getTime();
+        const isFull = (countBySlot.get(iso) ?? 0) >= store.max_orders_per_slot;
+        return { time, iso, isPast, available: !isPast && !isFull, reason: isFull ? ("full" as const) : undefined };
+      })
+      .filter((slot) => !slot.isPast)
+      .map(({ isPast: _isPast, ...slot }) => slot);
+    if (slots.length === 0) continue; // sucursal cerrada ese día, o ya no quedan horarios futuros
     options.push({ dateIso, label: DAY_LABEL_FORMATTER.format(slotDateForLabel(y, m, d)), slots });
   }
   return options;
+}
+
+export type CouponPreviewResult =
+  | { ok: true; discountClp: number }
+  | { ok: false; error: string }
+  | null;
+
+// Preview en vivo del cupón mientras el cliente lo escribe en el paso de
+// pago — antes esto solo se validaba al confirmar el pedido, así que el
+// cliente no tenía forma de saber si el código era válido (o cuánto
+// descontaba) hasta después de pagar. Reusa exactamente la misma
+// `validateCoupon` que la creación real del pedido, así que nunca puede
+// mostrar un descuento que el cobro final no vaya a aplicar.
+export async function previewCoupon(
+  code: string,
+  subtotal: number,
+  cartItems: { productId: string; quantity: number; unitPrice: number }[],
+): Promise<CouponPreviewResult> {
+  const trimmed = code.trim();
+  if (!trimmed) return null;
+
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Iniciá sesión para usar un cupón." };
+
+  const result = await validateCoupon({
+    supabase: createAdminClient(),
+    code: trimmed,
+    userId: profile.id,
+    subtotal,
+    cartItems,
+  });
+
+  if (!result.ok) return { ok: false, error: result.error };
+  return { ok: true, discountClp: result.discountClp };
 }
 
 // Mediodía UTC del día en cuestión — solo para formatear la etiqueta del
