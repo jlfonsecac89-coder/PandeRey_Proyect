@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatCLP } from "@/lib/format";
 import { STATUS_LABELS, type OrderStatus } from "@/lib/orders/status";
+import { PIPELINE_GROUPS, statusToGroup, type PipelineGroup } from "@/lib/orders/pipeline";
 import {
   markOrderReady,
   confirmPickup,
@@ -12,6 +13,71 @@ import {
   confirmBankTransferPayment,
   type OrderActionState,
 } from "@/lib/orders/actions";
+
+// Pasos "normales" del pipeline (excluye problemas/cancelados, que son
+// desvíos del camino feliz y se muestran aparte) — el paso "en_camino" solo
+// aplica a pedidos con envío, así que se salta para retiro en tienda, igual
+// que hacía el modelo de referencia (4 pasos para retiro, 5 para envío).
+const PICKUP_STEPS: { key: PipelineGroup; label: string }[] = [
+  { key: "pago_pendiente", label: "Recibido" },
+  { key: "por_preparar", label: "Preparando" },
+  { key: "listos", label: "Listo" },
+  { key: "entregados", label: "Entregado" },
+];
+const SHIPPING_STEPS: { key: PipelineGroup; label: string }[] = [
+  { key: "pago_pendiente", label: "Recibido" },
+  { key: "por_preparar", label: "Preparando" },
+  { key: "listos", label: "Listo" },
+  { key: "en_camino", label: "En camino" },
+  { key: "entregados", label: "Entregado" },
+];
+
+function PipelineStepper({ order }: { order: AdminOrder }) {
+  const group = statusToGroup(order.status);
+  const steps = order.delivery_method === "pickup" ? PICKUP_STEPS : SHIPPING_STEPS;
+  const currentIndex = steps.findIndex((s) => s.key === group);
+
+  if (group === "problemas" || group === "cancelados") {
+    return (
+      <span
+        className={`inline-block rounded-full border px-2 py-0.5 text-[10px] ${
+          group === "cancelados"
+            ? "border-red-500/40 text-red-400"
+            : "border-orange-500/40 text-orange-400"
+        }`}
+      >
+        {PIPELINE_GROUPS[group].label}
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      {steps.map((step, i) => {
+        const done = currentIndex >= 0 && i <= currentIndex;
+        return (
+          <span
+            key={step.key}
+            title={step.label}
+            className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-semibold ${
+              done ? "bg-gold text-ink" : "bg-white/10 text-foreground/40"
+            }`}
+          >
+            {done ? "✓" : i + 1}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function slaCountdown(order: AdminOrder): { label: string; className: string } | null {
+  if (!order.sla_deadline || order.status === "delivered" || order.status === "cancelled") return null;
+  const minutesLeft = Math.round((new Date(order.sla_deadline).getTime() - Date.now()) / 60000);
+  if (minutesLeft < 0) return { label: `Vencido hace ${Math.abs(minutesLeft)} min`, className: "text-red-400" };
+  if (minutesLeft <= 10) return { label: `${minutesLeft} min`, className: "text-orange-400" };
+  return { label: `${minutesLeft} min`, className: "text-foreground-muted" };
+}
 
 export type AdminOrder = {
   id: string;
@@ -25,6 +91,8 @@ export type AdminOrder = {
   assigned_driver_id: string | null;
   sla_deadline: string | null;
   delivered_at: string | null;
+  scheduled_at: string | null;
+  ticket_printed_at: string | null;
 };
 
 type Person = { id: string; full_name: string; phone: string | null };
@@ -85,6 +153,7 @@ export function AdminOrderRow({
     order.status === "delivered" && order.delivered_at && order.sla_deadline
       ? new Date(order.delivered_at) <= new Date(order.sla_deadline)
       : null;
+  const sla = slaCountdown(order);
 
   return (
     <>
@@ -100,14 +169,21 @@ export function AdminOrderRow({
             />
           </td>
         )}
-        <td className="py-2 pr-3 font-mono text-xs text-gold-dark">
-          {order.id.slice(0, 8)}
+        <td className="py-2 pr-3 font-mono text-xs">
+          <a
+            href={`/admin/pedidos/${order.id}/ticket`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gold-dark hover:text-gold hover:underline"
+          >
+            {order.id.slice(0, 8)}
+          </a>
           <button
             type="button"
             onClick={() => setShowItems((v) => !v)}
             className="mt-0.5 block text-[10px] font-sans text-foreground/40 hover:text-gold"
           >
-            {showItems ? "Ocultar productos" : "Ver productos"}
+            {items.length} producto{items.length === 1 ? "" : "s"} · {showItems ? "ocultar" : "ver detalle"}
           </button>
         </td>
         <td className="py-2 pr-3 text-xs">
@@ -133,6 +209,20 @@ export function AdminOrderRow({
           )}
         </td>
         <td className="py-2 pr-3 text-sm">{order.delivery_method === "pickup" ? "Retiro" : "Envío"}</td>
+        <td className="py-2 pr-3">
+          {order.scheduled_at && (
+            <p className="text-[10px] text-foreground/50">
+              Pidió para: {new Date(order.scheduled_at).toLocaleString("es-CL")}
+            </p>
+          )}
+          <PipelineStepper order={order} />
+          {sla && <p className={`mt-1 text-[10px] ${sla.className}`}>{sla.label}</p>}
+          {order.ticket_printed_at && (
+            <p className="mt-0.5 text-[10px] text-foreground/40">
+              Comanda impresa {new Date(order.ticket_printed_at).toLocaleTimeString("es-CL")}
+            </p>
+          )}
+        </td>
         <td className="py-2 pr-3 text-sm">{formatCLP(order.total)}</td>
         <td className="py-2 pr-3 text-xs text-foreground/50">
           {new Date(order.created_at).toLocaleString("es-CL")}
@@ -219,8 +309,8 @@ export function AdminOrderRow({
         </td>
       </tr>
       {showItems && (
-        <tr className="border-b border-charcoal-border/50 bg-charcoal-light/40">
-          <td colSpan={onToggleSelect ? 8 : 7} className="py-2 pl-3 text-xs text-foreground/60">
+        <tr className="border-b border-white/10 bg-white/[0.03]">
+          <td colSpan={onToggleSelect ? 9 : 8} className="py-2 pl-3 text-xs text-foreground/60">
             {items.map((item, i) => (
               <span key={i}>
                 {item.quantity}× {item.product_name_snapshot}

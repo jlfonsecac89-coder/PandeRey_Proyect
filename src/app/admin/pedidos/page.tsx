@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/server";
 import { PIPELINE_GROUPS, PIPELINE_ORDER, type PipelineGroup } from "@/lib/orders/pipeline";
 import { PedidosTable } from "@/components/admin/PedidosTable";
+import { KanbanBoard } from "@/components/admin/KanbanBoard";
 
 function startOfDay(date: Date): string {
   const d = new Date(date);
@@ -22,11 +23,12 @@ const RANGO_OPTIONS: { key: string; label: string; since: () => string | null }[
   { key: "todos", label: "Todos", since: () => null },
 ];
 
-type SearchParams = { grupo?: string; entrega?: string; rango?: string };
+type SearchParams = { grupo?: string; entrega?: string; rango?: string; vista?: string };
 
 export default async function AdminPedidosPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   await requireRole(["admin", "operaciones"], "/admin-login");
-  const { grupo, entrega, rango } = await searchParams;
+  const { grupo, entrega, rango, vista } = await searchParams;
+  const activeVista = vista === "kanban" ? "kanban" : "tabla";
   const supabase = await createClient();
 
   const activeRango = RANGO_OPTIONS.find((r) => r.key === rango) ?? RANGO_OPTIONS[2]; // default 30d
@@ -49,18 +51,16 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
   let query = supabase
     .from("orders")
     .select(
-      "id, status, payment_method, delivery_method, total, created_at, store_id, user_id, assigned_driver_id, sla_deadline, delivered_at",
+      "id, status, payment_method, delivery_method, total, created_at, store_id, user_id, assigned_driver_id, sla_deadline, delivered_at, scheduled_at, ticket_printed_at",
     )
     .order("created_at", { ascending: false })
     .limit(150);
 
   if (since) query = query.gte("created_at", since);
-  // pending_payment queda afuera de la vista por defecto (carritos de Mercado
-  // Pago abandonados a mitad de pago) salvo que se entre explícitamente al
-  // grupo "Pago pendiente" — ahí es donde vive lo que sí necesita acción:
-  // las transferencias por confirmar.
+  // Vista por defecto: todos los pedidos, incluido pago pendiente — el
+  // administrador filtra por grupo del pipeline con las tarjetas de arriba
+  // cuando quiere enfocarse en un estado puntual.
   if (activeGroup) query = query.in("status", PIPELINE_GROUPS[activeGroup].statuses);
-  else query = query.neq("status", "pending_payment");
   if (entrega === "pickup" || entrega === "shipping") query = query.eq("delivery_method", entrega);
 
   const { data: orders } = await query;
@@ -79,11 +79,12 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
   ]);
 
   function buildHref(overrides: Partial<SearchParams>) {
-    const merged = { grupo, entrega, rango, ...overrides };
+    const merged = { grupo, entrega, rango, vista, ...overrides };
     const params = new URLSearchParams();
     if (merged.grupo) params.set("grupo", merged.grupo);
     if (merged.entrega) params.set("entrega", merged.entrega);
     if (merged.rango) params.set("rango", merged.rango);
+    if (merged.vista) params.set("vista", merged.vista);
     const qs = params.toString();
     return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
   }
@@ -91,7 +92,33 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-dark">Seguimiento y control</p>
-      <h1 className="mt-1 font-display text-2xl font-medium text-foreground">Pedidos</h1>
+      <div className="mt-1 flex items-center justify-between">
+        <h1 className="font-display text-2xl font-medium text-foreground">Pedidos</h1>
+        <div className="flex rounded-full border border-white/10 p-0.5 text-[10px] font-semibold uppercase tracking-wide">
+          <Link
+            href={buildHref({ vista: undefined })}
+            className={`rounded-full px-3 py-1 transition ${
+              activeVista === "tabla" ? "bg-gold text-ink" : "text-foreground-muted"
+            }`}
+          >
+            Tabla
+          </Link>
+          <Link
+            href={buildHref({ vista: "kanban" })}
+            className={`rounded-full px-3 py-1 transition ${
+              activeVista === "kanban" ? "bg-gold text-ink" : "text-foreground-muted"
+            }`}
+          >
+            Kanban
+          </Link>
+          <Link
+            href="/admin/pedidos/monitor-impresion"
+            className="rounded-full px-3 py-1 text-foreground-muted transition hover:text-gold"
+          >
+            Vigía de impresión
+          </Link>
+        </div>
+      </div>
 
       {/* Pipeline */}
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -104,7 +131,7 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
               className={`rounded-xl border p-4 shadow-card transition ${
                 isActive
                   ? "border-gold bg-gold/10"
-                  : "border-charcoal-border bg-background-elevated hover:border-gold-dark"
+                  : "border-white/10 bg-white/[0.03] hover:border-gold-dark"
               }`}
             >
               <p className="text-xs font-medium uppercase tracking-wide text-foreground-muted">
@@ -156,12 +183,16 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
       </div>
 
       <div className="mt-5">
-        <PedidosTable
-          orders={orders ?? []}
-          repartidores={repartidores ?? []}
-          customers={customers ?? []}
-          items={items ?? []}
-        />
+        {activeVista === "kanban" ? (
+          <KanbanBoard orders={orders ?? []} customers={customers ?? []} />
+        ) : (
+          <PedidosTable
+            orders={orders ?? []}
+            repartidores={repartidores ?? []}
+            customers={customers ?? []}
+            items={items ?? []}
+          />
+        )}
       </div>
     </div>
   );

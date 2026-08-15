@@ -16,12 +16,11 @@ export function ImagenesSection({
   publicBaseUrl: string;
 }) {
   const [state, formAction, pending] = useActionState(uploadProductImage, null);
+  const atLimit = images.length >= 5;
 
   return (
-    <section>
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/50">
-        Fotos
-      </h2>
+    <div>
+      <p className="text-xs text-foreground/40">{images.length}/5 fotos cargadas.</p>
       <FormMessage error={state?.error} success={state?.success} />
       <div className="mt-2 flex flex-wrap gap-3">
         {images.map((img) => (
@@ -47,23 +46,29 @@ export function ImagenesSection({
           </div>
         ))}
       </div>
-      <form action={formAction} className="mt-3 flex items-center gap-3">
-        <input type="hidden" name="product_id" value={productId} />
-        <input
-          type="file"
-          name="file"
-          accept="image/png,image/jpeg,image/webp"
-          required
-          className="text-sm text-foreground/70 file:mr-3 file:rounded-md file:border-0 file:bg-charcoal-border file:px-3 file:py-1.5 file:text-xs file:text-foreground"
-        />
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
-        >
-          {pending ? "Subiendo..." : "Subir"}
-        </button>
-      </form>
-    </section>
+      {atLimit ? (
+        <p className="mt-3 text-xs text-foreground/40">
+          Ya tenés 5 fotos, el máximo. Eliminá una para subir otra.
+        </p>
+      ) : (
+        <form action={formAction} className="mt-3 flex items-center gap-3">
+          <input type="hidden" name="product_id" value={productId} />
+          <input
+            type="file"
+            name="file"
+            accept="image/png,image/jpeg,image/webp"
+            required
+            className="text-sm text-foreground/70 file:mr-3 file:rounded-md file:border-0 file:bg-charcoal-border file:px-3 file:py-1.5 file:text-xs file:text-foreground"
+          />
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
+          >
+            {pending ? "Subiendo..." : "Subir"}
+          </button>
+        </form>
+      )}
+    </div>
   );
 }

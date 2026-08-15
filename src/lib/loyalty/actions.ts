@@ -60,7 +60,7 @@ export async function redeemProductForPoints(
       payment_method: "points",
       store_id: storeId,
       status: "preparing",
-      sla_deadline: new Date(Date.now() + orderPrepSlaMinutes() * 60000).toISOString(),
+      sla_deadline: new Date(Date.now() + (await orderPrepSlaMinutes()) * 60000).toISOString(),
       delivery_confirmation_code: generateDeliveryCode(),
       subtotal: 0,
       discount_total: product.price,

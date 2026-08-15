@@ -23,7 +23,7 @@ export default async function PuntosPage() {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  const rate = loyaltyPointsToClpRate();
+  const rate = await loyaltyPointsToClpRate();
 
   return (
     <div>

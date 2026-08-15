@@ -115,7 +115,7 @@ export async function validatePointsRedemption(params: {
     return { ok: false, error: "No tenés suficientes puntos disponibles." };
   }
 
-  const discountClp = computePointsDiscountClp(pointsToRedeem);
+  const discountClp = await computePointsDiscountClp(pointsToRedeem);
   if (discountClp >= maxDiscountAllowed) {
     return {
       ok: false,

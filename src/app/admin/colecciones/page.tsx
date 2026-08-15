@@ -22,10 +22,10 @@ export default async function ColeccionesPage() {
       <p className="text-sm text-foreground-muted">
         Vitrinas transversales (Sin Gluten, Para Compartir, Navidad...). Un producto puede estar en varias a la vez.
       </p>
-      <div className="rounded-2xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
         <ColeccionForm />
       </div>
-      <div className="overflow-x-auto rounded-2xl border border-charcoal-border bg-background-elevated shadow-card">
+      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.03] shadow-card">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-charcoal-border text-xs uppercase tracking-wide text-foreground-muted">

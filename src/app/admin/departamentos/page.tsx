@@ -22,10 +22,10 @@ export default async function DepartamentosPage() {
       <p className="text-sm text-foreground-muted">
         Nivel 1 del árbol de catálogo — la organización operativa real de la panadería.
       </p>
-      <div className="rounded-2xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
         <DepartamentoForm />
       </div>
-      <div className="overflow-x-auto rounded-2xl border border-charcoal-border bg-background-elevated shadow-card">
+      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.03] shadow-card">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-charcoal-border text-xs uppercase tracking-wide text-foreground-muted">

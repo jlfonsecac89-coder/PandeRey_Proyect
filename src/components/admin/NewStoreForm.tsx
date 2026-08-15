@@ -8,7 +8,7 @@ export function NewStoreForm() {
   const [state, formAction, pending] = useActionState<StoreActionState, FormData>(createStore, null);
 
   return (
-    <div className="max-w-md rounded-lg border border-charcoal-border bg-charcoal-light p-4">
+    <div className="max-w-md rounded-lg border border-white/10 bg-white/[0.03] p-4">
       <h2 className="text-sm font-semibold text-gold">Nueva sucursal</h2>
       <FormMessage error={state?.error} success={state?.success} />
       <form action={formAction} className="mt-2 space-y-2">

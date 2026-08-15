@@ -96,7 +96,7 @@ export async function confirmPayment(mpPaymentId: string): Promise<ConfirmPaymen
   const nextStatus = order.scheduled_at ? "paid" : "preparing";
   const slaDeadline = order.scheduled_at
     ? order.scheduled_at
-    : new Date(Date.now() + orderPrepSlaMinutes() * 60000).toISOString();
+    : new Date(Date.now() + (await orderPrepSlaMinutes()) * 60000).toISOString();
 
   await supabase
     .from("orders")
@@ -118,7 +118,7 @@ export async function confirmPayment(mpPaymentId: string): Promise<ConfirmPaymen
   // pago (mismo evento que el resto de este bloque) — profiles.points_balance
   // se mantiene consistente solo, vía el trigger sync_points_balance
   // (sección 05) que recalcula la suma del ledger en cada insert.
-  const earnedPoints = computeEarnedPoints(order.total);
+  const earnedPoints = await computeEarnedPoints(order.total);
   if (earnedPoints > 0) {
     await supabase.from("points_ledger").insert({
       user_id: order.user_id,

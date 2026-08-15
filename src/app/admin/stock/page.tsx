@@ -93,19 +93,19 @@ export default async function StockPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
           <p className="text-xs uppercase tracking-wide text-foreground-muted">Productos con seguimiento</p>
           <p className="mt-1.5 font-display text-2xl font-medium text-foreground">{totalProducts}</p>
         </div>
-        <div className="rounded-xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
           <p className="text-xs uppercase tracking-wide text-foreground-muted">Sin stock</p>
           <p className="mt-1.5 font-display text-2xl font-medium text-burgundy-hover">{sinStock}</p>
         </div>
-        <div className="rounded-xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
           <p className="text-xs uppercase tracking-wide text-foreground-muted">Lotes por vencer</p>
           <p className="mt-1.5 font-display text-2xl font-medium text-gold">{expiringList.length}</p>
         </div>
-        <div className="rounded-xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
           <p className="text-xs uppercase tracking-wide text-foreground-muted">Valor en stock</p>
           <p className="mt-1.5 font-display text-2xl font-medium text-foreground">{formatCLP(valorTotal)}</p>
         </div>
@@ -115,7 +115,7 @@ export default async function StockPage() {
         <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">
           Lotes próximos a vencer
         </h2>
-        <div className="mt-3 overflow-x-auto rounded-2xl border border-charcoal-border bg-background-elevated shadow-card">
+        <div className="mt-3 overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.03] shadow-card">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-charcoal-border text-xs uppercase tracking-wide text-foreground-muted">
@@ -154,7 +154,7 @@ export default async function StockPage() {
 
       <div>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Stock por producto</h2>
-        <div className="mt-3 overflow-x-auto rounded-2xl border border-charcoal-border bg-background-elevated shadow-card">
+        <div className="mt-3 overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.03] shadow-card">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-charcoal-border text-xs uppercase tracking-wide text-foreground-muted">

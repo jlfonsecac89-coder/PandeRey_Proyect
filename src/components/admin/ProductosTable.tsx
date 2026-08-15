@@ -16,6 +16,8 @@ type Product = {
   categoryName: string | null;
   departmentId: string | null;
   departmentName: string | null;
+  hasPhotos: boolean;
+  hasStock: boolean;
 };
 
 export function ProductosTable({
@@ -28,25 +30,38 @@ export function ProductosTable({
   const [search, setSearch] = useState("");
   const [departamento, setDepartamento] = useState("");
   const [estado, setEstado] = useState<"todos" | "activo" | "inactivo">("todos");
+  const [faltantes, setFaltantes] = useState<"todos" | "sin_fotos" | "sin_stock">("todos");
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const sinFotos = useMemo(() => products.filter((p) => !p.hasPhotos).length, [products]);
+  const sinStock = useMemo(() => products.filter((p) => !p.hasStock).length, [products]);
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
       if (departamento && p.departmentId !== departamento) return false;
       if (estado === "activo" && !p.is_active) return false;
       if (estado === "inactivo" && p.is_active) return false;
+      if (faltantes === "sin_fotos" && p.hasPhotos) return false;
+      if (faltantes === "sin_stock" && p.hasStock) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         if (!p.name.toLowerCase().includes(q) && !p.sku.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [products, departamento, estado, search]);
+  }, [products, departamento, estado, faltantes, search]);
 
   async function handleToggle(p: Product) {
     setPendingId(p.id);
     await toggleProductActive(p.id, !p.is_active);
     setPendingId(null);
+  }
+
+  async function copyId(id: string) {
+    await navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1500);
   }
 
   return (
@@ -87,12 +102,47 @@ export function ProductosTable({
             </button>
           ))}
         </div>
+        <span className="text-charcoal-border">|</span>
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={() => setFaltantes(faltantes === "sin_fotos" ? "todos" : "sin_fotos")}
+            className={`rounded-full border px-3 py-1 text-xs transition ${
+              faltantes === "sin_fotos"
+                ? "border-gold-dark text-gold-hover"
+                : "border-charcoal-border text-foreground-muted hover:text-gold"
+            }`}
+          >
+            Sin fotos ({sinFotos})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFaltantes(faltantes === "sin_stock" ? "todos" : "sin_stock")}
+            className={`rounded-full border px-3 py-1 text-xs transition ${
+              faltantes === "sin_stock"
+                ? "border-gold-dark text-gold-hover"
+                : "border-charcoal-border text-foreground-muted hover:text-gold"
+            }`}
+          >
+            Sin stock ({sinStock})
+          </button>
+        </div>
         <p className="ml-auto text-xs text-foreground-muted">
           {filtered.length} producto{filtered.length === 1 ? "" : "s"}
         </p>
       </div>
 
-      <div className="mt-4 overflow-x-auto rounded-2xl border border-charcoal-border bg-background-elevated shadow-card">
+      {faltantes !== "todos" && (
+        <p className="mt-2 text-xs text-foreground-muted">
+          Copiá el id de cada producto (📋) y usalo con la{" "}
+          <Link href="/admin/productos/importar" className="text-gold-dark hover:text-gold hover:underline">
+            carga masiva de fotos
+          </Link>{" "}
+          nombrando los archivos <span className="font-mono">&lt;id&gt;-1.jpg</span>, <span className="font-mono">-2.jpg</span>, etc.
+        </p>
+      )}
+
+      <div className="mt-4 overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.03] shadow-card">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-charcoal-border text-xs uppercase tracking-wide text-foreground-muted">
@@ -101,6 +151,7 @@ export function ProductosTable({
               <th className="px-4 py-3 font-normal">Departamento</th>
               <th className="px-4 py-3 font-normal">Categoría</th>
               <th className="px-4 py-3 font-normal">Precio</th>
+              <th className="px-4 py-3 font-normal">Fotos/Stock</th>
               <th className="px-4 py-3 font-normal">Estado</th>
               <th className="px-4 py-3 font-normal">Editar</th>
             </tr>
@@ -108,11 +159,30 @@ export function ProductosTable({
           <tbody>
             {filtered.map((p) => (
               <tr key={p.id} className="border-b border-charcoal-border/50 last:border-0">
-                <td className="px-4 py-2.5 font-mono text-xs text-gold-dark">{p.sku}</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-gold-dark">
+                  {p.sku}
+                  <button
+                    type="button"
+                    onClick={() => copyId(p.id)}
+                    title="Copiar id del producto"
+                    className="ml-1.5 text-foreground/30 hover:text-gold"
+                  >
+                    {copiedId === p.id ? "✓" : "📋"}
+                  </button>
+                </td>
                 <td className="px-4 py-2.5 text-foreground">{p.name}</td>
                 <td className="px-4 py-2.5 text-foreground-muted">{p.departmentName ?? "—"}</td>
                 <td className="px-4 py-2.5 text-foreground-muted">{p.categoryName ?? "—"}</td>
                 <td className="px-4 py-2.5 text-foreground-muted">{formatCLP(p.price)}</td>
+                <td className="px-4 py-2.5">
+                  <span className={`text-xs ${p.hasPhotos ? "text-foreground-muted" : "text-amber-400"}`}>
+                    {p.hasPhotos ? "Con fotos" : "Sin fotos"}
+                  </span>
+                  {" · "}
+                  <span className={`text-xs ${p.hasStock ? "text-foreground-muted" : "text-amber-400"}`}>
+                    {p.hasStock ? "Con stock" : "Sin stock"}
+                  </span>
+                </td>
                 <td className="px-4 py-2.5">
                   <button
                     type="button"
@@ -126,7 +196,7 @@ export function ProductosTable({
                   </button>
                 </td>
                 <td className="px-4 py-2.5">
-                  <Link href={`/admin/productos/${p.id}`} className="text-xs text-gold-hover hover:underline">
+                  <Link href={`/admin/productos?editar=${p.id}`} className="text-xs text-gold-hover hover:underline">
                     Editar →
                   </Link>
                 </td>
@@ -134,7 +204,7 @@ export function ProductosTable({
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-sm text-foreground-muted">
+                <td colSpan={8} className="px-4 py-6 text-center text-sm text-foreground-muted">
                   No hay productos que coincidan con estos filtros.
                 </td>
               </tr>

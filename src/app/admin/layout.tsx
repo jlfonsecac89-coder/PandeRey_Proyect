@@ -19,12 +19,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const profile = await requireRole(["admin", "marketing", "operaciones"], "/admin-login");
 
   return (
-    <div className="flex min-h-full">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-charcoal-border bg-background-elevated">
-        <div className="border-b border-charcoal-border px-5 py-5">
-          {/* El logo es blanco puro sin fondo propio — sobre este sidebar
-              blanco quedaría invisible, así que va sobre una placa oscura,
-              igual que en el header de la tienda. */}
+    <div className="flex min-h-full bg-background print:block print:bg-white">
+      <aside className="flex w-64 shrink-0 flex-col border-r border-white/5 bg-background-alt print:hidden">
+        <div className="border-b border-white/5 px-5 py-5">
           <Link href="/admin" className="inline-flex rounded-lg bg-background p-2">
             <Logo iconClassName="h-11 w-11" />
           </Link>
@@ -33,7 +30,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
         <AdminNav role={profile.role} />
 
-        <div className="border-t border-charcoal-border px-5 py-4">
+        <div className="border-t border-white/5 px-5 py-4">
           <p className="truncate text-sm text-foreground">{profile.full_name}</p>
           <p className="text-xs text-foreground-muted">{ROLE_LABELS[profile.role]}</p>
           <form action={signOut} className="mt-2">
@@ -43,7 +40,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </form>
         </div>
       </aside>
-      <main className="flex-1 overflow-x-auto p-8">{children}</main>
+      <main className="flex-1 overflow-x-auto p-8 print:p-0">{children}</main>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/server";
 import { ImportForm } from "./ImportForm";
+import { BulkImagesForm } from "./BulkImagesForm";
 import { PendingRowActions } from "./PendingRowActions";
 
 export default async function ImportarProductosPage() {
@@ -37,6 +38,18 @@ export default async function ImportarProductosPage() {
       </div>
 
       <ImportForm />
+
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/50">
+          Carga masiva de fotos
+        </h2>
+        <p className="mt-1 text-sm text-foreground/60">
+          Hasta 5 fotos por producto, asociadas por su id en el nombre del archivo.
+        </p>
+        <div className="mt-3">
+          <BulkImagesForm />
+        </div>
+      </div>
 
       {(pendingRows ?? []).length > 0 && (
         <section>

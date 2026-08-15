@@ -57,7 +57,7 @@ export function StoreCard({ store, zones }: { store: Store; zones: ShippingZone[
   );
 
   return (
-    <div className="rounded-lg border border-charcoal-border bg-charcoal-light p-4">
+    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold text-gold">{store.name}</h2>

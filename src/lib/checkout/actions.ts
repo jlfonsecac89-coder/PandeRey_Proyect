@@ -395,6 +395,7 @@ export async function createCheckoutPreference(
     quantity: number;
     unit_price: number;
     subtotal: number;
+    customization_note: string | null;
     options: {
       option_group_name_snapshot: string;
       option_value_name_snapshot: string;
@@ -435,6 +436,7 @@ export async function createCheckoutPreference(
       quantity: item.quantity,
       unit_price: unitPrice,
       subtotal: itemSubtotal,
+      customization_note: item.customizationNote?.trim() || null,
       options,
     });
   }
@@ -727,6 +729,7 @@ export async function createCheckoutPreference(
         quantity: i.quantity,
         unit_price: i.unit_price,
         subtotal: i.subtotal,
+        customization_note: i.customization_note,
       })),
     )
     .select("id");

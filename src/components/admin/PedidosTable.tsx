@@ -3,7 +3,13 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminOrderRow, type AdminOrder } from "./AdminOrderRow";
-import { markOrderReady, confirmPickup, confirmReturnedToStore, confirmBankTransferPayment } from "@/lib/orders/actions";
+import {
+  markOrderReady,
+  confirmPickup,
+  confirmReturnedToStore,
+  confirmBankTransferPayment,
+  startPreparation,
+} from "@/lib/orders/actions";
 
 type Person = { id: string; full_name: string; phone: string | null; store_id?: string | null };
 type OrderItemRow = { order_id: string; product_name_snapshot: string; quantity: number };
@@ -13,6 +19,7 @@ type OrderItemRow = { order_id: string; product_name_snapshot: string; quantity:
 // tiene sus propias reglas (SLA, notificaciones) y no tiene sentido mezclarlas.
 const BULK_ACTIONS: Record<string, { label: string; run: (id: string) => Promise<unknown> }> = {
   pending_payment: { label: "Confirmar pago (transferencia) de todos", run: confirmBankTransferPayment },
+  paid: { label: "Iniciar preparación de todos", run: startPreparation },
   preparing: { label: "Marcar todos como preparados", run: markOrderReady },
   ready_for_pickup: { label: "Confirmar retiro de todos", run: confirmPickup },
   returning_to_store: { label: "Confirmar devolución de todos", run: confirmReturnedToStore },
@@ -156,6 +163,7 @@ export function PedidosTable({
               <th className="py-2 pr-3 font-normal">Cliente</th>
               <th className="py-2 pr-3 font-normal">Estado</th>
               <th className="py-2 pr-3 font-normal">Entrega</th>
+              <th className="py-2 pr-3 font-normal">Pipeline &amp; SLA</th>
               <th className="py-2 pr-3 font-normal">Total</th>
               <th className="py-2 pr-3 font-normal">Fecha</th>
               <th className="py-2 font-normal">Acción</th>

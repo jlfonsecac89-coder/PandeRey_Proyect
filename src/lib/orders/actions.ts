@@ -69,7 +69,7 @@ export async function confirmBankTransferPayment(orderId: string): Promise<Order
   const nextStatus = order.scheduled_at ? "paid" : "preparing";
   const slaDeadline = order.scheduled_at
     ? order.scheduled_at
-    : new Date(Date.now() + orderPrepSlaMinutes() * 60000).toISOString();
+    : new Date(Date.now() + (await orderPrepSlaMinutes()) * 60000).toISOString();
 
   const { error } = await supabase
     .from("orders")
@@ -81,7 +81,7 @@ export async function confirmBankTransferPayment(orderId: string): Promise<Order
   await insertHistory(supabase, orderId, nextStatus, profile.id, "Transferencia confirmada manualmente");
   revalidatePath("/admin/pedidos");
 
-  const earnedPoints = computeEarnedPoints(order.total);
+  const earnedPoints = await computeEarnedPoints(order.total);
   if (earnedPoints > 0) {
     const admin = createAdminClient();
     await admin.from("points_ledger").insert({
@@ -103,6 +103,80 @@ export async function confirmBankTransferPayment(orderId: string): Promise<Order
   );
 
   return { success: "Pago confirmado." };
+}
+
+// ---------- Operaciones/Admin: comanda de preparación (no fiscal) ----------
+
+// Imprimir la comanda (manual, desde el botón, o automático, desde el
+// vigía de impresión) es lo que arranca el reloj de preparación: reemplaza
+// `sla_deadline` (hasta acá la hora que pidió el cliente, o pago+30min) por
+// printedAt + orderPrepSlaMinutes(), y si el pedido estaba `paid` esperando
+// su horario agendado, lo pasa a `preparing` en el momento — la cocina ya
+// tiene la comanda en mano, no tiene sentido seguir esperando al cron diario.
+// `scheduled_at` nunca se toca acá: es el dato que se le sigue mostrando al
+// equipo como "hora que pidió el cliente".
+// Idempotente: una segunda impresión (reimpresión) no vuelve a resetear el
+// SLA ni la transición de estado.
+export async function printTicket(orderId: string): Promise<OrderActionState> {
+  const profile = await requireRole(["admin", "operaciones"]);
+  const supabase = await createClient();
+
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, status, ticket_printed_at")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (!order) return { error: "Pedido no encontrado." };
+
+  if (order.ticket_printed_at || !["paid", "preparing"].includes(order.status)) {
+    return { success: "Comanda reimpresa." };
+  }
+
+  const nowIso = new Date().toISOString();
+  const newSlaDeadline = new Date(Date.now() + (await orderPrepSlaMinutes()) * 60000).toISOString();
+
+  const { error } = await supabase
+    .from("orders")
+    .update({ ticket_printed_at: nowIso, status: "preparing", sla_deadline: newSlaDeadline })
+    .eq("id", orderId);
+  if (error) return { error: "No se pudo registrar la impresión." };
+
+  await insertHistory(supabase, orderId, "preparing", profile.id, "Comanda impresa — inicia SLA de preparación");
+  revalidatePath("/admin/pedidos");
+
+  return { success: "Comanda impresa." };
+}
+
+// Pasa un pedido `paid` (confirmado, esperando su horario agendado o el
+// cron diario) directo a `preparing` — mismo efecto de reloj que imprimir
+// la comanda (sección de arriba), pero sin imprimir: para cuando el equipo
+// quiere arrancar la preparación de varios pedidos confirmados a la vez
+// desde la selección masiva de la tabla, sin esperar el cron ni abrir cada
+// comanda una por una.
+export async function startPreparation(orderId: string): Promise<OrderActionState> {
+  const profile = await requireRole(["admin", "operaciones"]);
+  const supabase = await createClient();
+
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, status")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (!order) return { error: "Pedido no encontrado." };
+  if (order.status !== "paid") return { error: "El pedido no está confirmado y pendiente de preparar." };
+
+  const newSlaDeadline = new Date(Date.now() + (await orderPrepSlaMinutes()) * 60000).toISOString();
+
+  const { error } = await supabase
+    .from("orders")
+    .update({ status: "preparing", sla_deadline: newSlaDeadline })
+    .eq("id", orderId);
+  if (error) return { error: "No se pudo iniciar la preparación." };
+
+  await insertHistory(supabase, orderId, "preparing", profile.id, "Preparación iniciada manualmente");
+  revalidatePath("/admin/pedidos");
+
+  return { success: "Preparación iniciada." };
 }
 
 // ---------- Operaciones/Admin: preparación y retiro ----------
@@ -326,8 +400,9 @@ export async function markReturningToStore(orderId: string): Promise<OrderAction
   // delivery_issue_at, esta transición se rechaza — no es una restricción de
   // UI, se revalida acá con la hora real del servidor.
   const elapsedMinutes = (Date.now() - new Date(order.delivery_issue_at).getTime()) / 60000;
-  if (elapsedMinutes < maxDeliveryIssueWaitMinutes()) {
-    const remaining = Math.ceil(maxDeliveryIssueWaitMinutes() - elapsedMinutes);
+  const maxWaitMinutes = await maxDeliveryIssueWaitMinutes();
+  if (elapsedMinutes < maxWaitMinutes) {
+    const remaining = Math.ceil(maxWaitMinutes - elapsedMinutes);
     return { error: `Todavía hay que esperar ${remaining} minuto(s) antes de volver a la tienda.` };
   }
 

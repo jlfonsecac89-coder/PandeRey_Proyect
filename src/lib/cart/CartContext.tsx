@@ -55,7 +55,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [items, hydrated]);
 
   const addItem: CartContextValue["addItem"] = useCallback((input, quantity = 1) => {
-    const key = buildCartItemKey(input.productId, input.options);
+    const key = buildCartItemKey(input.productId, input.options, input.customizationNote);
     setItems((prev) => {
       const existing = prev.find((i) => i.key === key);
       if (existing) {

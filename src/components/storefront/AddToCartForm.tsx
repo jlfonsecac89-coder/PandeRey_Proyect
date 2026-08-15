@@ -23,6 +23,12 @@ export function AddToCartForm({
 }) {
   const { addItem, openCart } = useCart();
   const [selected, setSelected] = useState<Record<string, string[]>>({});
+  // "Otro" por grupo — texto libre para pedir algo que no está en la lista
+  // de valores (ej. un relleno que no ofrecemos por defecto). No es una
+  // opción real del catálogo, así que nunca viaja como optionValueId — se
+  // junta en una sola nota de personalización del ítem.
+  const [customText, setCustomText] = useState<Record<string, string>>({});
+  const [showCustomInput, setShowCustomInput] = useState<Record<string, boolean>>({});
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
 
@@ -40,7 +46,9 @@ export function AddToCartForm({
     });
   };
 
-  const missingRequired = optionGroups.some((g) => g.is_required && !(selected[g.id]?.length));
+  const missingRequired = optionGroups.some(
+    (g) => g.is_required && !(selected[g.id]?.length) && !customText[g.id]?.trim(),
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +67,14 @@ export function AddToCartForm({
       }),
     );
 
+    const customNotes = optionGroups
+      .map((g) => {
+        const text = customText[g.id]?.trim();
+        return text ? `${g.name}: ${text}` : null;
+      })
+      .filter((t): t is string => Boolean(t));
+    const customizationNote = customNotes.length > 0 ? customNotes.join(" · ") : null;
+
     addItem(
       {
         productId: product.id,
@@ -67,6 +83,7 @@ export function AddToCartForm({
         unitBasePrice: product.price,
         imagePath: product.imagePath,
         options,
+        customizationNote,
       },
       quantity,
     );
@@ -100,7 +117,42 @@ export function AddToCartForm({
                 </button>
               );
             })}
+            {group.selection_type === "multiple" &&
+              (showCustomInput[group.id] ? null : (
+                <button
+                  type="button"
+                  onClick={() => setShowCustomInput((prev) => ({ ...prev, [group.id]: true }))}
+                  className="rounded-md border border-dashed border-charcoal-border px-3 py-1.5 text-sm text-foreground/50 hover:border-gold-dark hover:text-gold"
+                >
+                  + Otro
+                </button>
+              ))}
           </div>
+          {group.selection_type === "multiple" && showCustomInput[group.id] && (
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="text"
+                autoFocus
+                placeholder="Escribí lo que necesitás"
+                value={customText[group.id] ?? ""}
+                onChange={(e) => {
+                  setAdded(false);
+                  setCustomText((prev) => ({ ...prev, [group.id]: e.target.value }));
+                }}
+                className="w-full max-w-xs rounded-md border border-charcoal-border bg-charcoal-light px-3 py-1.5 text-sm outline-none focus:border-gold"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomText((prev) => ({ ...prev, [group.id]: "" }));
+                  setShowCustomInput((prev) => ({ ...prev, [group.id]: false }));
+                }}
+                className="text-xs text-foreground/40 hover:text-red-400"
+              >
+                Quitar
+              </button>
+            </div>
+          )}
         </fieldset>
       ))}
 

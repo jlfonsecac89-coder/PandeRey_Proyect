@@ -9,6 +9,7 @@ import { loyaltyPointsToClpRate } from "@/lib/loyalty/points";
 export default async function CuentaLayout({ children }: { children: React.ReactNode }) {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/auth/login");
+  const pointsRate = await loyaltyPointsToClpRate();
 
   return (
     <CartProvider>
@@ -45,7 +46,7 @@ export default async function CuentaLayout({ children }: { children: React.React
           <CuentaSidebar
             fullName={profile.full_name}
             pointsBalance={profile.points_balance}
-            pointsValueClp={profile.points_balance * loyaltyPointsToClpRate()}
+            pointsValueClp={profile.points_balance * pointsRate}
           />
           <main className="min-h-[500px] flex-1 rounded-2xl border border-white/10 bg-background-alt/60 p-6 backdrop-blur-sm sm:p-8">
             {children}

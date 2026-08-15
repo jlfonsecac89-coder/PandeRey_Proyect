@@ -106,6 +106,9 @@ export function CartDrawer() {
                         {item.options.map((o) => o.optionValueName).join(", ")}
                       </p>
                     )}
+                    {item.customizationNote && (
+                      <p className="text-xs italic text-foreground-muted/80">{item.customizationNote}</p>
+                    )}
                     <div className="mt-1.5 flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <button

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { getSystemSettings } from "@/lib/settings/system-settings";
 
 export type OrderStatus =
   | "pending_payment"
@@ -38,10 +39,13 @@ export function generateDeliveryCode(): string {
   return String(crypto.randomInt(100000, 1000000));
 }
 
-export function orderPrepSlaMinutes(): number {
-  return Number(process.env.ORDER_PREP_SLA_MINUTES ?? 30);
+// Ahora editable desde /admin/configuracion/sistema sin redeploy — la
+// variable de entorno queda solo como default si nadie configuró nada
+// todavía (ver src/lib/settings/system-settings.ts).
+export async function orderPrepSlaMinutes(): Promise<number> {
+  return (await getSystemSettings()).orderPrepSlaMinutes;
 }
 
-export function maxDeliveryIssueWaitMinutes(): number {
-  return Number(process.env.MAX_DELIVERY_ISSUE_WAIT_MINUTES ?? 10);
+export async function maxDeliveryIssueWaitMinutes(): Promise<number> {
+  return (await getSystemSettings()).maxDeliveryIssueWaitMinutes;
 }

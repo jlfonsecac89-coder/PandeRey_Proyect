@@ -7,7 +7,7 @@ import { logAction } from "@/lib/audit/log-action";
 import { normalizeName, slugify } from "./normalize";
 import { generateUniqueSku } from "./sku";
 
-export type CatalogActionState = { error?: string; success?: string } | null;
+export type CatalogActionState = { error?: string; success?: string; id?: string } | null;
 
 function isUniqueViolation(error: { code?: string } | null): boolean {
   return error?.code === "23505";
@@ -172,7 +172,7 @@ export async function setProductCollection(
       .eq("collection_id", collectionId);
   }
 
-  revalidatePath(`/admin/productos/${productId}`);
+  revalidatePath("/admin/productos");
 }
 
 // ---------- Productos (Admin + Operaciones) ----------
@@ -248,7 +248,7 @@ export async function createProduct(
   }
 
   revalidatePath("/admin/productos");
-  return { success: `Producto "${name}" creado con SKU ${sku}.` };
+  return { success: `Producto "${name}" creado con SKU ${sku}.`, id: created.id };
 }
 
 export async function updateProduct(
@@ -259,14 +259,22 @@ export async function updateProduct(
   const profile = await requireRole(["admin", "operaciones"]);
 
   const name = String(formData.get("name") || "").trim();
+  const categoryId = String(formData.get("category_id") || "") || null;
   const description = String(formData.get("description") || "").trim() || null;
   const priceRaw = String(formData.get("price") || "");
   const isGlutenFree = formData.get("is_gluten_free") === "on";
   const isActive = formData.get("is_active") === "on";
+  const isSpecialEvent = formData.get("is_special_event") === "on";
+  const eventCollectionId = String(formData.get("event_collection_id") || "") || null;
+  const maxOrdersRaw = String(formData.get("max_orders") || "");
+  const requiresProductionNotes = formData.get("requires_production_notes") === "on";
 
   if (!name || !priceRaw) return { error: "Completa nombre y precio." };
   const price = Number(priceRaw);
   if (Number.isNaN(price) || price < 0) return { error: "El precio no es válido." };
+  if (isSpecialEvent && !eventCollectionId) {
+    return { error: "Un producto de evento necesita la colección de evento que lo activa." };
+  }
 
   const supabase = await createClient();
 
@@ -278,7 +286,18 @@ export async function updateProduct(
 
   const { error } = await supabase
     .from("products")
-    .update({ name, description, price, is_gluten_free: isGlutenFree, is_active: isActive })
+    .update({
+      name,
+      description,
+      price,
+      is_gluten_free: isGlutenFree,
+      is_active: isActive,
+      is_special_event: isSpecialEvent,
+      event_collection_id: isSpecialEvent ? eventCollectionId : null,
+      max_orders: isSpecialEvent && maxOrdersRaw ? Number(maxOrdersRaw) : null,
+      requires_production_notes: isSpecialEvent && requiresProductionNotes,
+      ...(categoryId ? { category_id: categoryId } : {}),
+    })
     .eq("id", productId);
 
   if (error) {
@@ -300,7 +319,6 @@ export async function updateProduct(
     });
   }
 
-  revalidatePath(`/admin/productos/${productId}`);
   revalidatePath("/admin/productos");
   return { success: "Producto actualizado." };
 }
@@ -362,6 +380,15 @@ export async function uploadProductImage(
   }
 
   const supabase = await createClient();
+
+  const { count } = await supabase
+    .from("product_images")
+    .select("id", { count: "exact", head: true })
+    .eq("product_id", productId);
+  if ((count ?? 0) >= 5) {
+    return { error: "Este producto ya tiene el máximo de 5 fotos. Eliminá una para subir otra." };
+  }
+
   const ext = file.name.split(".").pop() || "jpg";
   const path = `${productId}/${crypto.randomUUID()}.${ext}`;
 
@@ -379,7 +406,7 @@ export async function uploadProductImage(
     return { error: "No se pudo registrar la imagen." };
   }
 
-  revalidatePath(`/admin/productos/${productId}`);
+  revalidatePath("/admin/productos");
   return { success: "Imagen subida." };
 }
 
@@ -388,7 +415,7 @@ export async function deleteProductImage(imageId: string, productId: string, pat
   const supabase = await createClient();
   await supabase.storage.from("product-images").remove([path]);
   await supabase.from("product_images").delete().eq("id", imageId);
-  revalidatePath(`/admin/productos/${productId}`);
+  revalidatePath("/admin/productos");
 }
 
 // ---------- Variantes (grupos de opciones) — Admin + Operaciones ----------
@@ -414,7 +441,7 @@ export async function createOptionGroup(
 
   if (error) return { error: "No se pudo crear el grupo de opciones." };
 
-  revalidatePath(`/admin/productos/${productId}`);
+  revalidatePath("/admin/productos");
   return { success: `Grupo "${name}" creado.` };
 }
 
@@ -442,8 +469,27 @@ export async function createOptionValue(
 
   if (error) return { error: "No se pudo crear el valor de opción." };
 
-  revalidatePath(`/admin/productos/${productId}`);
+  revalidatePath("/admin/productos");
   return { success: `Valor "${name}" agregado.` };
+}
+
+// Cascada por FK (on delete cascade) — borrar un grupo se lleva sus
+// valores solo. El snapshot de lo que ya se vendió vive aparte en
+// order_item_options (texto, no FK viva), así que esto nunca afecta pedidos
+// pasados; sí puede dejar sin esa opción un carrito activo que la tenía
+// elegida, mismo riesgo que sacar un producto de catálogo.
+export async function deleteOptionGroup(groupId: string) {
+  await requireRole(["admin", "operaciones"]);
+  const supabase = await createClient();
+  await supabase.from("product_option_groups").delete().eq("id", groupId);
+  revalidatePath("/admin/productos");
+}
+
+export async function deleteOptionValue(valueId: string) {
+  await requireRole(["admin", "operaciones"]);
+  const supabase = await createClient();
+  await supabase.from("product_option_values").delete().eq("id", valueId);
+  revalidatePath("/admin/productos");
 }
 
 // ---------- Stock (lotes) — Admin + Operaciones, scoped a su sucursal por RLS ----------
@@ -480,7 +526,7 @@ export async function addStockBatch(
   // sucursal (sección 13) — este error confirma que la Capa 3 funcionó.
   if (error) return { error: "No se pudo cargar el lote (¿sucursal correcta?)." };
 
-  revalidatePath(`/admin/productos/${productId}`);
+  revalidatePath("/admin/productos");
   return { success: "Lote de stock cargado." };
 }
 
@@ -516,6 +562,6 @@ export async function setBatchClearance(
   // addStockBatch.
   if (error) return { error: "No se pudo actualizar la liquidación del lote." };
 
-  revalidatePath(`/admin/productos/${productId}`);
+  revalidatePath("/admin/productos");
   return { success: isClearance ? "Lote marcado en liquidación." : "Liquidación desactivada." };
 }

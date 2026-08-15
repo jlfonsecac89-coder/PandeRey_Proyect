@@ -1,19 +1,22 @@
-// Tasas del programa de puntos (sección 14 del blueprint) — configurables
-// por variable de entorno (sección 18), no hardcodeadas.
-export function loyaltyPointsPerClp(): number {
-  return Number(process.env.LOYALTY_POINTS_PER_CLP ?? 0.001);
+import { getSystemSettings } from "@/lib/settings/system-settings";
+
+// Tasas del programa de puntos (sección 14 del blueprint) — editables desde
+// /admin/configuracion/sistema, con la variable de entorno como default si
+// nadie configuró nada todavía.
+export async function loyaltyPointsPerClp(): Promise<number> {
+  return (await getSystemSettings()).loyaltyPointsPerClp;
 }
 
-export function loyaltyPointsToClpRate(): number {
-  return Number(process.env.LOYALTY_POINTS_TO_CLP_RATE ?? 10);
+export async function loyaltyPointsToClpRate(): Promise<number> {
+  return (await getSystemSettings()).loyaltyPointsToClpRate;
 }
 
 // Puntos acreditados por un pedido pagado — proporcional al monto pagado.
-export function computeEarnedPoints(amountClp: number): number {
-  return Math.floor(amountClp * loyaltyPointsPerClp());
+export async function computeEarnedPoints(amountClp: number): Promise<number> {
+  return Math.floor(amountClp * (await loyaltyPointsPerClp()));
 }
 
 // Descuento en CLP que representa canjear N puntos.
-export function computePointsDiscountClp(points: number): number {
-  return Math.floor(points * loyaltyPointsToClpRate());
+export async function computePointsDiscountClp(points: number): Promise<number> {
+  return Math.floor(points * (await loyaltyPointsToClpRate()));
 }

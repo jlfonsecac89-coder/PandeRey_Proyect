@@ -349,6 +349,107 @@ export async function resolveImportRow(
   }
 
   revalidatePath("/admin/productos/importar");
-  revalidatePath(`/admin/productos/${row.matched_product_id}`);
+  revalidatePath("/admin/productos");
   return { success: approve ? "Cambio aplicado." : "Cambio rechazado." };
+}
+
+// ---------- Carga masiva de fotos ----------
+
+export type BulkImagesState = { error?: string; success?: string } | null;
+
+const IMAGE_NAME_PATTERN =
+  /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-([1-5])\.(png|jpe?g|webp)$/i;
+const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+// Cada archivo se asocia al producto por su nombre: "<id-del-producto>-1.jpg",
+// "-2.jpg", etc. (hasta 5) — el id es el mismo que aparece en la URL del
+// panel de edición (?editar=<id>) o se puede copiar desde la comanda/ficha.
+// Sube en orden de nombre para que -1, -2, -3... queden en ese orden dentro
+// del máximo de 5 fotos por producto (mismo límite que la subida individual).
+export async function bulkUploadProductImages(
+  _prev: BulkImagesState,
+  formData: FormData,
+): Promise<BulkImagesState> {
+  await requireRole(["admin", "operaciones"]);
+
+  const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length === 0) return { error: "Seleccioná al menos una foto." };
+
+  files.sort((a, b) => a.name.localeCompare(b.name));
+
+  const supabase = await createClient();
+  const { count: totalCount } = await supabase.from("products").select("id", { count: "exact", head: true });
+  if (!totalCount) return { error: "No hay productos cargados todavía." };
+
+  const currentCounts = new Map<string, number>();
+  let uploaded = 0;
+  let skippedInvalidName = 0;
+  let skippedNotFound = 0;
+  let skippedLimit = 0;
+  let skippedBadType = 0;
+
+  for (const file of files) {
+    const match = file.name.match(IMAGE_NAME_PATTERN);
+    if (!match) {
+      skippedInvalidName++;
+      continue;
+    }
+    const [, productId, , ext] = match;
+
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      skippedBadType++;
+      continue;
+    }
+
+    if (!currentCounts.has(productId)) {
+      const { count } = await supabase
+        .from("product_images")
+        .select("id", { count: "exact", head: true })
+        .eq("product_id", productId);
+      currentCounts.set(productId, count ?? 0);
+    }
+    const current = currentCounts.get(productId)!;
+    if (current >= 5) {
+      skippedLimit++;
+      continue;
+    }
+
+    const { data: product } = await supabase.from("products").select("id").eq("id", productId).maybeSingle();
+    if (!product) {
+      skippedNotFound++;
+      continue;
+    }
+
+    const path = `${productId}/${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("product-images")
+      .upload(path, file, { contentType: file.type });
+    if (uploadError) {
+      skippedNotFound++;
+      continue;
+    }
+
+    const { error: insertError } = await supabase.from("product_images").insert({
+      product_id: productId,
+      storage_path: path,
+    });
+    if (insertError) {
+      await supabase.storage.from("product-images").remove([path]);
+      continue;
+    }
+
+    currentCounts.set(productId, current + 1);
+    uploaded++;
+  }
+
+  revalidatePath("/admin/productos");
+
+  const parts = [`${uploaded} foto(s) subida(s)`];
+  if (skippedLimit) parts.push(`${skippedLimit} omitida(s) por límite de 5`);
+  if (skippedNotFound) parts.push(`${skippedNotFound} con producto inexistente`);
+  if (skippedInvalidName) parts.push(`${skippedInvalidName} con nombre inválido`);
+  if (skippedBadType) parts.push(`${skippedBadType} con formato no soportado`);
+
+  if (uploaded === 0) return { error: parts.slice(1).join(", ") || "No se subió ninguna foto." };
+  return { success: parts.join(", ") + "." };
 }

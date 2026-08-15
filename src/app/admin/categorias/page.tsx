@@ -23,10 +23,10 @@ export default async function CategoriasPage() {
       </div>
       <CatalogoTabs active="categorias" role={profile.role} />
       <p className="text-sm text-foreground-muted">Nivel 2 del árbol, dentro de cada departamento.</p>
-      <div className="rounded-2xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
         <CategoriaForm departments={departments ?? []} />
       </div>
-      <div className="overflow-x-auto rounded-2xl border border-charcoal-border bg-background-elevated shadow-card">
+      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.03] shadow-card">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-charcoal-border text-xs uppercase tracking-wide text-foreground-muted">

@@ -20,7 +20,7 @@ export function BannersSection({ banners, publicBaseUrl }: { banners: Banner[]; 
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {banners.map((banner) => (
-          <div key={banner.id} className="rounded-lg border border-charcoal-border bg-charcoal-light p-3">
+          <div key={banner.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`${publicBaseUrl}/${banner.image_storage_path}`}
@@ -49,7 +49,7 @@ export function BannersSection({ banners, publicBaseUrl }: { banners: Banner[]; 
         {banners.length === 0 && <p className="text-sm text-foreground/40">Sin banners todavía.</p>}
       </div>
 
-      <div className="max-w-md rounded-lg border border-charcoal-border bg-charcoal-light p-4">
+      <div className="max-w-md rounded-lg border border-white/10 bg-white/[0.03] p-4">
         <h2 className="text-sm font-semibold text-gold">Nuevo banner</h2>
         <FormMessage error={state?.error} success={state?.success} />
         <form action={formAction} className="mt-2 space-y-2">
