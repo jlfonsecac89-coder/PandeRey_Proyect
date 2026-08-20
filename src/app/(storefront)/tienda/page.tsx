@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getClearanceDiscounts, getClearanceProductIds, applyClearanceDiscount } from "@/lib/catalog/clearance";
 import { SortSelect } from "@/components/storefront/SortSelect";
-import { TiendaSidebarLayout } from "@/components/storefront/TiendaSidebarLayout";
+import { TiendaFilterBar } from "@/components/storefront/TiendaFilterBar";
 import { ProductGridCard, type ProductGridCardData } from "@/components/storefront/ProductGridCard";
 
 type ProductImage = { storage_path: string; sort_order: number };
@@ -256,149 +256,42 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
         ))}
       </div>
 
-      <TiendaSidebarLayout
-        sidebar={
-        <aside className="space-y-6 rounded-2xl border border-white/5 bg-background-alt/60 p-5 backdrop-blur-sm lg:sticky lg:top-24 lg:self-start">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Filtros</p>
-            {activeFilterCount > 0 && (
-              <Link href="/tienda" className="text-xs text-gold-hover hover:underline">
-                Limpiar
-              </Link>
-            )}
-          </div>
+      <TiendaFilterBar
+        currentDept={currentDept}
+        categoriesInDept={categoriesInDept}
+        categoria={categoria}
+        precio={precio}
+        singluten={singluten}
+        filtro={filtro}
+        activeFilterCount={activeFilterCount}
+        buildHref={buildHref}
+      />
 
-          {currentDept && categoriesInDept.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Categoría</p>
-              <ul className="mt-2 space-y-1">
-                <li>
-                  <Link
-                    href={buildHref({ categoria: undefined })}
-                    className={`block rounded-md px-2 py-1 text-sm transition ${
-                      !categoria ? "bg-gold/10 font-medium text-gold" : "text-foreground-muted hover:text-gold"
-                    }`}
-                  >
-                    Todas las categorías
-                  </Link>
-                </li>
-                {categoriesInDept.map((c) => (
-                  <li key={c.id}>
-                    <Link
-                      href={buildHref({ categoria: c.slug })}
-                      className={`block rounded-md px-2 py-1 text-sm transition ${
-                        categoria === c.slug
-                          ? "bg-gold/10 font-medium text-gold"
-                          : "text-foreground-muted hover:text-gold"
-                      }`}
-                    >
-                      {c.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+      {/* Resultados */}
+      <div className="mt-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-foreground-muted">
+            {gridProducts.length} producto{gridProducts.length === 1 ? "" : "s"} encontrado
+            {gridProducts.length === 1 ? "" : "s"}
+          </p>
+          <SortSelect
+            current={orden ?? "nombre"}
+            options={SORT_OPTIONS}
+            currentParams={{ departamento, categoria, filtro, precio, singluten }}
+          />
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+          {gridProducts.map((product) => (
+            <ProductGridCard key={product.id} product={product} publicBaseUrl={publicBaseUrl} />
+          ))}
+          {gridProducts.length === 0 && (
+            <div className="col-span-full rounded-xl border border-dashed border-crust-soft py-16 text-center">
+              <p className="text-sm text-foreground-muted">No hay productos que coincidan con este filtro.</p>
             </div>
           )}
-
-          <div className="border-t border-white/5 pt-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Precio</p>
-            <ul className="mt-2 space-y-1">
-              <li>
-                <Link
-                  href={buildHref({ precio: undefined })}
-                  className={`block rounded-md px-2 py-1 text-sm transition ${
-                    !precio ? "bg-gold/10 font-medium text-gold" : "text-foreground-muted hover:text-gold"
-                  }`}
-                >
-                  Todos los precios
-                </Link>
-              </li>
-              {PRICE_BUCKETS.map((b) => (
-                <li key={b.key}>
-                  <Link
-                    href={buildHref({ precio: precio === b.key ? undefined : b.key })}
-                    className={`block rounded-md px-2 py-1 text-sm transition ${
-                      precio === b.key ? "bg-gold/10 font-medium text-gold" : "text-foreground-muted hover:text-gold"
-                    }`}
-                  >
-                    {b.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="space-y-1 border-t border-white/5 pt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Otros</p>
-            <Link
-              href={buildHref({ filtro: filtro === "ofertas" ? undefined : "ofertas" })}
-              className={`flex items-center gap-2 rounded-md px-2 py-1 text-sm transition ${
-                filtro === "ofertas" ? "bg-burgundy/10 font-medium text-burgundy-hover" : "text-foreground-muted hover:text-gold"
-              }`}
-            >
-              <span
-                className={`flex h-4 w-4 items-center justify-center rounded border ${filtro === "ofertas" ? "border-burgundy bg-burgundy" : "border-white/15"}`}
-              >
-                {filtro === "ofertas" && <span className="h-2 w-2 rounded-sm bg-white" />}
-              </span>
-              Ofertas
-            </Link>
-            <Link
-              href={buildHref({ filtro: filtro === "evento" ? undefined : "evento" })}
-              className={`flex items-center gap-2 rounded-md px-2 py-1 text-sm transition ${
-                filtro === "evento" ? "bg-gold/10 font-medium text-gold" : "text-foreground-muted hover:text-gold"
-              }`}
-            >
-              <span
-                className={`flex h-4 w-4 items-center justify-center rounded border ${filtro === "evento" ? "border-gold bg-gold" : "border-white/15"}`}
-              >
-                {filtro === "evento" && <span className="h-2 w-2 rounded-sm bg-ink" />}
-              </span>
-              Edición limitada
-            </Link>
-            <Link
-              href={buildHref({ singluten: singluten === "1" ? undefined : "1" })}
-              className={`flex items-center gap-2 rounded-md px-2 py-1 text-sm transition ${
-                singluten === "1" ? "bg-gold/10 font-medium text-gold" : "text-foreground-muted hover:text-gold"
-              }`}
-            >
-              <span
-                className={`flex h-4 w-4 items-center justify-center rounded border ${singluten === "1" ? "border-gold bg-gold" : "border-white/15"}`}
-              >
-                {singluten === "1" && <span className="h-2 w-2 rounded-sm bg-ink" />}
-              </span>
-              Sin gluten
-            </Link>
-          </div>
-        </aside>
-        }
-      >
-        {/* Resultados */}
-        <div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-foreground-muted">
-              {gridProducts.length} producto{gridProducts.length === 1 ? "" : "s"} encontrado
-              {gridProducts.length === 1 ? "" : "s"}
-            </p>
-            <SortSelect
-              current={orden ?? "nombre"}
-              options={SORT_OPTIONS}
-              currentParams={{ departamento, categoria, filtro, precio, singluten }}
-            />
-          </div>
-
-          <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
-            {gridProducts.map((product) => (
-              <ProductGridCard key={product.id} product={product} publicBaseUrl={publicBaseUrl} />
-            ))}
-            {gridProducts.length === 0 && (
-              <div className="col-span-full rounded-xl border border-dashed border-white/10 py-16 text-center">
-                <p className="text-sm text-foreground-muted">No hay productos que coincidan con este filtro.</p>
-              </div>
-            )}
-          </div>
         </div>
-      </TiendaSidebarLayout>
+      </div>
     </div>
   );
 }

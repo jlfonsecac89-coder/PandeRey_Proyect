@@ -6,6 +6,7 @@ import { useCart } from "@/lib/cart/CartContext";
 import { buildCartItemKey } from "@/lib/cart/types";
 import { formatCLP } from "@/lib/format";
 import { DepartmentIcon } from "@/components/storefront/DepartmentIcon";
+import { Seal } from "@/components/storefront/Seal";
 
 export type ProductGridCardData = {
   id: string;
@@ -79,6 +80,12 @@ export function ProductGridCard({ product, publicBaseUrl }: { product: ProductGr
             }}
           >
             <DepartmentIcon name={product.name} className="h-10 w-10" />
+          </div>
+        )}
+
+        {product.isSpecialEvent && cartQty === 0 && (
+          <div className="pointer-events-none absolute right-2 top-2 z-10 -rotate-6" aria-hidden="true">
+            <Seal size="sm" />
           </div>
         )}
 
