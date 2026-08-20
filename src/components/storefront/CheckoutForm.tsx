@@ -187,6 +187,7 @@ export function CheckoutForm({
   useEffect(() => {
     if (!storeId) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setScheduleLoading(true);
     setSelectedDayIso("");
     setSelectedSlotIso("");
@@ -207,6 +208,7 @@ export function CheckoutForm({
   // en el Total antes de pagar, no recién después.
   useEffect(() => {
     if (!couponCode.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCouponPreview(null);
       setCouponPreviewLoading(false);
       return;
@@ -288,7 +290,7 @@ export function CheckoutForm({
             etiquetas en otra debajo, alineadas por el mismo reparto
             flex-1/last:flex-initial, así se ven siempre (también en
             mobile) sin que el conector se rompa. */}
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-sm">
+        <div className="rounded-2xl border border-crust-soft bg-masa p-4 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             {visibleSteps.map((s, i) => {
               const stepStatus = statusFor(s.key);
@@ -303,12 +305,12 @@ export function CheckoutForm({
                         ? "bg-gold text-ink"
                         : stepStatus === "done"
                           ? "cursor-pointer bg-gold/20 text-gold"
-                          : "bg-white/5 text-foreground-muted"
+                          : "bg-crust-soft text-foreground-muted"
                     }`}
                   >
                     {stepStatus === "done" ? <Check className="h-4 w-4" /> : i + 1}
                   </button>
-                  {i < visibleSteps.length - 1 && <div className="mx-2 h-px flex-1 bg-white/5 sm:mx-4" />}
+                  {i < visibleSteps.length - 1 && <div className="mx-2 h-px flex-1 bg-crust-soft sm:mx-4" />}
                 </div>
               );
             })}
@@ -331,7 +333,7 @@ export function CheckoutForm({
         </div>
 
         {/* Tarjeta del paso activo */}
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 shadow-card sm:p-8">
+        <div className="rounded-2xl border border-crust-soft bg-masa p-6 shadow-card sm:p-8">
         {step === "entrega" && (
           <div className="space-y-6">
             <div className="flex items-center gap-3">
@@ -827,7 +829,7 @@ export function CheckoutForm({
 
       {/* Columna derecha: resumen, siempre visible */}
       <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 shadow-card">
+        <div className="rounded-2xl border border-crust-soft bg-masa p-6 shadow-card">
           <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-foreground-muted">
             <ClipboardList className="h-4 w-4 text-gold-dark" />
             Resumen del pedido
