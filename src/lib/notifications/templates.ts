@@ -49,12 +49,16 @@ export function readyForPickupTemplate(orderId: string) {
   };
 }
 
-export function inRouteTemplate(orderId: string) {
+export function inRouteTemplate(orderId: string, deliveryConfirmationCode: string) {
   return {
     subject: "Tu pedido va en camino — Pan de Rey",
     html: wrap(
       "¡Va en camino!",
-      `<p style="font-size:14px;color:#F5F5DC;opacity:0.85;">Tu pedido <strong>#${orderId.slice(0, 8)}</strong> salió en camino. Tené a mano el código de confirmación que te enviamos al comprar.</p>`,
+      `
+        <p style="font-size:14px;color:#F5F5DC;opacity:0.85;">Tu pedido <strong>#${orderId.slice(0, 8)}</strong> salió en camino.</p>
+        <p style="font-size:13px;color:#F5F5DC;opacity:0.7;">Tené a mano este código — te lo va a pedir el repartidor al momento de la entrega:</p>
+        <p style="font-size:28px;letter-spacing:0.15em;color:#D4AF37;font-weight:bold;text-align:center;margin:16px 0;">${deliveryConfirmationCode}</p>
+      `,
     ),
   };
 }

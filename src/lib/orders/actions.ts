@@ -311,7 +311,7 @@ export async function markInRoute(orderId: string): Promise<OrderActionState> {
 
   const { data: order } = await supabase
     .from("orders")
-    .select("id, status, assigned_driver_id, user_id")
+    .select("id, status, assigned_driver_id, user_id, delivery_confirmation_code")
     .eq("id", orderId)
     .maybeSingle();
   if (!order) return { error: "Pedido no encontrado." };
@@ -324,7 +324,11 @@ export async function markInRoute(orderId: string): Promise<OrderActionState> {
   await insertHistory(supabase, orderId, "in_route", profile.id);
   revalidatePath("/repartidor");
   // Aceptación 1 de la Fase 5: in_route SIEMPRE dispara email + notifications_log.
-  await notifyOwner(orderId, order.user_id, "in_route", () => inRouteTemplate(orderId));
+  // El correo repite el código de entrega para que el cliente lo tenga a mano
+  // justo cuando el repartidor se lo va a pedir (pedido del usuario, 2026-08-19).
+  await notifyOwner(orderId, order.user_id, "in_route", () =>
+    inRouteTemplate(orderId, order.delivery_confirmation_code),
+  );
 
   return { success: "Pedido marcado en camino." };
 }

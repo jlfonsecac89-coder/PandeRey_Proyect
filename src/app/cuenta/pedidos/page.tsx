@@ -33,7 +33,7 @@ export default async function MisPedidosPage() {
   const supabase = await createClient();
   const { data: orders } = await supabase
     .from("orders")
-    .select("id, status, total, delivery_method, created_at")
+    .select("id, status, total, delivery_method, delivery_confirmation_code, created_at")
     .eq("user_id", profile.id)
     .neq("status", "pending_payment")
     .order("created_at", { ascending: false });
@@ -85,10 +85,12 @@ export default async function MisPedidosPage() {
           );
           const status = order.status as OrderStatus;
           const isPickup = order.delivery_method === "pickup";
+          const showConfirmationCode =
+            order.delivery_method === "shipping" && !["delivered", "cancelled"].includes(status);
           return (
             <li
               key={order.id}
-              className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/20"
+              className="rounded-2xl border border-crust-soft bg-masa p-5 transition-colors hover:border-gold-dark/40"
             >
               <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
                 <div className="flex flex-wrap items-center gap-4">
@@ -140,6 +142,17 @@ export default async function MisPedidosPage() {
                   <ReorderButton orderId={order.id} />
                 </div>
               </div>
+
+              {showConfirmationCode && (
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-dashed border-gold-dark/50 bg-ink px-4 py-3">
+                  <p className="text-xs text-foreground-muted">
+                    Código de confirmación para la entrega
+                  </p>
+                  <p className="font-mono text-lg font-bold tracking-[0.2em] text-gold">
+                    {order.delivery_confirmation_code}
+                  </p>
+                </div>
+              )}
 
               {pendingReviewItems.length > 0 && (
                 <div className="mt-4 border-t border-white/10 pt-4">
