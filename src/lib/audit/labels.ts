@@ -6,6 +6,8 @@ export const ACTION_LABELS: Record<string, string> = {
   staff_account_created: "Cuenta de staff creada",
   product_price_changed: "Precio de producto modificado",
   promotion_created: "Promoción creada",
+  promotion_updated: "Promoción editada",
+  delivery_message_sent: "Mensaje enviado a repartidor",
 };
 
 export function actionLabel(action: string): string {
@@ -16,6 +18,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   profile: "Perfil",
   product: "Producto",
   promotion: "Promoción",
+  order: "Pedido",
 };
 
 export function entityLabel(entityType: string): string {

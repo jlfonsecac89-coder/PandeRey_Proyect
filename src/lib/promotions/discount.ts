@@ -22,12 +22,29 @@ export async function validateCoupon(params: {
   const { data: promo } = await supabase
     .from("promotions")
     .select(
-      "id, type, value, max_discount_amount, department_id, category_id, product_id, min_order_amount, single_use_per_customer, max_uses, usage_count, starts_at, ends_at, is_active",
+      "id, type, value, max_discount_amount, department_id, category_id, product_id, min_order_amount, single_use_per_customer, max_uses, usage_count, starts_at, ends_at, is_active, target_segment",
     )
     .eq("code", code.trim().toUpperCase())
     .maybeSingle();
 
   if (!promo || !promo.is_active) return { ok: false, error: "Cupón inválido." };
+
+  // Cupón restringido a un segmento RFM — se valida contra la fila MÁS
+  // RECIENTE del snapshot del cliente (mismo criterio que /admin/clientes).
+  // Sin segmentación calculada todavía para ese cliente = no califica, no se
+  // asume un segmento por default.
+  if (promo.target_segment) {
+    const { data: snapshot } = await supabase
+      .from("customer_rfm_snapshot")
+      .select("segment")
+      .eq("user_id", userId)
+      .order("computed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!snapshot || snapshot.segment !== promo.target_segment) {
+      return { ok: false, error: "Este cupón no está disponible para tu cuenta." };
+    }
+  }
 
   const now = new Date();
   if (now < new Date(promo.starts_at) || now > new Date(promo.ends_at)) {
