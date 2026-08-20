@@ -1,17 +1,19 @@
 import { requireRole } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/server";
+import { maxDeliveryIssueWaitMinutes } from "@/lib/orders/status-server";
 import { OrderCard, type RepartidorOrder } from "@/components/repartidor/OrderCard";
 
 export default async function RepartidorHomePage() {
   const profile = await requireRole(["repartidor"]);
   const supabase = await createClient();
+  const issueWaitMinutes = await maxDeliveryIssueWaitMinutes();
 
   // RLS (repartidor_manage_assigned_orders) ya limita esto a pedidos propios
   // — el filtro explícito acá es defensa en profundidad, no la única barrera.
   const { data: orders } = await supabase
     .from("orders")
     .select(
-      "id, status, total, delivery_issue_reason, delivery_code_locked, user_id, address_id",
+      "id, status, total, delivery_issue_reason, delivery_issue_at, delivery_code_locked, user_id, address_id",
     )
     .eq("assigned_driver_id", profile.id)
     .in("status", ["driver_assigned", "in_route", "at_address", "delivery_issue"])
@@ -40,6 +42,7 @@ export default async function RepartidorHomePage() {
     status: o.status,
     total: o.total,
     delivery_issue_reason: o.delivery_issue_reason,
+    delivery_issue_at: o.delivery_issue_at,
     delivery_code_locked: o.delivery_code_locked,
     customer: customerMap.get(o.user_id) ?? null,
     address: o.address_id ? (addressMap.get(o.address_id) ?? null) : null,
@@ -50,7 +53,7 @@ export default async function RepartidorHomePage() {
       <h1 className="text-xl font-semibold text-gold">Mis pedidos asignados</h1>
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {enriched.map((order) => (
-          <OrderCard key={order.id} order={order} />
+          <OrderCard key={order.id} order={order} issueWaitMinutes={issueWaitMinutes} />
         ))}
         {enriched.length === 0 && (
           <p className="text-sm text-foreground/50">No tenés pedidos asignados por ahora.</p>
