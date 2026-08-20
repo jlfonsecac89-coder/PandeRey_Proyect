@@ -57,7 +57,7 @@ export function AddressManager({ addresses }: { addresses: Address[] }) {
         {addresses.map((addr) => (
           <li
             key={addr.id}
-            className="flex items-start justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-card"
+            className="flex items-start justify-between gap-3 rounded-2xl border border-crust-soft bg-masa p-5 shadow-card"
           >
             <div className="flex items-start gap-3">
               <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold">
@@ -111,7 +111,7 @@ export function AddressManager({ addresses }: { addresses: Address[] }) {
         <form
           key={editingAddress?.id ?? "new"}
           action={formAction}
-          className="space-y-2 rounded-md border border-white/10 bg-white/[0.03] p-3"
+          className="space-y-2 rounded-md border border-crust-soft bg-masa p-3"
         >
           <FormMessage error={state?.error} success={state?.success} />
           {editingAddress && <input type="hidden" name="address_id" value={editingAddress.id} />}

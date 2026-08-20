@@ -30,7 +30,7 @@ export default async function PuntosPage() {
       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Fidelización</p>
       <h1 className="mt-1 font-display text-2xl font-medium text-foreground">Mis puntos</h1>
 
-      <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
+      <div className="mt-4 rounded-2xl border border-crust-soft bg-masa p-5 shadow-card">
         <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Saldo actual</p>
         <p className="mt-1 font-display text-3xl font-medium text-gold">{profile.points_balance} puntos</p>
         <p className="mt-1 text-xs text-foreground-muted">
@@ -43,7 +43,7 @@ export default async function PuntosPage() {
         {(ledger ?? []).map((entry) => (
           <li
             key={entry.id}
-            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] p-3.5 text-sm shadow-card"
+            className="flex items-center justify-between rounded-xl border border-crust-soft bg-masa p-3.5 text-sm shadow-card"
           >
             <div>
               <p className="text-foreground">{TYPE_LABELS[entry.type] ?? entry.type}</p>

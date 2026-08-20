@@ -48,7 +48,7 @@ export default async function CuentaLayout({ children }: { children: React.React
             pointsBalance={profile.points_balance}
             pointsValueClp={profile.points_balance * pointsRate}
           />
-          <main className="min-h-[500px] flex-1 rounded-2xl border border-white/10 bg-background-alt/60 p-6 backdrop-blur-sm sm:p-8">
+          <main className="min-h-[500px] flex-1 rounded-2xl border border-crust-soft bg-masa p-6 backdrop-blur-sm sm:p-8">
             {children}
           </main>
         </div>

@@ -27,7 +27,7 @@ export default async function CuentaHomePage() {
       <p className="mt-1 text-sm text-foreground-muted">Acá tenés un resumen de tu cuenta en Pan de Rey.</p>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
+        <div className="rounded-2xl border border-crust-soft bg-masa p-5 shadow-card">
           <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Puntos disponibles</p>
           <p className="mt-1 font-display text-3xl font-medium text-gold">{profile.points_balance}</p>
           <Link href="/cuenta/puntos" className="mt-2 inline-block text-xs text-gold-hover hover:underline">
@@ -35,7 +35,7 @@ export default async function CuentaHomePage() {
           </Link>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
+        <div className="rounded-2xl border border-crust-soft bg-masa p-5 shadow-card">
           <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Último pedido</p>
           {lastOrder ? (
             <>
@@ -71,7 +71,7 @@ export default async function CuentaHomePage() {
             <Link
               key={item.href}
               href={item.href}
-              className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-foreground transition hover:-translate-y-0.5 hover:border-gold/40 hover:bg-white/[0.06]"
+              className="rounded-xl border border-crust-soft bg-masa px-4 py-3 text-sm text-foreground transition hover:-translate-y-0.5 hover:border-gold/40"
             >
               {item.label}
             </Link>
