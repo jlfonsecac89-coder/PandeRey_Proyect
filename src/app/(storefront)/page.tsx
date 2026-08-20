@@ -16,6 +16,9 @@ import { NumberTicker } from "@/components/ui/number-ticker";
 import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
 import { DotPattern } from "@/components/ui/dot-pattern";
 import { BorderBeam } from "@/components/ui/border-beam";
+import { Seal } from "@/components/storefront/Seal";
+import { FlourDust } from "@/components/storefront/FlourDust";
+import { Reveal } from "@/components/storefront/Reveal";
 
 type ProductImage = { storage_path: string; sort_order: number };
 type ProductCard = {
@@ -144,10 +147,13 @@ export default async function Home() {
           className="pointer-events-none absolute inset-0 opacity-30"
           style={{
             background:
-              "radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, var(--color-gold) 12%, transparent), transparent 70%)",
+              "radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, var(--color-ember) 14%, var(--color-gold) 12%), transparent 70%)",
           }}
         />
+        <FlourDust />
         <div className="relative flex flex-col items-center justify-center gap-5 px-6 pb-6 pt-20 text-center">
+          <Seal dropOnVisible className="mb-1" />
+
           <div className="inline-flex items-center gap-2 rounded-full border border-charcoal-border bg-background-alt px-4 py-1.5 text-xs">
             <Sparkles className="h-3.5 w-3.5 text-gold" />
             <AnimatedGradientText colorFrom="#D4AF37" colorTo="#F5F1E6" className="font-medium">
@@ -233,7 +239,7 @@ export default async function Home() {
       )}
 
       {/* Historia */}
-      <section className="mx-auto max-w-5xl px-6">
+      <Reveal><section className="mx-auto max-w-5xl px-6">
         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Nuestra historia</p>
@@ -344,10 +350,10 @@ export default async function Home() {
             }
           />
         </BentoGrid>
-      </section>
+      </section></Reveal>
 
       {/* Especialidades — la fusión venezolano-chilena que define la marca */}
-      <section className="mx-auto max-w-5xl px-6">
+      <Reveal><section className="mx-auto max-w-5xl px-6">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Especialidades</p>
           <h2 className="mt-2 font-display text-3xl font-medium text-foreground">Dos hornos, una misma casa</h2>
@@ -402,11 +408,11 @@ export default async function Home() {
             </div>
           ))}
         </div>
-      </section>
+      </section></Reveal>
 
       {/* Categorías por departamento */}
       {departments && departments.length > 0 && (
-        <section className="mx-auto max-w-5xl px-6">
+        <Reveal><section className="mx-auto max-w-5xl px-6">
           <div className="text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Catálogo</p>
             <h2 className="mt-2 font-display text-3xl font-medium text-foreground">Explorá por categoría</h2>
@@ -431,11 +437,11 @@ export default async function Home() {
               </Link>
             ))}
           </div>
-        </section>
+        </section></Reveal>
       )}
 
       {bestSellers.length > 0 && (
-        <section className="mx-auto max-w-5xl px-6">
+        <Reveal><section className="mx-auto max-w-5xl px-6">
           <div className="flex items-baseline justify-between">
             <h2 className="font-display text-2xl font-medium text-foreground">Más vendidos</h2>
             <Link href="/tienda?filtro=ofertas" className="text-xs text-gold-hover hover:underline">
@@ -484,12 +490,12 @@ export default async function Home() {
               );
             })}
           </div>
-        </section>
+        </section></Reveal>
       )}
 
       {/* Mejores valorados */}
       {topRated.length > 0 && (
-        <section className="mx-auto max-w-5xl px-6">
+        <Reveal><section className="mx-auto max-w-5xl px-6">
           <div className="text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">
               Lo que dicen nuestros clientes
@@ -542,19 +548,19 @@ export default async function Home() {
               ))}
             </div>
           )}
-        </section>
+        </section></Reveal>
       )}
 
-      <section className="mx-auto max-w-5xl px-6">
+      <Reveal><section className="mx-auto max-w-5xl px-6">
         <div className="relative mx-auto max-w-sm overflow-hidden rounded-2xl border border-charcoal-border bg-background-elevated p-8 shadow-card">
           <BorderBeam size={80} duration={8} colorFrom="var(--color-gold)" colorTo="var(--color-gold-hover)" />
           <NewsletterForm />
         </div>
-      </section>
+      </section></Reveal>
 
       {/* Visítanos o Escríbenos */}
       {store && (
-        <section id="visitanos" className="mx-auto max-w-3xl px-6">
+        <Reveal><section id="visitanos" className="mx-auto max-w-3xl px-6">
           <div className="relative overflow-hidden rounded-2xl border border-gold-dark/30 bg-background-elevated p-10 text-center shadow-card">
             <div
               className="pointer-events-none absolute inset-0 opacity-40"
@@ -589,7 +595,7 @@ export default async function Home() {
               <SocialIcons links={store.social_links} className="mt-6 justify-center" />
             </div>
           </div>
-        </section>
+        </section></Reveal>
       )}
     </div>
   );
