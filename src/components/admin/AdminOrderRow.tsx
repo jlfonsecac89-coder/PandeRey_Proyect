@@ -4,7 +4,6 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatCLP } from "@/lib/format";
 import { STATUS_LABELS, type OrderStatus } from "@/lib/orders/status";
-import { PIPELINE_GROUPS, statusToGroup, type PipelineGroup } from "@/lib/orders/pipeline";
 import {
   markOrderReady,
   confirmPickup,
@@ -13,63 +12,9 @@ import {
   confirmBankTransferPayment,
   type OrderActionState,
 } from "@/lib/orders/actions";
-
-// Pasos "normales" del pipeline (excluye problemas/cancelados, que son
-// desvíos del camino feliz y se muestran aparte) — el paso "en_camino" solo
-// aplica a pedidos con envío, así que se salta para retiro en tienda, igual
-// que hacía el modelo de referencia (4 pasos para retiro, 5 para envío).
-const PICKUP_STEPS: { key: PipelineGroup; label: string }[] = [
-  { key: "pago_pendiente", label: "Recibido" },
-  { key: "por_preparar", label: "Preparando" },
-  { key: "listos", label: "Listo" },
-  { key: "entregados", label: "Entregado" },
-];
-const SHIPPING_STEPS: { key: PipelineGroup; label: string }[] = [
-  { key: "pago_pendiente", label: "Recibido" },
-  { key: "por_preparar", label: "Preparando" },
-  { key: "listos", label: "Listo" },
-  { key: "en_camino", label: "En camino" },
-  { key: "entregados", label: "Entregado" },
-];
-
-function PipelineStepper({ order }: { order: AdminOrder }) {
-  const group = statusToGroup(order.status);
-  const steps = order.delivery_method === "pickup" ? PICKUP_STEPS : SHIPPING_STEPS;
-  const currentIndex = steps.findIndex((s) => s.key === group);
-
-  if (group === "problemas" || group === "cancelados") {
-    return (
-      <span
-        className={`inline-block rounded-full border px-2 py-0.5 text-[10px] ${
-          group === "cancelados"
-            ? "border-red-500/40 text-red-400"
-            : "border-orange-500/40 text-orange-400"
-        }`}
-      >
-        {PIPELINE_GROUPS[group].label}
-      </span>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-1">
-      {steps.map((step, i) => {
-        const done = currentIndex >= 0 && i <= currentIndex;
-        return (
-          <span
-            key={step.key}
-            title={step.label}
-            className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-semibold ${
-              done ? "bg-gold text-ink" : "bg-white/10 text-foreground/40"
-            }`}
-          >
-            {done ? "✓" : i + 1}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
+import { OrderStepper } from "./OrderStepper";
+import { OrderRowDetail, type OrderItemSummary } from "./OrderRowDetail";
+import { OrderDetailModal } from "./OrderDetailModal";
 
 function slaCountdown(order: AdminOrder): { label: string; className: string } | null {
   if (!order.sla_deadline || order.status === "delivered" || order.status === "cancelled") return null;
@@ -96,7 +41,6 @@ export type AdminOrder = {
 };
 
 type Person = { id: string; full_name: string; phone: string | null };
-type OrderItemSummary = { product_name_snapshot: string; quantity: number };
 
 export function AdminOrderRow({
   order,
@@ -136,6 +80,7 @@ export function AdminOrderRow({
     null,
   );
   const [showItems, setShowItems] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   const router = useRouter();
   // `order` llega como prop del Server Component padre — sin este refresh,
@@ -170,14 +115,13 @@ export function AdminOrderRow({
           </td>
         )}
         <td className="py-2 pr-3 font-mono text-xs">
-          <a
-            href={`/admin/pedidos/${order.id}/ticket`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => setShowDetailModal(true)}
             className="text-gold-dark hover:text-gold hover:underline"
           >
             {order.id.slice(0, 8)}
-          </a>
+          </button>
           <button
             type="button"
             onClick={() => setShowItems((v) => !v)}
@@ -215,7 +159,7 @@ export function AdminOrderRow({
               Pidió para: {new Date(order.scheduled_at).toLocaleString("es-CL")}
             </p>
           )}
-          <PipelineStepper order={order} />
+          <OrderStepper status={order.status} deliveryMethod={order.delivery_method} />
           {sla && <p className={`mt-1 text-[10px] ${sla.className}`}>{sla.label}</p>}
           {order.ticket_printed_at && (
             <p className="mt-0.5 text-[10px] text-foreground/40">
@@ -308,18 +252,14 @@ export function AdminOrderRow({
           )}
         </td>
       </tr>
-      {showItems && (
-        <tr className="border-b border-white/10 bg-white/[0.03]">
-          <td colSpan={onToggleSelect ? 9 : 8} className="py-2 pl-3 text-xs text-foreground/60">
-            {items.map((item, i) => (
-              <span key={i}>
-                {item.quantity}× {item.product_name_snapshot}
-                {i < items.length - 1 ? " · " : ""}
-              </span>
-            ))}
-            {items.length === 0 && "Sin ítems."}
-          </td>
-        </tr>
+      {showItems && <OrderRowDetail items={items} colSpan={onToggleSelect ? 9 : 8} />}
+      {showDetailModal && (
+        <OrderDetailModal
+          order={order}
+          customer={customer}
+          items={items}
+          onClose={() => setShowDetailModal(false)}
+        />
       )}
     </>
   );

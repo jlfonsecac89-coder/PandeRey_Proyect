@@ -74,8 +74,19 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
       ? supabase.from("profiles").select("id, full_name, phone").in("id", customerIds)
       : Promise.resolve({ data: [] as { id: string; full_name: string; phone: string | null }[] }),
     orderIds.length
-      ? supabase.from("order_items").select("order_id, product_name_snapshot, quantity").in("order_id", orderIds)
-      : Promise.resolve({ data: [] as { order_id: string; product_name_snapshot: string; quantity: number }[] }),
+      ? supabase
+          .from("order_items")
+          .select("order_id, product_name_snapshot, quantity, unit_price, subtotal")
+          .in("order_id", orderIds)
+      : Promise.resolve({
+          data: [] as {
+            order_id: string;
+            product_name_snapshot: string;
+            quantity: number;
+            unit_price: number;
+            subtotal: number;
+          }[],
+        }),
   ]);
 
   function buildHref(overrides: Partial<SearchParams>) {

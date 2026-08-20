@@ -12,7 +12,13 @@ import {
 } from "@/lib/orders/actions";
 
 type Person = { id: string; full_name: string; phone: string | null; store_id?: string | null };
-type OrderItemRow = { order_id: string; product_name_snapshot: string; quantity: number };
+type OrderItemRow = {
+  order_id: string;
+  product_name_snapshot: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+};
 
 // Acciones masivas disponibles por estado — solo se ofrecen cuando TODOS los
 // pedidos seleccionados comparten el mismo estado, porque cada transición
