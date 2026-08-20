@@ -1,6 +1,9 @@
 import crypto from "node:crypto";
-import { getSystemSettings } from "@/lib/settings/system-settings";
 
+// Este archivo se importa desde componentes cliente (AdminOrderRow.tsx, para
+// OrderStatus/STATUS_LABELS) — por eso NO puede traer nada que dependa de
+// "server-only" (getSystemSettings), ni transitivamente. Las funciones que sí
+// lo necesitan viven en status-server.ts, separado a propósito.
 export type OrderStatus =
   | "pending_payment"
   | "paid"
@@ -37,15 +40,4 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
 // secreto que valida la entrega física.
 export function generateDeliveryCode(): string {
   return String(crypto.randomInt(100000, 1000000));
-}
-
-// Ahora editable desde /admin/configuracion/sistema sin redeploy — la
-// variable de entorno queda solo como default si nadie configuró nada
-// todavía (ver src/lib/settings/system-settings.ts).
-export async function orderPrepSlaMinutes(): Promise<number> {
-  return (await getSystemSettings()).orderPrepSlaMinutes;
-}
-
-export async function maxDeliveryIssueWaitMinutes(): Promise<number> {
-  return (await getSystemSettings()).maxDeliveryIssueWaitMinutes;
 }

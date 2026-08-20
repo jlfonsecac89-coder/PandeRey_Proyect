@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentProfile } from "@/lib/auth/session";
-import { generateDeliveryCode, orderPrepSlaMinutes } from "@/lib/orders/status";
+import { generateDeliveryCode } from "@/lib/orders/status";
+import { orderPrepSlaMinutes } from "@/lib/orders/status-server";
 
 export type RedeemProductState = { error?: string } | null;
 

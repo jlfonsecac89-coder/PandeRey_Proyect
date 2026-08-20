@@ -4,7 +4,7 @@ import { getMercadoPagoClient } from "./client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNotification, getUserEmail } from "@/lib/notifications/send";
 import { purchaseConfirmedTemplate } from "@/lib/notifications/templates";
-import { orderPrepSlaMinutes } from "@/lib/orders/status";
+import { orderPrepSlaMinutes } from "@/lib/orders/status-server";
 import { computeEarnedPoints } from "@/lib/loyalty/points";
 
 export type ConfirmPaymentResult =

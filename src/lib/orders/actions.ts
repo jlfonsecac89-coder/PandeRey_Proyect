@@ -14,7 +14,7 @@ import {
   returnedToStoreTemplate,
   purchaseConfirmedTemplate,
 } from "@/lib/notifications/templates";
-import { maxDeliveryIssueWaitMinutes, orderPrepSlaMinutes } from "./status";
+import { maxDeliveryIssueWaitMinutes, orderPrepSlaMinutes } from "./status-server";
 import { computeEarnedPoints } from "@/lib/loyalty/points";
 
 export type OrderActionState = { error?: string; success?: string } | null;
