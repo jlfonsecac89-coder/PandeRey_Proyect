@@ -1,0 +1,269 @@
+{
+  "changeSlug": "admin-redesign",
+  "epics": [
+    { "id": "01-ui-compartida", "file": "epics/01-ui-compartida.md" },
+    { "id": "02-pedidos", "file": "epics/02-pedidos.md" },
+    { "id": "03-catalogo", "file": "epics/03-catalogo.md" },
+    { "id": "04-crm-unificado", "file": "epics/04-crm-unificado.md" },
+    { "id": "05-promociones-unificadas", "file": "epics/05-promociones-unificadas.md" },
+    { "id": "06-repartidor", "file": "epics/06-repartidor.md" },
+    { "id": "07-decommission", "file": "epics/07-decommission.md" }
+  ],
+  "tasks": [
+    {
+      "id": "E01-T1",
+      "title": "Sidebar en acordeón (AdminNavGroup)",
+      "epic": "01-ui-compartida",
+      "dependencies": [],
+      "priority": "p0",
+      "acceptance": [
+        "WHEN el admin carga con un usuario admin THE SYSTEM SHALL mostrar los grupos \"Resumen\" y \"Operación diaria\" expandidos y el resto colapsados.",
+        "WHEN el usuario hace click en el header de un grupo colapsado THE SYSTEM SHALL expandirlo sin recargar la página.",
+        "WHEN el usuario navega a una ruta cuyo item vive en un grupo colapsado THE SYSTEM SHALL expandir ese grupo automáticamente.",
+        "WHEN se ejecuta `npx tsc --noEmit` THE SYSTEM SHALL salir con código 0."
+      ],
+      "verify": [
+        "npm run lint",
+        "npx tsc --noEmit",
+        "npm run build"
+      ],
+      "checkpoint": "step-01-sidebar-acordeon",
+      "files": ["src/components/admin/AdminNav.tsx", "src/components/admin/AdminNavGroup.tsx"],
+      "status": "pending"
+    },
+    {
+      "id": "E02-T1",
+      "title": "Stepper y detalle expandible en Pedidos",
+      "epic": "02-pedidos",
+      "dependencies": ["E01-T1"],
+      "priority": "p0",
+      "acceptance": [
+        "WHEN un pedido tiene status='driver_assigned' y delivery_method='shipping' THE SYSTEM SHALL mostrar el stepper con el paso 4 de 5 (\"En camino\") marcado como actual y los pasos 1-3 como completados (driver_assigned/in_route/at_address están agrupados bajo \"en_camino\" en pipeline.ts — corregido tras verificar contra el código real, el criterio original tenía un mapeo erróneo).",
+        "WHEN un pedido tiene status en ('delivery_issue','cancelled','returned_to_store') THE SYSTEM SHALL ocultar el stepper y mostrar el badge de estado simple, igual que hoy.",
+        "WHEN el usuario hace click en \"Ver detalle\" de una fila THE SYSTEM SHALL expandir una fila con las líneas de `order_items` de ese pedido sin request adicional (datos ya cargados por la query existente)."
+      ],
+      "verify": [
+        "npm run lint",
+        "npx tsc --noEmit",
+        "npm run build"
+      ],
+      "checkpoint": "step-02-pedidos-stepper",
+      "files": ["src/components/admin/PedidosTable.tsx", "src/components/admin/AdminOrderRow.tsx", "src/components/admin/OrderStepper.tsx", "src/components/admin/OrderRowDetail.tsx"],
+      "status": "pending"
+    },
+    {
+      "id": "E02-T2",
+      "title": "Selección múltiple y acciones masivas en Pedidos",
+      "epic": "02-pedidos",
+      "dependencies": ["E02-T1"],
+      "priority": "p0",
+      "acceptance": [
+        "WHEN el usuario selecciona N pedidos que comparten el mismo status THE SYSTEM SHALL habilitar exactamente un botón de acción masiva correspondiente a ese status.",
+        "WHEN la selección mezcla pedidos de distinto status THE SYSTEM SHALL deshabilitar toda acción masiva.",
+        "WHEN todos los seleccionados están en status='pending_payment' y payment_method='mercadopago' THE SYSTEM SHALL no ofrecer ninguna acción masiva (Mercado Pago no tiene confirmación manual).",
+        "WHEN se ejecuta la acción masiva THE SYSTEM SHALL invocar la Server Action unitaria existente una vez por pedido seleccionado, sin crear una Server Action nueva de tipo bulk."
+      ],
+      "verify": [
+        "npm run lint",
+        "npx tsc --noEmit",
+        "npm run build"
+      ],
+      "checkpoint": "step-03-pedidos-seleccion-multiple",
+      "files": ["src/components/admin/PedidosTable.tsx"],
+      "status": "pending"
+    },
+    {
+      "id": "E02-T3",
+      "title": "Kanban real conectado al toggle Tabla/Tablero",
+      "epic": "02-pedidos",
+      "dependencies": ["E02-T2"],
+      "priority": "p1",
+      "acceptance": [
+        "WHEN el usuario alterna a \"Tablero\" THE SYSTEM SHALL renderizar `KanbanBoard.tsx` sin modificar ese componente.",
+        "WHEN el usuario escribe en el buscador de la vista Tabla y alterna a Tablero y vuelve THE SYSTEM SHALL preservar el texto de búsqueda de la vista Tabla sin mezclarlo con el buscador propio del Tablero (búsquedas independientes, igual que hoy)."
+      ],
+      "verify": [
+        "npm run build"
+      ],
+      "checkpoint": "step-04-pedidos-kanban",
+      "files": ["src/app/admin/pedidos/page.tsx"],
+      "status": "pending"
+    },
+    {
+      "id": "E03-T1",
+      "title": "KPIs, filtro sin fotos, copiar SKU y toggle inline en Productos",
+      "epic": "03-catalogo",
+      "dependencies": [],
+      "priority": "p1",
+      "acceptance": [
+        "WHEN la página de Productos carga THE SYSTEM SHALL mostrar 4 KPIs (Total, Activos, Inactivos, Edición limitada) cuyo valor coincide con un `select count(*)` filtrado equivalente ejecutado contra la misma base.",
+        "WHEN el usuario activa el filtro \"Sin fotos\" THE SYSTEM SHALL mostrar solo productos con 0 filas en `product_images`.",
+        "WHEN el usuario hace click en el toggle activo/inactivo de una tarjeta THE SYSTEM SHALL invocar la misma Server Action que usa `ProductDrawer.tsx` para ese campo, no una nueva.",
+        "WHEN el usuario abre \"Editar\" desde una tarjeta THE SYSTEM SHALL abrir `ProductDrawer.tsx` sin cambios de comportamiento respecto a hoy."
+      ],
+      "verify": [
+        "npm run lint",
+        "npx tsc --noEmit",
+        "npm run build"
+      ],
+      "checkpoint": "step-05-productos-kpis",
+      "files": ["src/components/admin/ProductosTable.tsx", "src/components/admin/ProductKpiRow.tsx"],
+      "status": "pending"
+    },
+    {
+      "id": "E04-T1",
+      "title": "Unificar Clientes en pestañas (Lista/Segmentos/Ranking)",
+      "epic": "04-crm-unificado",
+      "dependencies": [],
+      "priority": "p1",
+      "acceptance": [
+        "WHEN el usuario visita /admin/clientes?tab=lista THE SYSTEM SHALL mostrar los mismos filtros de segmento y las mismas opciones de orden (LTV histórico / Gasto reciente) que la página actual.",
+        "WHEN el usuario visita /admin/clientes?tab=segmentos THE SYSTEM SHALL mostrar 5 columnas con conteo y valor total por segmento, calculados desde `customer_rfm_snapshot` con el mismo dedup manual que usa la página actual.",
+        "WHEN el usuario visita /admin/clientes?tab=ranking THE SYSTEM SHALL mostrar el mismo top N por LTV que la vista actual.",
+        "WHEN no se pasa `?tab=` THE SYSTEM SHALL asumir `lista` por defecto."
+      ],
+      "verify": [
+        "npm run lint",
+        "npx tsc --noEmit",
+        "npm run build"
+      ],
+      "checkpoint": "step-06-clientes-tabs",
+      "files": ["src/app/admin/clientes/page.tsx", "src/app/admin/clientes/SegmentosPanel.tsx", "src/app/admin/clientes/RankingPanel.tsx"],
+      "status": "pending"
+    },
+    {
+      "id": "E05-T1",
+      "title": "Unificar Promociones (Cupones + Análisis) en pestañas",
+      "epic": "05-promociones-unificadas",
+      "dependencies": [],
+      "priority": "p1",
+      "acceptance": [
+        "WHEN el usuario visita /admin/promociones?tab=activos THE SYSTEM SHALL mostrar el mismo formulario \"Nueva promoción\" (con todos sus campos condicionales) que la página actual.",
+        "WHEN el usuario visita /admin/promociones?tab=rendimiento THE SYSTEM SHALL mostrar los mismos 4 KPIs y la misma tabla \"Productos más vendidos con descuento\" que hoy muestra /admin/analisis-ofertas.",
+        "WHEN el usuario visita /admin/analisis-ofertas THE SYSTEM SHALL redirigir (HTTP 307/308 o `redirect()` de Next) a /admin/promociones?tab=rendimiento sin devolver 404."
+      ],
+      "verify": [
+        "npm run lint",
+        "npx tsc --noEmit",
+        "npm run build"
+      ],
+      "checkpoint": "step-07-promociones-tabs",
+      "files": ["src/app/admin/promociones/page.tsx", "src/app/admin/promociones/RendimientoPanel.tsx", "src/app/admin/analisis-ofertas/page.tsx"],
+      "status": "pending"
+    },
+    {
+      "id": "E06-T1",
+      "title": "Migración order_delivery_messages con RLS",
+      "epic": "06-repartidor",
+      "dependencies": [],
+      "priority": "p0",
+      "acceptance": [
+        "WHEN se aplica la migración en una rama/branch de desarrollo de Supabase THE SYSTEM SHALL crear la tabla `order_delivery_messages` con RLS habilitado.",
+        "WHEN un usuario con rol repartidor autenticado consulta `order_delivery_messages` para un pedido no asignado a él THE SYSTEM SHALL devolver 0 filas.",
+        "WHEN un usuario con rol repartidor autenticado consulta `order_delivery_messages` para un pedido sí asignado a él THE SYSTEM SHALL devolver las filas de ese pedido."
+      ],
+      "verify": [
+        "# manual: aplicar contra rama/branch de desarrollo de Supabase, nunca directo a producción",
+        "# manual: probar con 2 cuentas repartidor distintas, cada una viendo solo sus propios pedidos"
+      ],
+      "checkpoint": "step-08-migracion-chat",
+      "files": ["supabase/migrations/*_order_delivery_messages.sql"],
+      "status": "pending"
+    },
+    {
+      "id": "E06-T2",
+      "title": "Server Actions sendDeliveryMessage / listDeliveryMessages",
+      "epic": "06-repartidor",
+      "dependencies": ["E06-T1"],
+      "priority": "p0",
+      "acceptance": [
+        "WHEN un repartidor autenticado llama sendDeliveryMessage sobre un pedido asignado a él THE SYSTEM SHALL insertar la fila y devolverla.",
+        "WHEN un repartidor autenticado llama sendDeliveryMessage sobre un pedido NO asignado a él THE SYSTEM SHALL devolver un error sin insertar fila.",
+        "WHEN un mensaje consiste únicamente en 6 dígitos THE SYSTEM SHALL rechazarlo (medida defensiva contra fuga del código de entrega)."
+      ],
+      "verify": [
+        "npm run lint",
+        "npx tsc --noEmit",
+        "# manual: prueba con 2 cuentas repartidor"
+      ],
+      "checkpoint": "step-09-chat-actions",
+      "files": ["src/lib/delivery-chat/actions.ts", "src/lib/delivery-chat/types.ts"],
+      "status": "pending"
+    },
+    {
+      "id": "E06-T3",
+      "title": "Countdown de incidencia (delivery_issue_at + max_delivery_issue_wait_minutes)",
+      "epic": "06-repartidor",
+      "dependencies": [],
+      "priority": "p1",
+      "acceptance": [
+        "WHEN un pedido tiene delivery_issue_at hace menos de max_delivery_issue_wait_minutes THE SYSTEM SHALL mostrar el botón \"Volver a la tienda\" deshabilitado con el tiempo restante.",
+        "WHEN transcurre max_delivery_issue_wait_minutes desde delivery_issue_at THE SYSTEM SHALL habilitar el botón \"Volver a la tienda\" sin recargar la página."
+      ],
+      "verify": [
+        "npm run lint",
+        "npx tsc --noEmit",
+        "# manual: bajar max_delivery_issue_wait_minutes a 1 minuto en Ajustes del sistema y cronometrar"
+      ],
+      "checkpoint": "step-10-countdown-incidencia",
+      "files": ["src/components/repartidor/OrderCard.tsx"],
+      "status": "pending"
+    },
+    {
+      "id": "E06-T4",
+      "title": "Panel de chat (IssueChatPanel) integrado al portal repartidor",
+      "epic": "06-repartidor",
+      "dependencies": ["E06-T2", "E06-T3"],
+      "priority": "p1",
+      "acceptance": [
+        "WHEN el staff envía un mensaje desde el admin THE SYSTEM SHALL mostrarlo en el portal del repartidor dentro de una ventana de polling de 15 a 20 segundos.",
+        "WHEN el repartidor envía un mensaje THE SYSTEM SHALL mostrarlo del lado del staff dentro de la misma ventana de polling."
+      ],
+      "verify": [
+        "npm run lint",
+        "npx tsc --noEmit",
+        "# manual: 2 sesiones simultáneas (staff + repartidor)"
+      ],
+      "checkpoint": "step-11-chat-panel",
+      "files": ["src/app/repartidor/IssueChatPanel.tsx", "src/app/repartidor/page.tsx"],
+      "status": "pending"
+    },
+    {
+      "id": "E06-T5",
+      "title": "Alta de Repartidores separada de Usuarios",
+      "epic": "06-repartidor",
+      "dependencies": [],
+      "priority": "p1",
+      "acceptance": [
+        "WHEN un admin crea un repartidor desde /admin/configuracion/repartidores THE SYSTEM SHALL producir en `profiles` la misma fila (role='repartidor', misma sucursal, misma contraseña temporal mostrada una sola vez) que crearlo hoy desde Configuración → Usuarios con rol Repartidor.",
+        "WHEN la pantalla de Repartidores carga THE SYSTEM SHALL no mostrar un selector de rol (queda fijo)."
+      ],
+      "verify": [
+        "npm run lint",
+        "npx tsc --noEmit",
+        "# manual: comparar fila resultante en profiles contra alta desde Usuarios"
+      ],
+      "checkpoint": "step-12-alta-repartidores",
+      "files": ["src/app/admin/configuracion/repartidores/page.tsx", "src/app/admin/configuracion/repartidores/RepartidorForm.tsx"],
+      "status": "pending"
+    },
+    {
+      "id": "E07-T1",
+      "title": "Decommission de rutas viejas (analisis-ofertas y vistas de Clientes)",
+      "epic": "07-decommission",
+      "dependencies": ["E01-T1", "E02-T3", "E03-T1", "E04-T1", "E05-T1", "E06-T4", "E06-T5"],
+      "priority": "p2",
+      "acceptance": [
+        "WHEN se borran los archivos de las rutas reemplazadas THE SYSTEM SHALL seguir compilando (`npm run build` exit 0).",
+        "WHEN se busca `analisis-ofertas` en `src/` THE SYSTEM SHALL no encontrar referencias residuales fuera de la propia redirección ya removida."
+      ],
+      "verify": [
+        "npm run build",
+        "! grep -r \"analisis-ofertas\" src/"
+      ],
+      "checkpoint": "step-13-decommission",
+      "files": ["src/app/admin/analisis-ofertas/page.tsx"],
+      "status": "pending"
+    }
+  ]
+}
