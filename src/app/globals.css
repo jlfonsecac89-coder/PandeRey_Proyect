@@ -39,6 +39,16 @@
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 36px -16px rgba(0, 0, 0, 0.55);
 
+  /* Paleta "Sello del Obrador" — aditiva, solo para el storefront de cara
+     al cliente (Landing/Tienda/Checkout/Cuenta). Nunca se pisa una variable
+     existente: el admin sigue leyendo --background/--color-gold/etc. igual
+     que antes. Ver blueprints/... plan de rediseño para el detalle. */
+  --color-masa: #1C1610;
+  --color-crust: #3A2C1E;
+  --color-crust-soft: #2A2118;
+  --color-ember: #C1502E;
+  --color-ember-hover: #E0724C;
+
   /* Tokens semánticos de shadcn/Magic UI remapeados a la paleta de marca
      (negro/dorado/blanco) — así cualquier componente instalado desde el
      registry (Button, Card, Badge, BorderBeam, etc.) hereda la identidad
@@ -78,6 +88,11 @@
   --color-glass-fill: var(--color-glass-fill);
   --color-burgundy: var(--color-burgundy);
   --color-burgundy-hover: var(--color-burgundy-hover);
+  --color-masa: var(--color-masa);
+  --color-crust: var(--color-crust);
+  --color-crust-soft: var(--color-crust-soft);
+  --color-ember: var(--color-ember);
+  --color-ember-hover: var(--color-ember-hover);
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
   --font-mono: var(--font-geist-mono);
