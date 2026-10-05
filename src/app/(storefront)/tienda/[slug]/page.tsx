@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { formatCLP } from "@/lib/format";
 import { getClearanceDiscounts, applyClearanceDiscount } from "@/lib/catalog/clearance";
+import { getProductCampaigns } from "@/lib/campaigns/campaigns";
 import { AddToCartForm } from "@/components/storefront/AddToCartForm";
 import { RedeemPointsButton } from "@/components/storefront/RedeemPointsButton";
 import { ProductReviews } from "@/components/storefront/ProductReviews";
@@ -37,6 +38,9 @@ export default async function ProductoDetallePage({
     ...g,
     values: (g.values ?? []).filter((v) => v.is_active),
   }));
+
+  const campaign = (await getProductCampaigns([product.id])).get(product.id);
+  const ordersClosed = campaign?.phase === "closed";
 
   const publicBaseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images`;
   const images = [...product.images].sort((a, b) => a.sort_order - b.sort_order);
@@ -130,7 +134,13 @@ export default async function ProductoDetallePage({
               price: discountedPrice,
               imagePath: images[0]?.storage_path ?? null,
             }}
-            available={product.is_available}
+            available={product.is_available && !ordersClosed}
+            unavailableLabel={ordersClosed ? "Pedidos cerrados" : undefined}
+            byOrderNote={
+              campaign?.phase === "open"
+                ? "Producto por encargo: pagas ahora y eliges en qué días retiras al finalizar la compra."
+                : undefined
+            }
             optionGroups={optionGroups}
           />
         </div>

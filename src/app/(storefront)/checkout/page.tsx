@@ -3,6 +3,7 @@ import { getCurrentProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { CheckoutForm } from "@/components/storefront/CheckoutForm";
 import { getModuleFlags } from "@/lib/settings/modules";
+import { getOpenCampaigns } from "@/lib/campaigns/campaigns";
 
 export default async function CheckoutPage() {
   const profile = await getCurrentProfile();
@@ -10,6 +11,7 @@ export default async function CheckoutPage() {
 
   const supabase = await createClient();
   const modules = await getModuleFlags();
+  const campaigns = await getOpenCampaigns();
   const [{ data: addresses }, { data: stores }] = await Promise.all([
     supabase
       .from("addresses")
@@ -33,6 +35,7 @@ export default async function CheckoutPage() {
           stores={stores ?? []}
           deliveryEnabled={modules.delivery}
           bankTransferEnabled={modules.bank_transfer}
+          campaigns={campaigns}
         />
       </div>
     </div>

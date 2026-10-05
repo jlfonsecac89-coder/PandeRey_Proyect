@@ -18,6 +18,10 @@ export type ProductGridCardData = {
   isGlutenFree: boolean;
   isSpecialEvent: boolean;
   isAvailable: boolean;
+  // Pedidos de campaña cerrados: no se puede comprar, pero no es "no disponible".
+  ordersClosed?: boolean;
+  // Producto en campaña con pedidos abiertos (se compra por encargo).
+  byOrder?: boolean;
   imagePath: string | null;
   // Un producto con grupos de opciones obligatorios (ej. relleno de una
   // torta) no se puede agregar "a ciegas" desde la grilla — necesita que el
@@ -96,9 +100,19 @@ export function ProductGridCard({ product, publicBaseUrl }: { product: ProductGr
               -{product.clearancePct}%
             </span>
           )}
-          {!product.isAvailable && (
+          {!product.isAvailable && !product.ordersClosed && (
             <span className="rounded-full bg-background px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-400 shadow-card">
               No disponible
+            </span>
+          )}
+          {product.ordersClosed && (
+            <span className="rounded-full bg-background px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-400 shadow-card">
+              Pedidos cerrados
+            </span>
+          )}
+          {product.byOrder && (
+            <span className="rounded-full bg-gold px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink shadow-card">
+              Por encargo
             </span>
           )}
           {product.isSpecialEvent && (

@@ -18,6 +18,8 @@ import { useCart } from "@/lib/cart/CartContext";
 import { cartItemUnitPrice } from "@/lib/cart/types";
 import { formatCLP, splitIva } from "@/lib/format";
 import { RegionComunaFields } from "./RegionComunaFields";
+import { CampaignPickupPicker } from "./CampaignPickupPicker";
+import type { CheckoutCampaign } from "@/lib/campaigns/types";
 import { type BusinessHours } from "@/lib/stores/schedule";
 import {
   createCheckoutPreference,
@@ -93,11 +95,13 @@ export function CheckoutForm({
   stores,
   deliveryEnabled,
   bankTransferEnabled,
+  campaigns,
 }: {
   addresses: Address[];
   stores: StoreOption[];
   deliveryEnabled: boolean;
   bankTransferEnabled: boolean;
+  campaigns: CheckoutCampaign[];
 }) {
   const router = useRouter();
   const { items, hydrated, subtotal } = useCart();
@@ -127,6 +131,15 @@ export function CheckoutForm({
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [selectedDayIso, setSelectedDayIso] = useState("");
   const [selectedSlotIso, setSelectedSlotIso] = useState("");
+
+  // Pedido de campaña (ej. Pan de Jamón): en vez de un horario, el cliente
+  // reparte las unidades entre los días de retiro. Se compra en un pedido
+  // aparte, así que mezclarlo con otros productos bloquea el avance.
+  const campaign = campaigns.find((c) => items.some((i) => i.productId === c.productId)) ?? null;
+  const campaignMixed = !!campaign && items.some((i) => i.productId !== campaign.productId);
+  const campaignUnits = items.reduce((sum, i) => sum + i.quantity, 0);
+  const [campaignQty, setCampaignQty] = useState<Record<string, number>>({});
+  const campaignAssigned = Object.values(campaignQty).reduce((sum, q) => sum + q, 0);
 
   // Retiro en tienda no necesita dirección — el paso "Dirección" solo existe
   // en el recorrido cuando el cliente elige despacho a domicilio.
@@ -256,7 +269,9 @@ export function CheckoutForm({
 
   const selectedStore = stores.find((s) => s.id === storeId) ?? null;
   const selectedDay = scheduleDays.find((d) => d.dateIso === selectedDayIso) ?? null;
-  const canLeavePrograma = !!selectedSlotIso;
+  const canLeavePrograma = campaign
+    ? !campaignMixed && campaignUnits > 0 && campaignAssigned === campaignUnits
+    : !!selectedSlotIso;
   const shippingQuote = shippingState && "ok" in shippingState ? shippingState : null;
   const shippingError = shippingState && "error" in shippingState ? shippingState.error : null;
   const shippingCost = shippingQuote?.shippingCost ?? 0;
@@ -639,8 +654,29 @@ export function CheckoutForm({
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold/10 text-xs font-bold text-gold">
                 {visibleSteps.findIndex((s) => s.key === "programar") + 1}
               </span>
-              <h2 className="font-display text-lg text-foreground">Fecha y hora</h2>
+              <h2 className="font-display text-lg text-foreground">{campaign ? "Fechas de retiro" : "Fecha y hora"}</h2>
             </div>
+            {campaign ? (
+              <section>
+                <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-foreground-muted">
+                  <CalendarClock className="h-4 w-4 text-gold-dark" />
+                  Días de retiro
+                </h2>
+                {campaignMixed ? (
+                  <p className="mt-2 text-sm text-burgundy-hover">
+                    {campaign.name} se compra en un pedido aparte. Vuelve al carrito, saca los otros productos y
+                    compra esos después.
+                  </p>
+                ) : (
+                  <CampaignPickupPicker
+                    campaign={campaign}
+                    totalUnits={campaignUnits}
+                    value={campaignQty}
+                    onChange={setCampaignQty}
+                  />
+                )}
+              </section>
+            ) : (
             <section>
               <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-foreground-muted">
                 <CalendarClock className="h-4 w-4 text-gold-dark" />
@@ -719,6 +755,8 @@ export function CheckoutForm({
                 </>
               )}
             </section>
+
+            )}
 
             <div className="flex gap-2">
               <button
@@ -803,7 +841,16 @@ export function CheckoutForm({
               <input type="hidden" name="delivery_method" value={deliveryMethod} />
               <input type="hidden" name="store_id" value={storeId} />
               <input type="hidden" name="address_id" value={deliveryMethod === "shipping" ? addressId : ""} />
-              <input type="hidden" name="scheduled_at" value={selectedSlotIso} />
+              <input type="hidden" name="scheduled_at" value={campaign ? "" : selectedSlotIso} />
+              {campaign && (
+                <input
+                  type="hidden"
+                  name="campaign_pickups"
+                  value={JSON.stringify(
+                    Object.entries(campaignQty).map(([dateId, quantity]) => ({ dateId, quantity })),
+                  )}
+                />
+              )}
               <input type="hidden" name="coupon_code" value={couponCode} />
               <input type="hidden" name="payment_method" value={paymentMethod} />
               {checkoutState?.error && <p className="mb-2 text-sm text-burgundy-hover">{checkoutState.error}</p>}

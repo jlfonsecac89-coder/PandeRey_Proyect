@@ -26,6 +26,8 @@ import { generateDeliveryCode } from "@/lib/orders/status";
 import { validateCoupon, validatePointsRedemption } from "@/lib/promotions/discount";
 import { checkRateLimit } from "@/lib/rate-limit/limiter";
 import { getModuleFlags } from "@/lib/settings/modules";
+import { getProductCampaigns } from "@/lib/campaigns/campaigns";
+import { formatPickupDate } from "@/lib/campaigns/types";
 import { getClearanceDiscounts, applyClearanceDiscount } from "@/lib/catalog/clearance";
 import type { CartItem } from "@/lib/cart/types";
 
@@ -42,6 +44,16 @@ function describeMpError(err: unknown): Record<string, unknown> {
     return { message: e.message, error: e.error, status: e.status, cause: e.cause };
   }
   return { raw: String(err) };
+}
+
+// Motivos de rechazo de reserve_campaign_pickups (función SQL) a mensajes.
+function describeCampaignRejection(code: string): string {
+  const [reason, date] = code.split(":");
+  const label = date ? formatPickupDate(date) : "ese día";
+  if (reason === "date_full") return `El ${label} ya no tiene cupo. Elige otro día o menos unidades.`;
+  if (reason === "date_closed") return `El retiro del ${label} ya no está disponible. Elige otro día.`;
+  if (reason === "campaign_closed") return "Los pedidos de esta campaña ya cerraron.";
+  return "No se pudo reservar el reparto de retiros.";
 }
 
 export type ShippingPreviewState =
@@ -389,6 +401,22 @@ export async function createCheckoutPreference(
     .in("id", productIds);
   const productMap = new Map((dbProducts ?? []).map((p) => [p.id, p]));
 
+  // Producto en campaña: con pedidos abiertos se compra en un pedido aparte y
+  // el retiro se reparte por día; con pedidos cerrados no se puede comprar.
+  const campaignByProduct = await getProductCampaigns(productIds);
+  for (const [productId, c] of campaignByProduct) {
+    if (c.phase === "closed" && productMap.has(productId)) {
+      return { error: `Los pedidos de "${productMap.get(productId)!.name}" ya cerraron.` };
+    }
+  }
+  const openCampaigns = [...campaignByProduct].filter(([, c]) => c.phase === "open");
+  const campaignOrder = openCampaigns.length > 0 ? { productId: openCampaigns[0][0], campaignId: openCampaigns[0][1].campaignId } : null;
+  if (campaignOrder && (openCampaigns.length > 1 || cartItems.some((i) => i.productId !== campaignOrder.productId))) {
+    return {
+      error: `"${productMap.get(campaignOrder.productId)?.name ?? "Este producto"}" se compra en un pedido aparte. Sácalo del carrito o compra los demás productos primero.`,
+    };
+  }
+
   // Sección 13: si hay un lote en liquidación con stock para un producto en
   // esta sucursal, su precio de venta se recalcula acá — nunca se confía en
   // lo que haya mostrado la tienda al cliente, mismo principio que el resto
@@ -474,50 +502,101 @@ export async function createCheckoutPreference(
   // ventana de agendamiento (hoy + 3 días) y sin superar el cupo de pedidos
   // de ese horario — nunca se confía en lo que eligió el cliente en la
   // grilla, se recalcula todo acá con los mismos datos que armó esa grilla.
-  const resolvedSchedule = resolveSchedule(
-    store.business_hours as BusinessHours,
-    store.delivery_schedule as BusinessHours,
-    deliveryMethod,
-  );
-  if (!scheduledAtRaw) return { error: "Elegí una fecha y hora de retiro o despacho." };
-  const scheduledAtDate = new Date(scheduledAtRaw);
-  if (Number.isNaN(scheduledAtDate.getTime())) return { error: "Fecha/hora programada inválida." };
-  if (scheduledAtDate.getTime() < Date.now()) return { error: "Elegí una fecha y hora futura." };
+  // Pedido de campaña: no hay horario, el cliente reparte las unidades entre los
+  // días de retiro de la campaña. scheduled_at queda en el comienzo del primer
+  // día elegido (la agenda y el cron de SLA lo necesitan, y así el pedido no
+  // pasa a preparación antes de su primer retiro).
+  let scheduledAtDate: Date;
+  const campaignPickups: { dateId: string; quantity: number }[] = [];
+  if (campaignOrder) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(String(formData.get("campaign_pickups") || "[]"));
+    } catch {
+      return { error: "Reparto de retiros inválido." };
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 20) {
+      return { error: "Indica cuántas unidades retiras cada día." };
+    }
+    const seen = new Set<string>();
+    for (const entry of parsed) {
+      const dateId = typeof entry?.dateId === "string" ? entry.dateId : "";
+      const quantity = entry?.quantity;
+      if (!dateId || seen.has(dateId) || !Number.isInteger(quantity) || quantity <= 0) {
+        return { error: "Reparto de retiros inválido." };
+      }
+      seen.add(dateId);
+      campaignPickups.push({ dateId, quantity });
+    }
+    const campaignUnits = cartItems.reduce((sum, i) => sum + i.quantity, 0);
+    if (campaignPickups.reduce((sum, p) => sum + p.quantity, 0) !== campaignUnits) {
+      return { error: `El reparto debe sumar exactamente las ${campaignUnits} unidades del pedido.` };
+    }
 
-  const nowYmd = chileDateYmd(new Date());
-  const maxYmd = addDaysToYmd(nowYmd.y, nowYmd.m, nowYmd.d, 3);
-  const maxScheduledAt = chileWallTimeToUtc(maxYmd.y, maxYmd.m, maxYmd.d, 23, 59);
-  if (scheduledAtDate.getTime() > maxScheduledAt.getTime()) {
-    return { error: "Solo se puede agendar hasta 3 días desde hoy." };
-  }
+    const { data: pickupDates } = await createAdminClient()
+      .from("campaign_pickup_dates")
+      .select("id, pickup_date, is_open")
+      .eq("campaign_id", campaignOrder.campaignId)
+      .in("id", campaignPickups.map((p) => p.dateId));
+    const todayYmd = chileDateYmd(new Date());
+    const todayKey = `${todayYmd.y}-${String(todayYmd.m).padStart(2, "0")}-${String(todayYmd.d).padStart(2, "0")}`;
+    if (
+      !pickupDates ||
+      pickupDates.length !== campaignPickups.length ||
+      pickupDates.some((d) => !d.is_open || d.pickup_date < todayKey)
+    ) {
+      return { error: "Alguno de los días elegidos ya no está disponible. Elige de nuevo." };
+    }
+    const firstDate = pickupDates.map((d) => d.pickup_date as string).sort()[0];
+    const [fy, fm, fd] = firstDate.split("-").map(Number);
+    scheduledAtDate = chileWallTimeToUtc(fy, fm, fd, 0, 0);
+  } else {
+    const resolvedSchedule = resolveSchedule(
+      store.business_hours as BusinessHours,
+      store.delivery_schedule as BusinessHours,
+      deliveryMethod,
+    );
+    if (!scheduledAtRaw) return { error: "Elegí una fecha y hora de retiro o despacho." };
+    scheduledAtDate = new Date(scheduledAtRaw);
+    if (Number.isNaN(scheduledAtDate.getTime())) return { error: "Fecha/hora programada inválida." };
+    if (scheduledAtDate.getTime() < Date.now()) return { error: "Elegí una fecha y hora futura." };
 
-  const scheduledYmd = chileDateYmd(scheduledAtDate);
-  const dayEntry = resolvedSchedule?.find((h) => h.day === scheduledYmd.day) ?? null;
-  const daySlots = slotsForDay(dayEntry as DaySchedule | null);
-  const scheduledHhmm = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "America/Santiago",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(scheduledAtDate);
-  if (!daySlots.includes(scheduledHhmm)) {
-    return {
-      error: `Ese horario está fuera del horario de ${deliveryMethod === "pickup" ? "retiro" : "despacho"} de la sucursal (${formatBusinessHours(resolvedSchedule)}).`,
-    };
-  }
+    const nowYmd = chileDateYmd(new Date());
+    const maxYmd = addDaysToYmd(nowYmd.y, nowYmd.m, nowYmd.d, 3);
+    const maxScheduledAt = chileWallTimeToUtc(maxYmd.y, maxYmd.m, maxYmd.d, 23, 59);
+    if (scheduledAtDate.getTime() > maxScheduledAt.getTime()) {
+      return { error: "Solo se puede agendar hasta 3 días desde hoy." };
+    }
 
-  // Cupo por horario (sección "no saturar al equipo") — se cuenta con el
-  // cliente admin porque customer_select_own_orders (RLS) no deja ver
-  // pedidos de otros clientes, y acá hace falta el total real del slot.
-  const adminForSlotCheck = createAdminClient();
-  const { count: slotCount } = await adminForSlotCheck
-    .from("orders")
-    .select("id", { count: "exact", head: true })
-    .eq("store_id", storeId)
-    .eq("scheduled_at", scheduledAtDate.toISOString())
-    .neq("status", "cancelled");
-  if ((slotCount ?? 0) >= store.max_orders_per_slot) {
-    return { error: "Ese horario ya está completo. Elegí otro horario cercano." };
+    const scheduledYmd = chileDateYmd(scheduledAtDate);
+    const dayEntry = resolvedSchedule?.find((h) => h.day === scheduledYmd.day) ?? null;
+    const daySlots = slotsForDay(dayEntry as DaySchedule | null);
+    const scheduledHhmm = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "America/Santiago",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(scheduledAtDate);
+    if (!daySlots.includes(scheduledHhmm)) {
+      return {
+        error: `Ese horario está fuera del horario de ${deliveryMethod === "pickup" ? "retiro" : "despacho"} de la sucursal (${formatBusinessHours(resolvedSchedule)}).`,
+      };
+    }
+
+    // Cupo por horario (sección "no saturar al equipo") — se cuenta con el
+    // cliente admin porque customer_select_own_orders (RLS) no deja ver
+    // pedidos de otros clientes, y acá hace falta el total real del slot.
+    const adminForSlotCheck = createAdminClient();
+    const { count: slotCount } = await adminForSlotCheck
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("store_id", storeId)
+      .eq("scheduled_at", scheduledAtDate.toISOString())
+      .neq("status", "cancelled");
+    if ((slotCount ?? 0) >= store.max_orders_per_slot) {
+      return { error: "Ese horario ya está completo. Elegí otro horario cercano." };
+    }
+
   }
 
   // Aceptación 4: mínimo de compra.
@@ -693,6 +772,23 @@ export async function createCheckoutPreference(
   if (orderError || !order) {
     await releaseReservedStock();
     return { error: "No se pudo crear el pedido." };
+  }
+
+  // Cupo diario de la campaña: se reserva de forma atómica en la base (bloquea
+  // cada fecha y suma lo comprometido). Va antes de consumir cupón/puntos para
+  // que un rechazo no deje nada que devolver.
+  if (campaignOrder) {
+    const { data: rejection, error: reserveError } = await createAdminClient().rpc("reserve_campaign_pickups", {
+      p_order_id: order.id,
+      p_campaign_id: campaignOrder.campaignId,
+      p_pickups: campaignPickups,
+    });
+    if (reserveError || rejection) {
+      if (reserveError) Sentry.captureException(reserveError, { extra: { orderId: order.id, context: "reserve-campaign" } });
+      await createAdminClient().from("orders").update({ status: "cancelled" }).eq("id", order.id);
+      await releaseReservedStock();
+      return { error: rejection ? describeCampaignRejection(String(rejection)) : "No se pudo reservar el cupo de retiro." };
+    }
   }
 
   // El descuento ya se validó arriba (cupón vigente, saldo de puntos

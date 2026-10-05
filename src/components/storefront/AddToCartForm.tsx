@@ -18,10 +18,14 @@ export function AddToCartForm({
   product,
   optionGroups,
   available = true,
+  unavailableLabel = "No disponible por ahora",
+  byOrderNote,
 }: {
   product: { id: string; name: string; slug: string; price: number; imagePath: string | null };
   optionGroups: OptionGroup[];
   available?: boolean;
+  unavailableLabel?: string;
+  byOrderNote?: string;
 }) {
   const { addItem, openCart } = useCart();
   const [selected, setSelected] = useState<Record<string, string[]>>({});
@@ -177,8 +181,10 @@ export function AddToCartForm({
         disabled={missingRequired || !available}
         className="rounded-full bg-gold px-6 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover disabled:opacity-50"
       >
-        {available ? "Agregar al carrito" : "No disponible por ahora"}
+        {available ? "Agregar al carrito" : unavailableLabel}
       </button>
+
+      {byOrderNote && <p className="text-xs text-foreground-muted">{byOrderNote}</p>}
 
       {added && <p className="text-sm text-gold">Agregado al carrito.</p>}
     </form>

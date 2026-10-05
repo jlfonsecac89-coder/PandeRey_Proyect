@@ -10,6 +10,15 @@ export const ACTION_LABELS: Record<string, string> = {
   delivery_message_sent: "Mensaje enviado a repartidor",
   module_toggled: "Módulo activado/desactivado",
   pickup_confirmed: "Retiro confirmado",
+  campaign_created: "Campaña creada",
+  campaign_activated: "Campaña activada",
+  campaign_deactivated: "Campaña desactivada",
+  campaign_window_changed: "Ventana de campaña modificada",
+  campaign_dates_added: "Fechas de campaña agregadas",
+  campaign_capacity_changed: "Cupo diario de campaña modificado",
+  campaign_date_opened: "Fecha de campaña abierta",
+  campaign_date_closed: "Fecha de campaña cerrada",
+  campaign_date_removed: "Fecha de campaña eliminada",
 };
 
 export function actionLabel(action: string): string {
@@ -22,6 +31,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   promotion: "Promoción",
   order: "Pedido",
   system_setting: "Ajuste del sistema",
+  campaign: "Campaña",
+  campaign_pickup_date: "Fecha de retiro de campaña",
 };
 
 export function entityLabel(entityType: string): string {

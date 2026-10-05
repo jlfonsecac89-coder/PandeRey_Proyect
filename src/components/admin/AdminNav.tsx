@@ -53,6 +53,7 @@ const NAV_SECTIONS: NavSection[] = [
       // acá — viven como pestañas dentro de /admin/productos (CatalogoTabs),
       // así el menú no repite 4 entradas del mismo árbol de catálogo.
       { href: "/admin/productos", label: "Productos", roles: ["admin", "operaciones"] },
+      { href: "/admin/campanas", label: "Campañas", roles: ["admin"] },
       { href: "/admin/stock", label: "Stock", roles: ["admin", "operaciones"], requiresModule: "inventory" },
     ],
   },

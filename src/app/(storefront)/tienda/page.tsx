@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getClearanceDiscounts, getClearanceProductIds, applyClearanceDiscount } from "@/lib/catalog/clearance";
+import { getProductCampaigns } from "@/lib/campaigns/campaigns";
 import { SortSelect } from "@/components/storefront/SortSelect";
 import { TiendaFilterBar } from "@/components/storefront/TiendaFilterBar";
 import { ProductGridCard, type ProductGridCardData } from "@/components/storefront/ProductGridCard";
@@ -207,8 +208,14 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
     (precio ? 1 : 0) +
     (singluten ? 1 : 0);
 
+  const campaigns = await getProductCampaigns((products as ProductRow[] | null ?? []).map((p) => p.id));
   const gridProducts: ProductGridCardData[] = (products as ProductRow[] | null ?? []).map((product) => {
     const clearancePct = clearanceDiscounts.get(product.id);
+    const phase = campaigns.get(product.id)?.phase;
+    const ordersClosed = phase === "closed";
+    // Con la campaña abierta se compra desde la ficha (elige los días de retiro),
+    // no con el atajo de la grilla.
+    const byOrder = phase === "open";
     return {
       id: product.id,
       name: product.name,
@@ -219,8 +226,10 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
       isGlutenFree: product.is_gluten_free,
       isSpecialEvent: product.is_special_event,
       imagePath: firstImagePath(product.images),
-      isAvailable: product.is_available,
-      canQuickAdd: product.is_available && !product.option_groups.some((g) => g.is_required),
+      isAvailable: product.is_available && !ordersClosed,
+      ordersClosed,
+      byOrder,
+      canQuickAdd: product.is_available && !ordersClosed && !byOrder && !product.option_groups.some((g) => g.is_required),
     };
   });
 
