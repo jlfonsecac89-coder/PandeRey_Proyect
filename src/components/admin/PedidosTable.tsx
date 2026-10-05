@@ -10,6 +10,7 @@ import {
   confirmBankTransferPayment,
   startPreparation,
 } from "@/lib/orders/actions";
+import { matchesOrderSearch } from "@/lib/orders/search";
 
 type Person = { id: string; full_name: string; phone: string | null; store_id?: string | null };
 type OrderItemRow = {
@@ -74,7 +75,7 @@ export function PedidosTable({
     const q = search.trim().toLowerCase();
     return orders.filter((o) => {
       const customer = customerById.get(o.user_id ?? "");
-      return o.id.slice(0, 8).toLowerCase().includes(q) || customer?.full_name?.toLowerCase().includes(q);
+      return matchesOrderSearch(o, q) || customer?.full_name?.toLowerCase().includes(q);
     });
   }, [orders, search, customerById]);
 

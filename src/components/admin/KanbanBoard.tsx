@@ -5,6 +5,8 @@ import Link from "next/link";
 import { formatCLP } from "@/lib/format";
 import { PIPELINE_GROUPS, PIPELINE_ORDER, type PipelineGroup } from "@/lib/orders/pipeline";
 import type { AdminOrder } from "./AdminOrderRow";
+import { matchesOrderSearch } from "@/lib/orders/search";
+import { formatOrderNumber } from "@/lib/format";
 
 type Person = { id: string; full_name: string; phone: string | null };
 
@@ -56,7 +58,7 @@ export function KanbanBoard({
     const q = search.trim().toLowerCase();
     return orders.filter((o) => {
       const customer = customerById.get(o.user_id);
-      return o.id.slice(0, 8).toLowerCase().includes(q) || customer?.full_name?.toLowerCase().includes(q);
+      return matchesOrderSearch(o, q) || customer?.full_name?.toLowerCase().includes(q);
     });
   }, [orders, search, customerById]);
 
@@ -109,14 +111,14 @@ export function KanbanBoard({
                           rel="noopener noreferrer"
                           className="font-mono text-xs text-gold-hover hover:underline"
                         >
-                          {order.id.slice(0, 8)}
+                          {formatOrderNumber(order.order_number, order.id)}
                         </a>
                         <span className="text-xs text-foreground-muted">
                           {order.delivery_method === "pickup" ? "Retiro" : "Envío"}
                         </span>
                       </div>
                       <Link
-                        href={`/admin/pedidos?grupo=${key}&buscar=${order.id.slice(0, 8)}`}
+                        href={`/admin/pedidos?grupo=${key}&buscar=${formatOrderNumber(order.order_number, order.id)}`}
                         className="mt-1 block truncate text-sm text-foreground hover:text-gold"
                       >
                         {customer?.full_name ?? "—"}

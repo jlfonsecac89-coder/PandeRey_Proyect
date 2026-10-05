@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { cancelAbandonedDrafts } from "@/lib/orders/drafts";
 
 // Vercel Cron llama esta ruta con `Authorization: Bearer $CRON_SECRET` —
 // cualquier otro caller se rechaza, para que no sea un endpoint público que
@@ -45,5 +46,9 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  return NextResponse.json({ transitioned: dueOrders?.length ?? 0 });
+  // Borradores de Mercado Pago que nunca se pagaron: se cancelan y se revierte
+  // lo que el checkout ya había consumido (cupón, puntos, cupo).
+  const cancelledDrafts = await cancelAbandonedDrafts();
+
+  return NextResponse.json({ transitioned: dueOrders?.length ?? 0, cancelledDrafts });
 }

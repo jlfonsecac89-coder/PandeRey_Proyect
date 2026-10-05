@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { formatOrderNumber } from "@/lib/format";
 
 // Cuánto antes de la hora comprometida (sla_deadline) se manda a imprimir
 // la comanda — pedido explícito del negocio: "que se imprima sola cuando
@@ -29,7 +30,7 @@ export function PrintMonitor() {
       const leadWindow = new Date(Date.now() + AUTO_PRINT_LEAD_MINUTES * 60000).toISOString();
       const { data: due } = await supabase
         .from("orders")
-        .select("id, sla_deadline")
+        .select("id, order_number, sla_deadline")
         .in("status", ["paid", "preparing"])
         .is("ticket_printed_at", null)
         .not("sla_deadline", "is", null)
@@ -40,7 +41,7 @@ export function PrintMonitor() {
       if (cancelled) return;
 
       if (due && due.length > 0) {
-        setStatus(`Enviando a imprimir pedido #${due[0].id.slice(0, 8)}...`);
+        setStatus(`Enviando a imprimir pedido ${formatOrderNumber(due[0].order_number, due[0].id)}...`);
         router.push(`/admin/pedidos/${due[0].id}/ticket?auto=1`);
         return;
       }

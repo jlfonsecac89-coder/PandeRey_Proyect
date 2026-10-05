@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { formatCLP } from "@/lib/format";
+import { formatCLP, formatOrderNumber } from "@/lib/format";
+import { getModuleFlags } from "@/lib/settings/modules";
 import { DashboardCharts, type ProductSalesRow, type CategorySalesRow } from "@/components/admin/DashboardCharts";
 import { PIPELINE_GROUPS, PIPELINE_ORDER, type PipelineGroup } from "@/lib/orders/pipeline";
 import { STATUS_LABELS, type OrderStatus } from "@/lib/orders/status";
@@ -81,10 +82,21 @@ export default async function AdminHomePage({
   const isOps = role === "admin" || role === "operaciones";
   const isMarketingView = role === "admin" || role === "marketing";
 
+  // Mismo criterio que /admin/pedidos: un pedido solo cuenta cuando tiene N°
+  // (pago confirmado) y se ocultan los grupos de módulos apagados.
+  const { delivery: deliveryOn, bank_transfer: bankTransferOn } = await getModuleFlags();
+  const visibleOrdersFilter = bankTransferOn
+    ? "order_number.not.is.null,and(status.eq.pending_payment,payment_method.eq.bank_transfer)"
+    : "order_number.not.is.null";
+  const dashboardGroups = PIPELINE_ORDER.filter((key) => {
+    if (key === "pago_pendiente") return bankTransferOn;
+    return deliveryOn || (key !== "en_camino" && key !== "problemas");
+  });
+
   const activeRange = RANGE_OPTIONS.find((r) => r.key === range) ?? RANGE_OPTIONS[3]; // default 7d
   const rangeSince = hoursAgo(activeRange.hours);
   const activeEstado =
-    estado && PIPELINE_ORDER.includes(estado as PipelineGroup) ? (estado as PipelineGroup) : null;
+    estado && dashboardGroups.includes(estado as PipelineGroup) ? (estado as PipelineGroup) : null;
 
   function buildHref(overrides: Partial<SearchParams>) {
     const merged = { range, estado, ...overrides };
@@ -141,11 +153,12 @@ export default async function AdminHomePage({
       : Promise.resolve({ data: [] as CategorySalesRow[] }),
     isOps
       ? Promise.all(
-          PIPELINE_ORDER.map((key) =>
+          dashboardGroups.map((key) =>
             supabase
               .from("orders")
               .select("id", { count: "exact", head: true })
               .in("status", PIPELINE_GROUPS[key].statuses)
+              .or(visibleOrdersFilter)
               .gte("created_at", rangeSince),
           ),
         )
@@ -154,14 +167,15 @@ export default async function AdminHomePage({
       ? (() => {
           let q = supabase
             .from("orders")
-            .select("id, status, delivery_method, total, created_at, user_id")
+            .select("id, order_number, status, delivery_method, total, created_at, user_id")
+            .or(visibleOrdersFilter)
             .gte("created_at", rangeSince)
             .order("created_at", { ascending: false })
             .limit(8);
           if (activeEstado) q = q.in("status", PIPELINE_GROUPS[activeEstado].statuses);
           return q;
         })()
-      : Promise.resolve({ data: [] as { id: string; status: string; delivery_method: string; total: number; created_at: string; user_id: string }[] }),
+      : Promise.resolve({ data: [] as { id: string; order_number: number | null; status: string; delivery_method: string; total: number; created_at: string; user_id: string }[] }),
   ]);
 
   const sumTotal = (rows: { total: number }[] | null) => (rows ?? []).reduce((sum, o) => sum + Number(o.total), 0);
@@ -237,7 +251,7 @@ export default async function AdminHomePage({
           debajo de las tarjetas de ventas, antes de los gráficos. */}
       {isOps && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-          {PIPELINE_ORDER.map((key, i) => {
+          {dashboardGroups.map((key, i) => {
             const isActive = activeEstado === key;
             return (
               <Link
@@ -291,7 +305,7 @@ export default async function AdminHomePage({
                     <tr key={o.id} className="hover:bg-white/[0.02]">
                       <td className="px-4 py-3">
                         <Link href={`/admin/pedidos?grupo=${group ?? ""}`} className="font-mono text-xs text-gold-hover hover:underline">
-                          {o.id.slice(0, 8)}
+                          {formatOrderNumber(o.order_number, o.id)}
                         </Link>
                       </td>
                       <td className="px-4 py-3 text-foreground">{customerNameById.get(o.user_id) ?? "—"}</td>

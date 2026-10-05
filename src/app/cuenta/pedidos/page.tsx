@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Package, Calendar, Truck, Store } from "lucide-react";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { formatCLP } from "@/lib/format";
+import { formatCLP, formatOrderNumber } from "@/lib/format";
 import { STATUS_LABELS, type OrderStatus } from "@/lib/orders/status";
 import { ReorderButton } from "@/components/storefront/ReorderButton";
 import { ReviewForm } from "@/components/storefront/ReviewForm";
@@ -33,7 +33,7 @@ export default async function MisPedidosPage() {
   const supabase = await createClient();
   const { data: orders } = await supabase
     .from("orders")
-    .select("id, status, total, delivery_method, delivery_confirmation_code, created_at")
+    .select("id, order_number, status, total, delivery_method, delivery_confirmation_code, created_at")
     .eq("user_id", profile.id)
     .neq("status", "pending_payment")
     .order("created_at", { ascending: false });
@@ -103,7 +103,7 @@ export default async function MisPedidosPage() {
                         href={`/pedido/${order.id}`}
                         className="font-mono text-xs font-bold uppercase tracking-widest text-foreground hover:text-gold"
                       >
-                        Pedido #{order.id.slice(0, 8)}
+                        Pedido {formatOrderNumber(order.order_number, order.id)}
                       </Link>
                       <span
                         className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${statusStyle(status)}`}

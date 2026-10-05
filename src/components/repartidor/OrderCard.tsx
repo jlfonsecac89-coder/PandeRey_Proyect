@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatCLP } from "@/lib/format";
+import { formatCLP, formatOrderNumber } from "@/lib/format";
 import { IssueChatPanel } from "@/app/repartidor/IssueChatPanel";
 import {
   markInRoute,
@@ -16,6 +16,7 @@ import {
 
 export type RepartidorOrder = {
   id: string;
+  order_number: number | null;
   status: string;
   total: number;
   delivery_issue_reason: string | null;
@@ -107,7 +108,7 @@ export function OrderCard({
   return (
     <div className="rounded-lg border border-charcoal-border bg-charcoal-light p-4">
       <div className="flex items-center justify-between">
-        <p className="font-mono text-xs text-gold-dark">#{order.id.slice(0, 8)}</p>
+        <p className="font-mono text-xs text-gold-dark">{formatOrderNumber(order.order_number, order.id)}</p>
         <p className="text-xs text-foreground/50">{formatCLP(order.total)}</p>
       </div>
       <p className="mt-1 text-sm text-foreground/90">{order.customer?.full_name ?? "Cliente"}</p>

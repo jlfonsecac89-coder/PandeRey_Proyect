@@ -728,7 +728,7 @@ export async function createCheckoutPreference(
       order_id: order.id,
       type: "redeem_discount",
       points: -pointsToRedeem,
-      description: `Descuento aplicado en pedido #${order.id.slice(0, 8)}`,
+      description: "Descuento por canje de puntos en una compra",
     });
   }
 

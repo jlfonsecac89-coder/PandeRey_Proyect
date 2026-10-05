@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { generateDeliveryCode } from "@/lib/orders/status";
 import { orderPrepSlaMinutes } from "@/lib/orders/status-server";
+import { assignOrderNumber } from "@/lib/orders/order-number";
 
 export type RedeemProductState = { error?: string } | null;
 
@@ -70,6 +71,10 @@ export async function redeemProductForPoints(
     .select("id")
     .single();
   if (orderError || !order) return { error: "No se pudo generar el canje." };
+
+  // El canje por puntos no pasa por pago: el pedido nace ya confirmado, así
+  // que recibe su N° correlativo acá mismo.
+  await assignOrderNumber(order.id);
 
   await adminSupabase.from("order_items").insert({
     order_id: order.id,

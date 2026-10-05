@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { formatCLP } from "@/lib/format";
+import { formatCLP, formatOrderNumber } from "@/lib/format";
 import { STATUS_LABELS, type OrderStatus } from "@/lib/orders/status";
 
 // Página pública de seguimiento — se llega acá solo después de que
@@ -17,7 +17,7 @@ export default async function SeguimientoResultadoPage({
 
   const { data: order } = await admin
     .from("orders")
-    .select("id, status, delivery_method, total, delivery_confirmation_code, scheduled_at, created_at")
+    .select("id, order_number, status, delivery_method, total, delivery_confirmation_code, scheduled_at, created_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -40,7 +40,7 @@ export default async function SeguimientoResultadoPage({
       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Seguimiento de pedido</p>
       <div className="mt-3 flex items-baseline justify-between">
         <h1 className="font-display text-2xl font-medium text-foreground">{STATUS_LABELS[status] ?? status}</h1>
-        <p className="font-mono text-xs text-foreground-muted">#{order.id.slice(0, 8).toUpperCase()}</p>
+        <p className="font-mono text-xs text-foreground-muted">{formatOrderNumber(order.order_number, order.id)}</p>
       </div>
       <p className="mt-1 text-sm text-foreground-muted">
         {order.delivery_method === "pickup" ? "Retiro en tienda" : "Envío a domicilio"} · Total{" "}

@@ -17,6 +17,8 @@ import {
 import { maxDeliveryIssueWaitMinutes, orderPrepSlaMinutes } from "./status-server";
 import { computeEarnedPoints } from "@/lib/loyalty/points";
 import { isModuleEnabled } from "@/lib/settings/modules";
+import { assignOrderNumber, getOrderLabel } from "./order-number";
+import { buildPickupSummary } from "./pickup-summary";
 
 export type OrderActionState = { error?: string; success?: string } | null;
 
@@ -38,11 +40,11 @@ async function notifyOwner(
   orderId: string,
   userId: string,
   template: string,
-  build: () => { subject: string; html: string },
+  build: (orderLabel: string) => { subject: string; html: string },
 ) {
   const email = await getUserEmail(userId);
   if (!email) return;
-  const { subject, html } = build();
+  const { subject, html } = build(await getOrderLabel(orderId));
   await sendNotification({ userId, orderId, to: email, template, subject, html });
 }
 
@@ -84,6 +86,11 @@ export async function confirmBankTransferPayment(orderId: string): Promise<Order
   await insertHistory(supabase, orderId, nextStatus, profile.id, "Transferencia confirmada manualmente");
   revalidatePath("/admin/pedidos");
 
+  // El N° de pedido nace con el pago confirmado, no con el borrador.
+  await assignOrderNumber(orderId);
+  const orderLabel = await getOrderLabel(orderId);
+  const pickup = await buildPickupSummary(orderId);
+
   const earnedPoints = await computeEarnedPoints(order.total);
   if (earnedPoints > 0) {
     const admin = createAdminClient();
@@ -92,16 +99,18 @@ export async function confirmBankTransferPayment(orderId: string): Promise<Order
       order_id: order.id,
       type: "earn_purchase",
       points: earnedPoints,
-      description: `Compra pedido #${order.id.slice(0, 8)}`,
+      description: `Compra pedido ${orderLabel}`,
     });
   }
 
-  await notifyOwner(orderId, order.user_id, "purchase_confirmed", () =>
+  await notifyOwner(orderId, order.user_id, "purchase_confirmed", (label) =>
     purchaseConfirmedTemplate({
-      orderId: order.id,
+      orderLabel: label,
       total: order.total,
       deliveryConfirmationCode: order.delivery_confirmation_code ?? "",
       deliveryMethod: order.delivery_method as "pickup" | "shipping",
+      storeName: pickup.storeName,
+      pickupLines: pickup.pickupLines,
     }),
   );
 
@@ -211,7 +220,7 @@ export async function markOrderReady(orderId: string): Promise<OrderActionState>
   if (nextStatus === "ready_for_pickup") {
     const { data: full } = await supabase.from("orders").select("user_id").eq("id", orderId).single();
     if (full) {
-      await notifyOwner(orderId, full.user_id, "ready_for_pickup", () => readyForPickupTemplate(orderId));
+      await notifyOwner(orderId, full.user_id, "ready_for_pickup", (label) => readyForPickupTemplate(label));
     }
   }
 
@@ -240,7 +249,7 @@ export async function confirmPickup(orderId: string): Promise<OrderActionState> 
 
   await insertHistory(supabase, orderId, "delivered", profile.id);
   revalidatePath("/admin/pedidos");
-  await notifyOwner(orderId, order.user_id, "delivered", () => deliveredTemplate(orderId));
+  await notifyOwner(orderId, order.user_id, "delivered", (label) => deliveredTemplate(label));
 
   return { success: "Retiro confirmado." };
 }
@@ -302,7 +311,7 @@ export async function confirmReturnedToStore(orderId: string): Promise<OrderActi
 
   await insertHistory(supabase, orderId, "returned_to_store", profile.id);
   revalidatePath("/admin/pedidos");
-  await notifyOwner(orderId, order.user_id, "returned_to_store", () => returnedToStoreTemplate(orderId));
+  await notifyOwner(orderId, order.user_id, "returned_to_store", (label) => returnedToStoreTemplate(label));
 
   return { success: "Devolución confirmada." };
 }
@@ -331,8 +340,8 @@ export async function markInRoute(orderId: string): Promise<OrderActionState> {
   // Aceptación 1 de la Fase 5: in_route SIEMPRE dispara email + notifications_log.
   // El correo repite el código de entrega para que el cliente lo tenga a mano
   // justo cuando el repartidor se lo va a pedir (pedido del usuario, 2026-08-19).
-  await notifyOwner(orderId, order.user_id, "in_route", () =>
-    inRouteTemplate(orderId, order.delivery_confirmation_code),
+  await notifyOwner(orderId, order.user_id, "in_route", (label) =>
+    inRouteTemplate(label, order.delivery_confirmation_code),
   );
 
   return { success: "Pedido marcado en camino." };
@@ -387,7 +396,7 @@ export async function markDeliveryIssue(orderId: string, reason: string): Promis
 
   await insertHistory(supabase, orderId, "delivery_issue", profile.id, reason.trim());
   revalidatePath("/repartidor");
-  await notifyOwner(orderId, order.user_id, "delivery_issue", () => deliveryIssueTemplate(orderId));
+  await notifyOwner(orderId, order.user_id, "delivery_issue", (label) => deliveryIssueTemplate(label));
 
   return { success: "Problema registrado." };
 }
@@ -479,7 +488,7 @@ export async function confirmDeliveryCode(
 
   await insertHistory(supabase, orderId, "delivered", profile.id);
   revalidatePath("/repartidor");
-  await notifyOwner(orderId, order.user_id, "delivered", () => deliveredTemplate(orderId));
+  await notifyOwner(orderId, order.user_id, "delivered", (label) => deliveredTemplate(label));
 
   return { success: "Entrega confirmada." };
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { formatCLP } from "@/lib/format";
+import { formatCLP, formatOrderNumber } from "@/lib/format";
 import { STATUS_LABELS, type OrderStatus } from "@/lib/orders/status";
 import { DeliveryChatPanel } from "@/components/delivery-chat/DeliveryChatPanel";
 import type { AdminOrder } from "./AdminOrderRow";
@@ -70,7 +70,7 @@ export function OrderDetailModal({
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5">
           <div>
             <h2 className="font-display text-base font-medium text-foreground">
-              Pedido #{order.id.slice(0, 8)}
+              Pedido {formatOrderNumber(order.order_number, order.id)}
             </h2>
             <p className="text-xs text-foreground-muted">
               {STATUS_LABELS[order.status as OrderStatus] ?? order.status} ·{" "}

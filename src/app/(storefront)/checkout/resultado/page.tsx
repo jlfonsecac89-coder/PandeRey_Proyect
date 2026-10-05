@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { confirmPayment } from "@/lib/mercadopago/confirm-payment";
-import { formatCLP } from "@/lib/format";
+import { formatCLP, formatOrderNumber } from "@/lib/format";
 import { ClearCartOnSuccess } from "@/components/storefront/ClearCartOnSuccess";
 import { Seal } from "@/components/storefront/Seal";
 
@@ -35,12 +35,12 @@ export default async function CheckoutResultadoPage({
   // acá solo interesa el id real del pedido para mostrar su estado.
   const cleanOrderId = orderId?.split(":")[0];
 
-  let order: { id: string; status: string; total: number; delivery_method: string } | null = null;
+  let order: { id: string; order_number: number | null; status: string; total: number; delivery_method: string } | null = null;
   if (cleanOrderId) {
     const supabase = await createClient();
     const { data } = await supabase
       .from("orders")
-      .select("id, status, total, delivery_method")
+      .select("id, order_number, status, total, delivery_method")
       .eq("id", cleanOrderId)
       .maybeSingle();
     order = data;
@@ -61,8 +61,8 @@ export default async function CheckoutResultadoPage({
 
           <div className="mt-6 space-y-2 rounded-2xl border border-dashed border-crust bg-masa p-5 text-left text-sm shadow-card">
             <div className="flex justify-between">
-              <span className="text-foreground-muted">Código de pedido</span>
-              <span className="font-mono text-xs text-gold-dark">{order!.id.slice(0, 8).toUpperCase()}</span>
+              <span className="text-foreground-muted">N° de pedido</span>
+              <span className="font-mono text-xs text-gold-dark">{formatOrderNumber(order!.order_number, order!.id)}</span>
             </div>
             {paymentId && (
               <div className="flex justify-between">
@@ -77,9 +77,9 @@ export default async function CheckoutResultadoPage({
           </div>
 
           <p className="mt-4 text-xs text-foreground-muted">
-            Te va a llegar un email de confirmación con el detalle de tu pedido
+            Te va a llegar un email con tu orden de compra
             {order!.delivery_method === "pickup"
-              ? " y el código para validar el retiro en tienda."
+              ? ". Cuando retires tu pedido te entregamos la boleta impresa."
               : " y el código de confirmación que le vas a dar al repartidor."}
           </p>
 

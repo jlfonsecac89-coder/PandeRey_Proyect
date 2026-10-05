@@ -13,7 +13,7 @@ export default async function RepartidorHomePage() {
   const { data: orders } = await supabase
     .from("orders")
     .select(
-      "id, status, total, delivery_issue_reason, delivery_issue_at, delivery_code_locked, user_id, address_id",
+      "id, order_number, status, total, delivery_issue_reason, delivery_issue_at, delivery_code_locked, user_id, address_id",
     )
     .eq("assigned_driver_id", profile.id)
     .in("status", ["driver_assigned", "in_route", "at_address", "delivery_issue"])
@@ -39,6 +39,7 @@ export default async function RepartidorHomePage() {
 
   const enriched: RepartidorOrder[] = list.map((o) => ({
     id: o.id,
+    order_number: o.order_number,
     status: o.status,
     total: o.total,
     delivery_issue_reason: o.delivery_issue_reason,

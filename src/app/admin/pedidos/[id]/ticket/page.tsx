@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/server";
-import { formatCLP } from "@/lib/format";
+import { formatCLP, formatOrderNumber } from "@/lib/format";
 import { STATUS_LABELS, type OrderStatus } from "@/lib/orders/status";
 import { TicketPrintController } from "./TicketPrintController";
 
@@ -35,7 +35,7 @@ export default async function OrderTicketPage({
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, status, delivery_method, total, created_at, sla_deadline, scheduled_at, ticket_printed_at, user_id, address_id, store:stores(name)",
+      "id, order_number, status, delivery_method, total, created_at, sla_deadline, scheduled_at, ticket_printed_at, user_id, address_id, store:stores(name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -69,7 +69,7 @@ export default async function OrderTicketPage({
 
       <div className="mt-3 border-t border-dashed border-ink/30 pt-2 text-xs">
         <p>
-          <span className="font-semibold">Pedido:</span> #{order.id.slice(0, 8)}
+          <span className="font-semibold">Pedido:</span> {formatOrderNumber(order.order_number, order.id)}
         </p>
         <p>
           <span className="font-semibold">Fecha del pedido:</span> {new Date(order.created_at).toLocaleString("es-CL")}

@@ -31,12 +31,20 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
   const { grupo, entrega, rango, vista } = await searchParams;
   const activeVista = vista === "kanban" ? "kanban" : "tabla";
   const supabase = await createClient();
-  const { delivery: deliveryOn } = await getModuleFlags();
+  const { delivery: deliveryOn, bank_transfer: bankTransferOn } = await getModuleFlags();
   // Sin delivery no hay pedidos "en camino" ni con problemas de entrega: se
   // ocultan esos grupos y el filtro de envío en vez de mostrar columnas vacías.
-  const pipelineKeys = PIPELINE_ORDER.filter(
-    (key) => deliveryOn || (key !== "en_camino" && key !== "problemas"),
-  );
+  // Un pedido solo existe para el equipo cuando el pago está confirmado
+  // (recibe su N° PDR en ese momento): los borradores de Mercado Pago sin pagar
+  // quedan ocultos. Con transferencia activa, el pedido pendiente sí se ve
+  // porque el equipo tiene que confirmar el depósito a mano.
+  const visibleOrdersFilter = bankTransferOn
+    ? "order_number.not.is.null,and(status.eq.pending_payment,payment_method.eq.bank_transfer)"
+    : "order_number.not.is.null";
+  const pipelineKeys = PIPELINE_ORDER.filter((key) => {
+    if (key === "pago_pendiente") return bankTransferOn;
+    return deliveryOn || (key !== "en_camino" && key !== "problemas");
+  });
 
   const activeRango = RANGO_OPTIONS.find((r) => r.key === rango) ?? RANGO_OPTIONS[2]; // default 30d
   const since = activeRango.since();
@@ -46,10 +54,11 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
   // activos, para que las tarjetas sigan mostrando el panorama completo aunque
   // ya se esté filtrando la tabla de abajo.
   const countQueries = pipelineKeys.map((key) => {
-    let q = supabase.from("orders").select("id", { count: "exact", head: true }).in(
-      "status",
-      PIPELINE_GROUPS[key].statuses,
-    );
+    let q = supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .in("status", PIPELINE_GROUPS[key].statuses)
+      .or(visibleOrdersFilter);
     if (since) q = q.gte("created_at", since);
     return q;
   });
@@ -58,8 +67,9 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
   let query = supabase
     .from("orders")
     .select(
-      "id, status, payment_method, delivery_method, total, created_at, store_id, user_id, assigned_driver_id, sla_deadline, delivered_at, scheduled_at, ticket_printed_at",
+      "id, order_number, status, payment_method, delivery_method, total, created_at, store_id, user_id, assigned_driver_id, sla_deadline, delivered_at, scheduled_at, ticket_printed_at",
     )
+    .or(visibleOrdersFilter)
     .order("created_at", { ascending: false })
     .limit(150);
 

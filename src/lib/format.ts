@@ -18,3 +18,11 @@ export function splitIva(amountWithIva: number): { neto: number; iva: number } {
   const neto = Math.round(amountWithIva / (1 + IVA_RATE));
   return { neto, iva: amountWithIva - neto };
 }
+
+// N° de pedido que ve el cliente y usa el equipo (PDR-000123). Los pedidos
+// sin número (borradores sin pago, o anteriores a la migración) caen al
+// prefijo del UUID para que nunca se muestre un código vacío.
+export function formatOrderNumber(orderNumber: number | null | undefined, fallbackId?: string): string {
+  if (orderNumber != null) return `PDR-${String(orderNumber).padStart(6, "0")}`;
+  return fallbackId ? `#${fallbackId.slice(0, 8).toUpperCase()}` : "—";
+}

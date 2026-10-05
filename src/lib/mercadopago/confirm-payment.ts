@@ -6,6 +6,8 @@ import { sendNotification, getUserEmail } from "@/lib/notifications/send";
 import { purchaseConfirmedTemplate } from "@/lib/notifications/templates";
 import { orderPrepSlaMinutes } from "@/lib/orders/status-server";
 import { computeEarnedPoints } from "@/lib/loyalty/points";
+import { assignOrderNumber, getOrderLabel } from "@/lib/orders/order-number";
+import { buildPickupSummary } from "@/lib/orders/pickup-summary";
 
 export type ConfirmPaymentResult =
   | { ok: true; alreadyProcessed: boolean; status?: string }
@@ -118,6 +120,13 @@ export async function confirmPayment(mpPaymentId: string): Promise<ConfirmPaymen
   // pago (mismo evento que el resto de este bloque) — profiles.points_balance
   // se mantiene consistente solo, vía el trigger sync_points_balance
   // (sección 05) que recalcula la suma del ledger en cada insert.
+  // El N° de pedido nace acá, con el pago confirmado: los borradores sin pagar
+  // nunca lo tienen. assign_order_number es idempotente (webhook y vuelta del
+  // cliente pueden confirmar el mismo pago).
+  await assignOrderNumber(order.id);
+  const orderLabel = await getOrderLabel(order.id);
+  const pickup = await buildPickupSummary(order.id);
+
   const earnedPoints = await computeEarnedPoints(order.total);
   if (earnedPoints > 0) {
     await supabase.from("points_ledger").insert({
@@ -125,17 +134,19 @@ export async function confirmPayment(mpPaymentId: string): Promise<ConfirmPaymen
       order_id: order.id,
       type: "earn_purchase",
       points: earnedPoints,
-      description: `Compra pedido #${order.id.slice(0, 8)}`,
+      description: `Compra pedido ${orderLabel}`,
     });
   }
 
   const email = await getUserEmail(order.user_id);
   if (email) {
     const { subject, html } = purchaseConfirmedTemplate({
-      orderId: order.id,
+      orderLabel,
       total: order.total,
       deliveryConfirmationCode: order.delivery_confirmation_code ?? "",
       deliveryMethod: order.delivery_method as "pickup" | "shipping",
+      storeName: pickup.storeName,
+      pickupLines: pickup.pickupLines,
     });
     await sendNotification({
       userId: order.user_id,

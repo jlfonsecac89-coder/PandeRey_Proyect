@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatCLP } from "@/lib/format";
+import { formatCLP, formatOrderNumber } from "@/lib/format";
 import { STATUS_LABELS, type OrderStatus } from "@/lib/orders/status";
 import {
   markOrderReady,
@@ -26,6 +26,7 @@ function slaCountdown(order: AdminOrder): { label: string; className: string } |
 
 export type AdminOrder = {
   id: string;
+  order_number: number | null;
   status: string;
   payment_method: "mercadopago" | "bank_transfer";
   delivery_method: "pickup" | "shipping";
@@ -109,7 +110,7 @@ export function AdminOrderRow({
               type="checkbox"
               checked={selected}
               onChange={onToggleSelect}
-              aria-label={`Seleccionar pedido ${order.id.slice(0, 8)}`}
+              aria-label={`Seleccionar pedido ${formatOrderNumber(order.order_number, order.id)}`}
               className="h-4 w-4 accent-gold"
             />
           </td>
@@ -120,7 +121,7 @@ export function AdminOrderRow({
             onClick={() => setShowDetailModal(true)}
             className="text-gold-dark hover:text-gold hover:underline"
           >
-            {order.id.slice(0, 8)}
+            {formatOrderNumber(order.order_number, order.id)}
           </button>
           <button
             type="button"

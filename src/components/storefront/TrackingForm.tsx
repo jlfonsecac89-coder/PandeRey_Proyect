@@ -11,10 +11,10 @@ export function TrackingForm() {
     <form action={formAction} className="space-y-4">
       <FormMessage error={state?.error} />
       <label className="block text-sm text-foreground-muted">
-        Código de pedido
+        N° de pedido
         <input
           name="code"
-          placeholder="Ej: A1B2C3D4"
+          placeholder="Ej: PDR-000123"
           required
           className="mt-1 w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm uppercase tracking-wider outline-none focus:border-gold-dark"
         />
