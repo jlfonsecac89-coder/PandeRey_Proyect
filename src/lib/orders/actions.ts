@@ -16,8 +16,11 @@ import {
 } from "@/lib/notifications/templates";
 import { maxDeliveryIssueWaitMinutes, orderPrepSlaMinutes } from "./status-server";
 import { computeEarnedPoints } from "@/lib/loyalty/points";
+import { isModuleEnabled } from "@/lib/settings/modules";
 
 export type OrderActionState = { error?: string; success?: string } | null;
+
+const DELIVERY_OFF_ERROR = "El módulo de delivery está desactivado.";
 
 async function insertHistory(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -244,6 +247,7 @@ export async function confirmPickup(orderId: string): Promise<OrderActionState> 
 
 export async function assignDriver(orderId: string, driverId: string): Promise<OrderActionState> {
   const profile = await requireRole(["admin", "operaciones"]);
+  if (!(await isModuleEnabled("delivery"))) return { error: DELIVERY_OFF_ERROR };
   const supabase = await createClient();
 
   const { data: order } = await supabase
@@ -307,6 +311,7 @@ export async function confirmReturnedToStore(orderId: string): Promise<OrderActi
 
 export async function markInRoute(orderId: string): Promise<OrderActionState> {
   const profile = await requireRole(["repartidor"]);
+  if (!(await isModuleEnabled("delivery"))) return { error: DELIVERY_OFF_ERROR };
   const supabase = await createClient();
 
   const { data: order } = await supabase
@@ -335,6 +340,7 @@ export async function markInRoute(orderId: string): Promise<OrderActionState> {
 
 export async function markAtAddress(orderId: string): Promise<OrderActionState> {
   const profile = await requireRole(["repartidor"]);
+  if (!(await isModuleEnabled("delivery"))) return { error: DELIVERY_OFF_ERROR };
   const supabase = await createClient();
 
   const { data: order } = await supabase
@@ -356,6 +362,7 @@ export async function markAtAddress(orderId: string): Promise<OrderActionState> 
 
 export async function markDeliveryIssue(orderId: string, reason: string): Promise<OrderActionState> {
   const profile = await requireRole(["repartidor"]);
+  if (!(await isModuleEnabled("delivery"))) return { error: DELIVERY_OFF_ERROR };
   if (!reason.trim()) return { error: "Indicá el motivo del problema." };
   const supabase = await createClient();
 
@@ -387,6 +394,7 @@ export async function markDeliveryIssue(orderId: string, reason: string): Promis
 
 export async function markReturningToStore(orderId: string): Promise<OrderActionState> {
   const profile = await requireRole(["repartidor"]);
+  if (!(await isModuleEnabled("delivery"))) return { error: DELIVERY_OFF_ERROR };
   const supabase = await createClient();
 
   const { data: order } = await supabase
@@ -428,6 +436,7 @@ export async function confirmDeliveryCode(
   code: string,
 ): Promise<ConfirmCodeState> {
   const profile = await requireRole(["repartidor"]);
+  if (!(await isModuleEnabled("delivery"))) return { error: DELIVERY_OFF_ERROR };
   const supabase = await createClient();
 
   const { data: order } = await supabase

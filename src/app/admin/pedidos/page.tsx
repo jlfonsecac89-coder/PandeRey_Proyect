@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PIPELINE_GROUPS, PIPELINE_ORDER, type PipelineGroup } from "@/lib/orders/pipeline";
 import { PedidosTable } from "@/components/admin/PedidosTable";
 import { KanbanBoard } from "@/components/admin/KanbanBoard";
+import { getModuleFlags } from "@/lib/settings/modules";
 
 function startOfDay(date: Date): string {
   const d = new Date(date);
@@ -30,15 +31,21 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
   const { grupo, entrega, rango, vista } = await searchParams;
   const activeVista = vista === "kanban" ? "kanban" : "tabla";
   const supabase = await createClient();
+  const { delivery: deliveryOn } = await getModuleFlags();
+  // Sin delivery no hay pedidos "en camino" ni con problemas de entrega: se
+  // ocultan esos grupos y el filtro de envío en vez de mostrar columnas vacías.
+  const pipelineKeys = PIPELINE_ORDER.filter(
+    (key) => deliveryOn || (key !== "en_camino" && key !== "problemas"),
+  );
 
   const activeRango = RANGO_OPTIONS.find((r) => r.key === rango) ?? RANGO_OPTIONS[2]; // default 30d
   const since = activeRango.since();
-  const activeGroup = grupo && PIPELINE_ORDER.includes(grupo as PipelineGroup) ? (grupo as PipelineGroup) : null;
+  const activeGroup = grupo && pipelineKeys.includes(grupo as PipelineGroup) ? (grupo as PipelineGroup) : null;
 
   // Conteos del pipeline — respetan el rango de fechas pero NO el grupo/entrega
   // activos, para que las tarjetas sigan mostrando el panorama completo aunque
   // ya se esté filtrando la tabla de abajo.
-  const countQueries = PIPELINE_ORDER.map((key) => {
+  const countQueries = pipelineKeys.map((key) => {
     let q = supabase.from("orders").select("id", { count: "exact", head: true }).in(
       "status",
       PIPELINE_GROUPS[key].statuses,
@@ -133,7 +140,7 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
 
       {/* Pipeline */}
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {PIPELINE_ORDER.map((key, i) => {
+        {pipelineKeys.map((key, i) => {
           const isActive = activeGroup === key;
           return (
             <Link
@@ -176,7 +183,7 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
           {[
             { key: undefined, label: "Todas las entregas" },
             { key: "pickup", label: "Retiro" },
-            { key: "shipping", label: "Envío" },
+            ...(deliveryOn ? [{ key: "shipping", label: "Envío" }] : []),
           ].map((e) => (
             <Link
               key={e.label}
@@ -195,7 +202,7 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
 
       <div className="mt-5">
         {activeVista === "kanban" ? (
-          <KanbanBoard orders={orders ?? []} customers={customers ?? []} />
+          <KanbanBoard orders={orders ?? []} customers={customers ?? []} groups={pipelineKeys} />
         ) : (
           <PedidosTable
             orders={orders ?? []}

@@ -91,9 +91,13 @@ function groupSlotsByPeriod(slots: ScheduleSlot[]): { label: string; slots: Sche
 export function CheckoutForm({
   addresses,
   stores,
+  deliveryEnabled,
+  bankTransferEnabled,
 }: {
   addresses: Address[];
   stores: StoreOption[];
+  deliveryEnabled: boolean;
+  bankTransferEnabled: boolean;
 }) {
   const router = useRouter();
   const { items, hydrated, subtotal } = useCart();
@@ -170,7 +174,7 @@ export function CheckoutForm({
   // se dispara solo (sin esperar a que el cliente confirme nada), así el
   // paso "Dirección" ya puede mostrar si el despacho tiene cobertura.
   useEffect(() => {
-    if (!storeId || !addressId) return;
+    if (!deliveryEnabled || !storeId || !addressId) return;
     const fd = new FormData();
     fd.set("store_id", storeId);
     fd.set("delivery_method", "shipping");
@@ -178,7 +182,7 @@ export function CheckoutForm({
     fd.set("subtotal", String(subtotal));
     startTransition(() => shippingAction(fd));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId, addressId, subtotal]);
+  }, [deliveryEnabled, storeId, addressId, subtotal]);
 
   // Días/horarios agendables — se recargan cuando cambia la sucursal o el
   // método de entrega (cada uno puede tener su propio horario). La
@@ -400,7 +404,9 @@ export function CheckoutForm({
                       desc: "En el próximo paso pedimos tu dirección para calcular el envío.",
                     },
                   ]
-                ).map(({ value, Icon, title, desc }) => {
+                )
+                  .filter(({ value }) => deliveryEnabled || value === "pickup")
+                  .map(({ value, Icon, title, desc }) => {
                   const selected = deliveryMethod === value;
                   return (
                     <button
@@ -763,7 +769,9 @@ export function CheckoutForm({
                       desc: "Coordinás el pago por WhatsApp con el pedido y el monto ya listos.",
                     },
                   ]
-                ).map(({ value, Icon, title, desc }) => {
+                )
+                  .filter(({ value }) => bankTransferEnabled || value === "mercadopago")
+                  .map(({ value, Icon, title, desc }) => {
                   const selected = paymentMethod === value;
                   return (
                     <label

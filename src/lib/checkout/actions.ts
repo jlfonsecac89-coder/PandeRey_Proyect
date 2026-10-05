@@ -25,6 +25,7 @@ import { formatCLP } from "@/lib/format";
 import { generateDeliveryCode } from "@/lib/orders/status";
 import { validateCoupon, validatePointsRedemption } from "@/lib/promotions/discount";
 import { checkRateLimit } from "@/lib/rate-limit/limiter";
+import { getModuleFlags } from "@/lib/settings/modules";
 import { getClearanceDiscounts, applyClearanceDiscount } from "@/lib/catalog/clearance";
 import type { CartItem } from "@/lib/cart/types";
 
@@ -161,6 +162,9 @@ export async function previewShipping(
   if (!storeId) return { error: "Elegí una sucursal." };
   if (deliveryMethod !== "pickup" && deliveryMethod !== "shipping") {
     return { error: "Elegí un método de entrega." };
+  }
+  if (deliveryMethod === "shipping" && !(await getModuleFlags()).delivery) {
+    return { error: "Por ahora solo atendemos con retiro en tienda." };
   }
 
   const supabase = await createClient();
@@ -350,6 +354,15 @@ export async function createCheckoutPreference(
 
   if (deliveryMethod !== "pickup" && deliveryMethod !== "shipping") {
     return { error: "Elegí un método de entrega." };
+  }
+  // Un módulo apagado se rechaza acá y no solo en la interfaz: el formulario
+  // se puede forjar con un POST directo.
+  const modules = await getModuleFlags();
+  if (deliveryMethod === "shipping" && !modules.delivery) {
+    return { error: "Por ahora solo atendemos con retiro en tienda." };
+  }
+  if (paymentMethod === "bank_transfer" && !modules.bank_transfer) {
+    return { error: "Por ahora solo se puede pagar con Mercado Pago." };
   }
   if (!storeId) return { error: "Elegí una sucursal." };
   if (deliveryMethod === "shipping" && !addressId) {

@@ -2,12 +2,14 @@ import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { CheckoutForm } from "@/components/storefront/CheckoutForm";
+import { getModuleFlags } from "@/lib/settings/modules";
 
 export default async function CheckoutPage() {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/auth/login?next=/checkout");
 
   const supabase = await createClient();
+  const modules = await getModuleFlags();
   const [{ data: addresses }, { data: stores }] = await Promise.all([
     supabase
       .from("addresses")
@@ -26,7 +28,12 @@ export default async function CheckoutPage() {
       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Checkout</p>
       <h1 className="mt-1 font-display text-3xl font-medium text-foreground">Finalizar compra</h1>
       <div className="mt-6">
-        <CheckoutForm addresses={addresses ?? []} stores={stores ?? []} />
+        <CheckoutForm
+          addresses={addresses ?? []}
+          stores={stores ?? []}
+          deliveryEnabled={modules.delivery}
+          bankTransferEnabled={modules.bank_transfer}
+        />
       </div>
     </div>
   );

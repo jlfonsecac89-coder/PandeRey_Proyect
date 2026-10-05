@@ -2,10 +2,12 @@ import { requireRole } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/server";
 import { StoreCard } from "@/components/admin/StoreCard";
 import { NewStoreForm } from "@/components/admin/NewStoreForm";
+import { isModuleEnabled } from "@/lib/settings/modules";
 
 export default async function SucursalesPage() {
   await requireRole(["admin"], "/admin-login");
   const supabase = await createClient();
+  const deliveryOn = await isModuleEnabled("delivery");
 
   const [{ data: stores }, { data: zones }] = await Promise.all([
     supabase
@@ -24,9 +26,13 @@ export default async function SucursalesPage() {
     <div className="max-w-3xl space-y-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-dark">Seguimiento y control</p>
-        <h1 className="mt-1 font-display text-2xl font-medium text-foreground">Envíos y sucursales</h1>
+        <h1 className="mt-1 font-display text-2xl font-medium text-foreground">
+          {deliveryOn ? "Envíos y sucursales" : "Sucursales"}
+        </h1>
         <p className="mt-1 text-sm text-foreground-muted">
-          Radio de entrega, mínimo de compra, envío gratis y tramos de envío por sucursal.
+          {deliveryOn
+            ? "Radio de entrega, mínimo de compra, envío gratis y tramos de envío por sucursal."
+            : "Horarios de retiro, mínimo de compra y WhatsApp por sucursal. Los campos de envío se ignoran mientras el módulo de delivery esté apagado."}
         </p>
       </div>
 

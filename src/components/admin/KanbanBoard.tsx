@@ -42,9 +42,11 @@ function slaBadge(order: AdminOrder): { label: string; className: string } | nul
 export function KanbanBoard({
   orders,
   customers,
+  groups = PIPELINE_ORDER,
 }: {
   orders: AdminOrder[];
   customers: Person[];
+  groups?: readonly PipelineGroup[];
 }) {
   const [search, setSearch] = useState("");
   const customerById = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
@@ -79,7 +81,7 @@ export function KanbanBoard({
       />
 
       <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
-        {PIPELINE_ORDER.map((key) => {
+        {groups.map((key) => {
           const columnOrders = byGroup.get(key) ?? [];
           return (
             <div key={key} className="w-72 shrink-0">

@@ -1,8 +1,12 @@
 import { requireRole } from "@/lib/auth/rbac";
 import { signOut } from "@/lib/auth/actions";
+import { requireModule } from "@/lib/settings/modules";
 
 export default async function RepartidorLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireRole(["repartidor"]);
+  // Portal apagado: un repartidor con sesión vuelve al inicio en vez de ver
+  // una lista de pedidos que ya no se gestionan.
+  await requireModule("delivery", "/");
 
   return (
     <div className="flex min-h-full flex-col">
