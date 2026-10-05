@@ -19,7 +19,7 @@ export default async function ProductoDetallePage({
   const { data: product } = await supabase
     .from("products")
     .select(
-      "id, name, slug, description, price, points_cost, is_gluten_free, images:product_images(storage_path, sort_order)",
+      "id, name, slug, description, price, points_cost, is_gluten_free, is_available, images:product_images(storage_path, sort_order)",
     )
     .eq("slug", slug)
     .eq("is_active", true)
@@ -130,6 +130,7 @@ export default async function ProductoDetallePage({
               price: discountedPrice,
               imagePath: images[0]?.storage_path ?? null,
             }}
+            available={product.is_available}
             optionGroups={optionGroups}
           />
         </div>

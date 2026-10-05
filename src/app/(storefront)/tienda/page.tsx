@@ -13,6 +13,7 @@ type ProductRow = {
   price: number;
   is_gluten_free: boolean;
   is_special_event: boolean;
+  is_available: boolean;
   images: ProductImage[];
   option_groups: { is_required: boolean }[];
 };
@@ -138,7 +139,7 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
   let query = supabase
     .from("products")
     .select(
-      "id, name, slug, price, is_gluten_free, is_special_event, images:product_images(storage_path, sort_order), option_groups:product_option_groups(is_required)",
+      "id, name, slug, price, is_gluten_free, is_special_event, is_available, images:product_images(storage_path, sort_order), option_groups:product_option_groups(is_required)",
     )
     .eq("is_active", true);
 
@@ -218,7 +219,8 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
       isGlutenFree: product.is_gluten_free,
       isSpecialEvent: product.is_special_event,
       imagePath: firstImagePath(product.images),
-      canQuickAdd: !product.option_groups.some((g) => g.is_required),
+      isAvailable: product.is_available,
+      canQuickAdd: product.is_available && !product.option_groups.some((g) => g.is_required),
     };
   });
 

@@ -333,6 +333,16 @@ export async function toggleProductActive(id: string, isActive: boolean) {
   revalidatePath("/admin/productos");
 }
 
+// Disponibilidad por producto (lanzamiento sin control de stock): visible en
+// la tienda pero no comprable. Distinto de is_active, que lo oculta.
+export async function toggleProductAvailable(id: string, isAvailable: boolean) {
+  await requireRole(["admin", "operaciones"]);
+  const supabase = await createClient();
+  await supabase.from("products").update({ is_available: isAvailable }).eq("id", id);
+  revalidatePath("/admin/productos");
+  revalidatePath("/tienda");
+}
+
 // Único punto de escritura de Marketing sobre `products` (sección 13):
 // exclusivamente el campo points_cost, a través del módulo "Canje de puntos".
 export async function updateProductPointsCost(

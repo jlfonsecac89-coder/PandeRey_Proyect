@@ -385,7 +385,7 @@ export async function createCheckoutPreference(
   const productIds = [...new Set(cartItems.map((i) => i.productId))];
   const { data: dbProducts } = await supabase
     .from("products")
-    .select("id, name, price, is_active, is_special_event")
+    .select("id, name, price, is_active, is_available, is_special_event")
     .in("id", productIds);
   const productMap = new Map((dbProducts ?? []).map((p) => [p.id, p]));
 
@@ -418,7 +418,7 @@ export async function createCheckoutPreference(
 
   for (const item of cartItems) {
     const product = productMap.get(item.productId);
-    if (!product || !product.is_active) {
+    if (!product || !product.is_active || !product.is_available) {
       return { error: `"${item.name}" ya no está disponible.` };
     }
     if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
@@ -646,7 +646,10 @@ export async function createCheckoutPreference(
   // para productos que efectivamente tienen lotes cargados en esta sucursal
   // — un producto sin ningún lote se trata como no trackeado por lotes
   // (ver comentario de diseño en la migración 20260808000100).
-  for (const [productId, quantity] of productQuantities) {
+  // Con el módulo de inventario apagado la disponibilidad se controla solo por
+  // products.is_available (arriba): los lotes ya cargados quedan intactos pero
+  // no se exigen ni se descuentan.
+  for (const [productId, quantity] of modules.inventory ? productQuantities : new Map<string, number>()) {
     const { data: tracked } = await supabase.rpc("has_tracked_batches", {
       p_store_id: store.id,
       p_product_id: productId,

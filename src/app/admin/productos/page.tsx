@@ -10,6 +10,7 @@ import { ImagenesSection } from "./ImagenesSection";
 import { VariantesSection } from "./VariantesSection";
 import { StockSection } from "./StockSection";
 import { ProductosTable } from "@/components/admin/ProductosTable";
+import { getModuleFlags } from "@/lib/settings/modules";
 
 type SearchParams = { nuevo?: string; editar?: string };
 
@@ -22,12 +23,13 @@ export default async function ProductosPage({
   const { nuevo, editar } = await searchParams;
 
   const supabase = await createClient();
+  const { inventory: inventoryEnabled } = await getModuleFlags();
   const [{ data: products }, { data: categories }, { data: collections }, { data: departments }, { data: allImages }, { data: allBatches }] =
     await Promise.all([
       supabase
         .from("products")
         .select(
-          "id, name, sku, price, is_active, is_special_event, category:categories(id, name, department:departments(id, name))",
+          "id, name, sku, price, is_active, is_available, is_special_event, category:categories(id, name, department:departments(id, name))",
         )
         .order("created_at", { ascending: false }),
       supabase
@@ -52,6 +54,7 @@ export default async function ProductosPage({
     sku: string;
     price: number;
     is_active: boolean;
+    is_available: boolean;
     is_special_event: boolean;
     category: { id: string; name: string; department: { id: string; name: string } | { id: string; name: string }[] | null } | { id: string; name: string; department: { id: string; name: string } | { id: string; name: string }[] | null }[] | null;
   };
@@ -65,6 +68,7 @@ export default async function ProductosPage({
       sku: p.sku,
       price: p.price,
       is_active: p.is_active,
+      is_available: p.is_available,
       is_special_event: p.is_special_event,
       categoryId: cat?.id ?? null,
       categoryName: cat?.name ?? null,
@@ -229,7 +233,7 @@ export default async function ProductosPage({
         </div>
       </div>
 
-      <ProductosTable products={normalized} departments={departments ?? []} />
+      <ProductosTable products={normalized} departments={departments ?? []} inventoryEnabled={inventoryEnabled} />
 
       {nuevo === "1" && (
         <ProductDrawer title="Nuevo producto">
@@ -258,14 +262,16 @@ export default async function ProductosPage({
               <VariantesSection productId={editar} groups={editData.groups} catalog={variantCatalog} />
             </DrawerSection>
 
-            <DrawerSection title="Stock" count={editData.batches.length}>
-              <StockSection
-                productId={editar}
-                stores={editData.stores}
-                batches={editData.batches}
-                clearanceAlertDays={clearanceAlertDays}
-              />
-            </DrawerSection>
+            {inventoryEnabled && (
+              <DrawerSection title="Stock" count={editData.batches.length}>
+                <StockSection
+                  productId={editar}
+                  stores={editData.stores}
+                  batches={editData.batches}
+                  clearanceAlertDays={clearanceAlertDays}
+                />
+              </DrawerSection>
+            )}
           </div>
         </ProductDrawer>
       )}

@@ -17,9 +17,11 @@ type OptionGroup = {
 export function AddToCartForm({
   product,
   optionGroups,
+  available = true,
 }: {
   product: { id: string; name: string; slug: string; price: number; imagePath: string | null };
   optionGroups: OptionGroup[];
+  available?: boolean;
 }) {
   const { addItem, openCart } = useCart();
   const [selected, setSelected] = useState<Record<string, string[]>>({});
@@ -172,10 +174,10 @@ export function AddToCartForm({
 
       <button
         type="submit"
-        disabled={missingRequired}
+        disabled={missingRequired || !available}
         className="rounded-full bg-gold px-6 py-2.5 text-sm font-semibold text-ink shadow-card transition hover:bg-gold-hover disabled:opacity-50"
       >
-        Agregar al carrito
+        {available ? "Agregar al carrito" : "No disponible por ahora"}
       </button>
 
       {added && <p className="text-sm text-gold">Agregado al carrito.</p>}

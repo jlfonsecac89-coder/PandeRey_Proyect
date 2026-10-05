@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { toggleProductActive } from "@/lib/catalog/actions";
+import { toggleProductActive, toggleProductAvailable } from "@/lib/catalog/actions";
 import { formatCLP } from "@/lib/format";
 
 type Product = {
@@ -11,6 +11,7 @@ type Product = {
   sku: string;
   price: number;
   is_active: boolean;
+  is_available: boolean;
   is_special_event: boolean;
   categoryId: string | null;
   categoryName: string | null;
@@ -23,19 +24,22 @@ type Product = {
 export function ProductosTable({
   products,
   departments,
+  inventoryEnabled,
 }: {
   products: Product[];
   departments: { id: string; name: string }[];
+  inventoryEnabled: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [departamento, setDepartamento] = useState("");
   const [estado, setEstado] = useState<"todos" | "activo" | "inactivo">("todos");
-  const [faltantes, setFaltantes] = useState<"todos" | "sin_fotos" | "sin_stock">("todos");
+  const [faltantes, setFaltantes] = useState<"todos" | "sin_fotos" | "sin_stock" | "no_disponible">("todos");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const sinFotos = useMemo(() => products.filter((p) => !p.hasPhotos).length, [products]);
   const sinStock = useMemo(() => products.filter((p) => !p.hasStock).length, [products]);
+  const noDisponible = useMemo(() => products.filter((p) => !p.is_available).length, [products]);
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
@@ -44,6 +48,7 @@ export function ProductosTable({
       if (estado === "inactivo" && p.is_active) return false;
       if (faltantes === "sin_fotos" && p.hasPhotos) return false;
       if (faltantes === "sin_stock" && p.hasStock) return false;
+      if (faltantes === "no_disponible" && p.is_available) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         if (!p.name.toLowerCase().includes(q) && !p.sku.toLowerCase().includes(q)) return false;
@@ -55,6 +60,12 @@ export function ProductosTable({
   async function handleToggle(p: Product) {
     setPendingId(p.id);
     await toggleProductActive(p.id, !p.is_active);
+    setPendingId(null);
+  }
+
+  async function handleToggleAvailable(p: Product) {
+    setPendingId(p.id);
+    await toggleProductAvailable(p.id, !p.is_available);
     setPendingId(null);
   }
 
@@ -115,16 +126,29 @@ export function ProductosTable({
           >
             Sin fotos ({sinFotos})
           </button>
+          {inventoryEnabled && (
+            <button
+              type="button"
+              onClick={() => setFaltantes(faltantes === "sin_stock" ? "todos" : "sin_stock")}
+              className={`rounded-full border px-3 py-1 text-xs transition ${
+                faltantes === "sin_stock"
+                  ? "border-gold-dark text-gold-hover"
+                  : "border-charcoal-border text-foreground-muted hover:text-gold"
+              }`}
+            >
+              Sin stock ({sinStock})
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setFaltantes(faltantes === "sin_stock" ? "todos" : "sin_stock")}
+            onClick={() => setFaltantes(faltantes === "no_disponible" ? "todos" : "no_disponible")}
             className={`rounded-full border px-3 py-1 text-xs transition ${
-              faltantes === "sin_stock"
+              faltantes === "no_disponible"
                 ? "border-gold-dark text-gold-hover"
                 : "border-charcoal-border text-foreground-muted hover:text-gold"
             }`}
           >
-            Sin stock ({sinStock})
+            No disponible ({noDisponible})
           </button>
         </div>
         <p className="ml-auto text-xs text-foreground-muted">
@@ -151,8 +175,9 @@ export function ProductosTable({
               <th className="px-4 py-3 font-normal">Departamento</th>
               <th className="px-4 py-3 font-normal">Categoría</th>
               <th className="px-4 py-3 font-normal">Precio</th>
-              <th className="px-4 py-3 font-normal">Fotos/Stock</th>
+              <th className="px-4 py-3 font-normal">{inventoryEnabled ? "Fotos/Stock" : "Fotos"}</th>
               <th className="px-4 py-3 font-normal">Estado</th>
+              <th className="px-4 py-3 font-normal">Disponibilidad</th>
               <th className="px-4 py-3 font-normal">Editar</th>
             </tr>
           </thead>
@@ -178,10 +203,14 @@ export function ProductosTable({
                   <span className={`text-xs ${p.hasPhotos ? "text-foreground-muted" : "text-amber-400"}`}>
                     {p.hasPhotos ? "Con fotos" : "Sin fotos"}
                   </span>
-                  {" · "}
-                  <span className={`text-xs ${p.hasStock ? "text-foreground-muted" : "text-amber-400"}`}>
-                    {p.hasStock ? "Con stock" : "Sin stock"}
-                  </span>
+                  {inventoryEnabled && (
+                    <>
+                      {" · "}
+                      <span className={`text-xs ${p.hasStock ? "text-foreground-muted" : "text-amber-400"}`}>
+                        {p.hasStock ? "Con stock" : "Sin stock"}
+                      </span>
+                    </>
+                  )}
                 </td>
                 <td className="px-4 py-2.5">
                   <button
@@ -196,6 +225,18 @@ export function ProductosTable({
                   </button>
                 </td>
                 <td className="px-4 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleAvailable(p)}
+                    disabled={pendingId === p.id}
+                    className={`rounded-full border px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
+                      p.is_available ? "border-gold text-gold" : "border-amber-400/60 text-amber-400"
+                    }`}
+                  >
+                    {p.is_available ? "Disponible" : "No disponible"}
+                  </button>
+                </td>
+                <td className="px-4 py-2.5">
                   <Link href={`/admin/productos?editar=${p.id}`} className="text-xs text-gold-hover hover:underline">
                     Editar →
                   </Link>
@@ -204,7 +245,7 @@ export function ProductosTable({
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-sm text-foreground-muted">
+                <td colSpan={9} className="px-4 py-6 text-center text-sm text-foreground-muted">
                   No hay productos que coincidan con estos filtros.
                 </td>
               </tr>

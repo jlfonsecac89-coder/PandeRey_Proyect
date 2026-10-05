@@ -562,9 +562,9 @@ export async function getReorderItems(orderId: string): Promise<ReorderResult> {
   const { data: products } = productIds.length
     ? await supabase
         .from("products")
-        .select("id, name, slug, price, is_active, images:product_images(storage_path, sort_order)")
+        .select("id, name, slug, price, is_active, is_available, images:product_images(storage_path, sort_order)")
         .in("id", productIds)
-    : { data: [] as { id: string; name: string; slug: string; price: number; is_active: boolean; images: { storage_path: string; sort_order: number }[] }[] };
+    : { data: [] as { id: string; name: string; slug: string; price: number; is_active: boolean; is_available: boolean; images: { storage_path: string; sort_order: number }[] }[] };
   const productMap = new Map((products ?? []).map((p) => [p.id, p]));
 
   const available: ReorderItem[] = [];
@@ -572,7 +572,7 @@ export async function getReorderItems(orderId: string): Promise<ReorderResult> {
 
   for (const item of items ?? []) {
     const product = productMap.get(item.product_id);
-    if (!product || !product.is_active) {
+    if (!product || !product.is_active || !product.is_available) {
       unavailable.push(item.product_name_snapshot);
       continue;
     }

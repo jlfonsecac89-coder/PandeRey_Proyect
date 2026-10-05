@@ -17,6 +17,7 @@ export type ProductGridCardData = {
   clearancePct: number | undefined;
   isGlutenFree: boolean;
   isSpecialEvent: boolean;
+  isAvailable: boolean;
   imagePath: string | null;
   // Un producto con grupos de opciones obligatorios (ej. relleno de una
   // torta) no se puede agregar "a ciegas" desde la grilla — necesita que el
@@ -93,6 +94,11 @@ export function ProductGridCard({ product, publicBaseUrl }: { product: ProductGr
           {product.clearancePct && (
             <span className="rounded-full bg-burgundy px-2 py-0.5 text-[10px] font-medium text-foreground shadow-card">
               -{product.clearancePct}%
+            </span>
+          )}
+          {!product.isAvailable && (
+            <span className="rounded-full bg-background px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-400 shadow-card">
+              No disponible
             </span>
           )}
           {product.isSpecialEvent && (
