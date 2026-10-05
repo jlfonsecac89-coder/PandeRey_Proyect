@@ -4,6 +4,7 @@ import { signOut } from "@/lib/auth/actions";
 import { Logo } from "@/components/storefront/Logo";
 import { AdminNav } from "@/components/admin/AdminNav";
 import type { Profile } from "@/lib/auth/session";
+import { getModuleFlags } from "@/lib/settings/modules";
 
 const ROLE_LABELS: Record<Profile["role"], string> = {
   admin: "Administrador",
@@ -17,6 +18,7 @@ const ROLE_LABELS: Record<Profile["role"], string> = {
 // filtró middleware.ts (Capa 1) — nunca confiar en una sola capa.
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireRole(["admin", "marketing", "operaciones"], "/admin-login");
+  const modules = await getModuleFlags();
 
   return (
     <div className="flex min-h-full bg-background print:block print:bg-white">
@@ -28,7 +30,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-gold-dark">Panel administrativo</p>
         </div>
 
-        <AdminNav role={profile.role} />
+        <AdminNav role={profile.role} modules={modules} />
 
         <div className="border-t border-white/5 px-5 py-4">
           <p className="truncate text-sm text-foreground">{profile.full_name}</p>

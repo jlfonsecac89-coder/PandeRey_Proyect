@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/format";
+import { requireModule } from "@/lib/settings/modules";
 
 function dateNDaysFromNow(n: number): string {
   const d = new Date();
@@ -20,6 +21,7 @@ function unwrap<T>(value: T | T[] | null | undefined): T | null {
 
 export default async function StockPage() {
   await requireRole(["admin", "operaciones"], "/admin-login");
+  await requireModule("inventory");
   const supabase = await createClient();
 
   const [{ data: storeProducts }, { data: batches }] = await Promise.all([

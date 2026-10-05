@@ -1,9 +1,11 @@
 import { requireRole } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/server";
+import { requireModule } from "@/lib/settings/modules";
 import { RepartidorForm } from "./RepartidorForm";
 
 export default async function RepartidoresPage() {
   await requireRole(["admin"]);
+  await requireModule("delivery");
 
   const supabase = await createClient();
   const { data: stores } = await supabase

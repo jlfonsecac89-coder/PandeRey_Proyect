@@ -4,9 +4,19 @@ import Link from "next/link";
 import { useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { Profile } from "@/lib/auth/session";
+import type { ModuleFlags, ModuleKey } from "@/lib/settings/module-keys";
 import { AdminNavGroup } from "./AdminNavGroup";
 
-type NavItem = { href: string; label: string; roles: Profile["role"][] };
+type NavItem = {
+  href: string;
+  label: string;
+  roles: Profile["role"][];
+  // El item solo aparece si el módulo está encendido en Ajustes del sistema.
+  requiresModule?: ModuleKey;
+  // El item siempre aparece, pero con otro nombre mientras el módulo está
+  // apagado (Sucursales sigue haciendo falta sin delivery).
+  offLabel?: { module: ModuleKey; label: string };
+};
 type NavSection = { label: string; items: NavItem[] };
 
 // Rutas que se presentan como pestañas de /admin/productos (CatalogoTabs) —
@@ -22,8 +32,18 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/admin", label: "Dashboard", roles: ["admin", "marketing", "operaciones"] },
       { href: "/admin/pedidos", label: "Pedidos", roles: ["admin", "operaciones"] },
-      { href: "/admin/pedidos?grupo=en_camino", label: "App Delivery", roles: ["admin", "operaciones"] },
-      { href: "/admin/configuracion/sucursales", label: "Envíos y sucursales", roles: ["admin"] },
+      {
+        href: "/admin/pedidos?grupo=en_camino",
+        label: "App Delivery",
+        roles: ["admin", "operaciones"],
+        requiresModule: "delivery",
+      },
+      {
+        href: "/admin/configuracion/sucursales",
+        label: "Envíos y sucursales",
+        roles: ["admin"],
+        offLabel: { module: "delivery", label: "Sucursales" },
+      },
     ],
   },
   {
@@ -33,7 +53,7 @@ const NAV_SECTIONS: NavSection[] = [
       // acá — viven como pestañas dentro de /admin/productos (CatalogoTabs),
       // así el menú no repite 4 entradas del mismo árbol de catálogo.
       { href: "/admin/productos", label: "Productos", roles: ["admin", "operaciones"] },
-      { href: "/admin/stock", label: "Stock", roles: ["admin", "operaciones"] },
+      { href: "/admin/stock", label: "Stock", roles: ["admin", "operaciones"], requiresModule: "inventory" },
     ],
   },
   {
@@ -54,7 +74,12 @@ const NAV_SECTIONS: NavSection[] = [
     label: "Configuración",
     items: [
       { href: "/admin/configuracion/usuarios", label: "Usuarios", roles: ["admin"] },
-      { href: "/admin/configuracion/repartidores", label: "Repartidores", roles: ["admin"] },
+      {
+        href: "/admin/configuracion/repartidores",
+        label: "Repartidores",
+        roles: ["admin"],
+        requiresModule: "delivery",
+      },
       { href: "/admin/configuracion/sistema", label: "Ajustes del sistema", roles: ["admin"] },
       { href: "/admin/auditoria", label: "Auditoría", roles: ["admin"] },
     ],
@@ -77,7 +102,7 @@ function isItemActive(item: NavItem, pathname: string, currentGroup: string | nu
   return pathname === itemPath && (itemPath !== "/admin/pedidos" || !currentGroup);
 }
 
-export function AdminNav({ role }: { role: Profile["role"] }) {
+export function AdminNav({ role, modules }: { role: Profile["role"]; modules: ModuleFlags }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentGroup = searchParams.get("grupo");
@@ -114,7 +139,9 @@ export function AdminNav({ role }: { role: Profile["role"] }) {
   return (
     <nav className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
       {NAV_SECTIONS.map((section) => {
-        const visible = section.items.filter((item) => item.roles.includes(role));
+        const visible = section.items.filter(
+          (item) => item.roles.includes(role) && (!item.requiresModule || modules[item.requiresModule]),
+        );
         if (visible.length === 0) return null;
         return (
           <AdminNavGroup
@@ -135,7 +162,7 @@ export function AdminNav({ role }: { role: Profile["role"] }) {
                       : "border-transparent text-foreground-muted hover:bg-white/[0.03] hover:text-foreground"
                   }`}
                 >
-                  {item.label}
+                  {item.offLabel && !modules[item.offLabel.module] ? item.offLabel.label : item.label}
                 </Link>
               );
             })}

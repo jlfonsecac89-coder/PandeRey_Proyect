@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/rbac";
 import { getSystemSettings } from "@/lib/settings/system-settings";
+import { getModuleFlags } from "@/lib/settings/modules";
 import { SistemaForm } from "./SistemaForm";
+import { ModulosForm } from "./ModulosForm";
 
 export default async function ConfiguracionSistemaPage() {
   await requireRole(["admin"], "/admin-login");
-  const settings = await getSystemSettings();
+  const [settings, moduleFlags] = await Promise.all([getSystemSettings(), getModuleFlags()]);
 
   return (
     <div className="max-w-2xl">
@@ -17,6 +19,15 @@ export default async function ConfiguracionSistemaPage() {
       </p>
 
       <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
+        <p className="mb-1 text-sm font-semibold uppercase tracking-wide text-foreground-muted">Módulos</p>
+        <p className="mb-4 text-xs text-foreground/50">
+          Funciones ya desarrolladas que se pueden encender cuando el negocio las necesite. Apagar un módulo solo lo
+          oculta y lo bloquea — no borra datos ni código.
+        </p>
+        <ModulosForm flags={moduleFlags} />
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
         <SistemaForm settings={settings} />
       </div>
 
