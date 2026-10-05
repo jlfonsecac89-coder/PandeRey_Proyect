@@ -1,5 +1,19 @@
 # 🤖 Estado operativo del agente
 
+## 📍 Cambio de alcance activo (oct-2026): lanzamiento solo-retiro + campaña Pan de Jamón
+Plan aprobado: `~/.claude/plans/sleepy-foraging-wilkinson.md`.
+Trabajo directo sobre producción (sin datos reales aún), migraciones aditivas con confirmación una por una; **no hacer push hasta validar y que el usuario lo apruebe**.
+- [x] Paso 1 — Interruptores de módulo (`module_inventory/delivery/invoicing/bank_transfer` en `system_settings`, apagados por defecto). `src/lib/settings/module-keys.ts` (cliente), `modules.ts` (`getModuleFlags`, `requireModule`), `module-actions.ts` (`toggleModule`, solo admin, auditado), `ModulosForm.tsx` en Ajustes del sistema, `AdminNav` con `requiresModule`. Stock y Repartidores redirigen si su módulo está apagado. Desvío del plan: "Envíos y sucursales" **no se oculta** (ahí viven horarios, WhatsApp y pedido mínimo); solo cambia a "Sucursales" con delivery apagado. Typecheck/lint verdes; falta verificación visual (el navegador de prueba no tenía sesión admin).
+- [ ] Paso 2 — Delivery deshabilitado y solo pago en plataforma
+- [ ] Paso 3 — Disponibilidad en vez de stock
+- [ ] Paso 4 — Pedido solo con pago, N° PDR-000123 y orden de compra
+- [ ] Paso 5 — Retiro con N° de boleta
+- [ ] Paso 6 — Campaña Pan de Jamón
+- [ ] Paso 7 — Retiros por día, reporte y producción
+- [ ] Paso 8 — Verificación y cierre
+
+---
+
 ## 📍 Cambio activo
 Rediseño visual "Sello del Obrador" (storefront: Landing/Tienda/Checkout/Cuenta).
 Plan completo en `C:\Users\54112\.claude\plans\sleepy-foraging-wilkinson.md`.
