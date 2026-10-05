@@ -20,6 +20,7 @@ import { computeEarnedPoints } from "@/lib/loyalty/points";
 import { isModuleEnabled } from "@/lib/settings/modules";
 import { assignOrderNumber, getOrderLabel } from "./order-number";
 import { buildPickupSummary } from "./pickup-summary";
+import { checkReceipt } from "./receipt";
 
 export type OrderActionState = { error?: string; success?: string } | null;
 
@@ -231,19 +232,16 @@ export async function markOrderReady(orderId: string): Promise<OrderActionState>
 // Con el módulo de facturación apagado la boleta se emite a mano en Defontana:
 // el N° que el equipo digita acá es lo que cierra el pedido. Con el módulo
 // encendido la boleta la genera el sistema y no se pide.
-const RECEIPT_FORMAT = /^[A-Za-z0-9-]{1,20}$/;
-
 export async function confirmPickup(orderId: string, receiptNumber?: string): Promise<OrderActionState> {
   const profile = await requireRole(["admin", "operaciones"]);
   const supabase = await createClient();
 
   const manualReceipt = !(await isModuleEnabled("invoicing"));
-  const receipt = receiptNumber?.trim() ?? "";
+  let receipt = "";
   if (manualReceipt) {
-    if (!receipt) return { error: "Ingresa el N° de boleta para cerrar el pedido." };
-    if (!RECEIPT_FORMAT.test(receipt)) {
-      return { error: "El N° de boleta solo admite letras, números y guiones (máx. 20)." };
-    }
+    const checked = checkReceipt(receiptNumber);
+    if ("error" in checked) return { error: checked.error };
+    receipt = checked.receipt;
   }
 
   const { data: order } = await supabase
@@ -254,6 +252,16 @@ export async function confirmPickup(orderId: string, receiptNumber?: string): Pr
   if (!order) return { error: "Pedido no encontrado." };
   if (order.status !== "ready_for_pickup") {
     return { error: "El pedido no está listo para retiro." };
+  }
+
+  // Un pedido de campaña se retira en varios días: se cierra desde "Retiros por
+  // día", cuando se entrega la última parte.
+  const { count: campaignLines } = await supabase
+    .from("order_campaign_pickups")
+    .select("id", { count: "exact", head: true })
+    .eq("order_id", orderId);
+  if ((campaignLines ?? 0) > 0) {
+    return { error: "Este pedido es de campaña: marca cada retiro en Retiros por día." };
   }
 
   if (manualReceipt) {

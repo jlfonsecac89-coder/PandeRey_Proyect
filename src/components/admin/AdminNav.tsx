@@ -32,6 +32,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/admin", label: "Dashboard", roles: ["admin", "marketing", "operaciones"] },
       { href: "/admin/pedidos", label: "Pedidos", roles: ["admin", "operaciones"] },
+      { href: "/admin/retiros", label: "Retiros por día", roles: ["admin", "operaciones"] },
       {
         href: "/admin/pedidos?grupo=en_camino",
         label: "App Delivery",

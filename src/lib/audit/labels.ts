@@ -10,6 +10,8 @@ export const ACTION_LABELS: Record<string, string> = {
   delivery_message_sent: "Mensaje enviado a repartidor",
   module_toggled: "Módulo activado/desactivado",
   pickup_confirmed: "Retiro confirmado",
+  campaign_pickup_marked: "Retiro de campaña marcado",
+  campaign_pickup_undone: "Retiro de campaña deshecho",
   campaign_created: "Campaña creada",
   campaign_activated: "Campaña activada",
   campaign_deactivated: "Campaña desactivada",
