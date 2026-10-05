@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/rbac";
 import { getCurrentProfile } from "@/lib/auth/session";
+import { logAction } from "@/lib/audit/log-action";
 import { sendNotification, getUserEmail } from "@/lib/notifications/send";
 import {
   readyForPickupTemplate,
@@ -227,9 +228,23 @@ export async function markOrderReady(orderId: string): Promise<OrderActionState>
   return { success: "Pedido actualizado." };
 }
 
-export async function confirmPickup(orderId: string): Promise<OrderActionState> {
+// Con el módulo de facturación apagado la boleta se emite a mano en Defontana:
+// el N° que el equipo digita acá es lo que cierra el pedido. Con el módulo
+// encendido la boleta la genera el sistema y no se pide.
+const RECEIPT_FORMAT = /^[A-Za-z0-9-]{1,20}$/;
+
+export async function confirmPickup(orderId: string, receiptNumber?: string): Promise<OrderActionState> {
   const profile = await requireRole(["admin", "operaciones"]);
   const supabase = await createClient();
+
+  const manualReceipt = !(await isModuleEnabled("invoicing"));
+  const receipt = receiptNumber?.trim() ?? "";
+  if (manualReceipt) {
+    if (!receipt) return { error: "Ingresa el N° de boleta para cerrar el pedido." };
+    if (!RECEIPT_FORMAT.test(receipt)) {
+      return { error: "El N° de boleta solo admite letras, números y guiones (máx. 20)." };
+    }
+  }
 
   const { data: order } = await supabase
     .from("orders")
@@ -241,13 +256,44 @@ export async function confirmPickup(orderId: string): Promise<OrderActionState> 
     return { error: "El pedido no está listo para retiro." };
   }
 
-  const { error } = await supabase
-    .from("orders")
-    .update({ status: "delivered", delivered_at: new Date().toISOString() })
-    .eq("id", orderId);
-  if (error) return { error: "No se pudo confirmar el retiro." };
+  if (manualReceipt) {
+    const { data: duplicate } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("receipt_number", receipt)
+      .neq("id", orderId)
+      .maybeSingle();
+    if (duplicate) return { error: "Ese N° de boleta ya está registrado en otro pedido." };
+  }
 
-  await insertHistory(supabase, orderId, "delivered", profile.id);
+  const { data: updated, error } = await supabase
+    .from("orders")
+    .update({
+      status: "delivered",
+      delivered_at: new Date().toISOString(),
+      delivered_by: profile.id,
+      ...(manualReceipt ? { receipt_number: receipt } : {}),
+    })
+    .eq("id", orderId)
+    .eq("status", "ready_for_pickup")
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    // El índice único atrapa la carrera entre dos cierres con la misma boleta.
+    return {
+      error: error.code === "23505" ? "Ese N° de boleta ya está registrado en otro pedido." : "No se pudo confirmar el retiro.",
+    };
+  }
+  if (!updated) return { error: "El pedido ya no está listo para retiro." };
+
+  await insertHistory(supabase, orderId, "delivered", profile.id, manualReceipt ? `Boleta N° ${receipt}` : undefined);
+  await logAction({
+    actor: profile,
+    action: "pickup_confirmed",
+    entityType: "order",
+    entityId: orderId,
+    after: manualReceipt ? { receipt_number: receipt } : null,
+  });
   revalidatePath("/admin/pedidos");
   await notifyOwner(orderId, order.user_id, "delivered", (label) => deliveredTemplate(label));
 

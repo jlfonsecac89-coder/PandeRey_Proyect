@@ -7,6 +7,25 @@ create sequence if not exists order_number_seq;
 
 alter table orders add column if not exists order_number bigint;
 
+-- En producción la columna ya existía como text (sin datos, sin migración en el
+-- repo). Se convierte a bigint solo si no es de ese tipo y está vacía; si
+-- tuviera valores, aborta en vez de arriesgar una conversión.
+do $$
+declare
+  v_type text;
+begin
+  select data_type into v_type
+  from information_schema.columns
+  where table_schema = 'public' and table_name = 'orders' and column_name = 'order_number';
+
+  if v_type is distinct from 'bigint' then
+    if exists (select 1 from orders where order_number is not null) then
+      raise exception 'orders.order_number es % y tiene datos; revisar antes de convertir', v_type;
+    end if;
+    alter table orders alter column order_number type bigint using null;
+  end if;
+end $$;
+
 -- Numera por orden de creación los pedidos que ya están pagados o más allá.
 with numbered as (
   select id, row_number() over (order by created_at, id) as rn

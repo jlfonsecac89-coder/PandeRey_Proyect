@@ -9,6 +9,7 @@ export const ACTION_LABELS: Record<string, string> = {
   promotion_updated: "Promoción editada",
   delivery_message_sent: "Mensaje enviado a repartidor",
   module_toggled: "Módulo activado/desactivado",
+  pickup_confirmed: "Retiro confirmado",
 };
 
 export function actionLabel(action: string): string {

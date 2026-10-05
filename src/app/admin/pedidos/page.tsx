@@ -31,7 +31,7 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
   const { grupo, entrega, rango, vista } = await searchParams;
   const activeVista = vista === "kanban" ? "kanban" : "tabla";
   const supabase = await createClient();
-  const { delivery: deliveryOn, bank_transfer: bankTransferOn } = await getModuleFlags();
+  const { delivery: deliveryOn, bank_transfer: bankTransferOn, invoicing: invoicingOn } = await getModuleFlags();
   // Sin delivery no hay pedidos "en camino" ni con problemas de entrega: se
   // ocultan esos grupos y el filtro de envío en vez de mostrar columnas vacías.
   // Un pedido solo existe para el equipo cuando el pago está confirmado
@@ -67,7 +67,7 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
   let query = supabase
     .from("orders")
     .select(
-      "id, order_number, status, payment_method, delivery_method, total, created_at, store_id, user_id, assigned_driver_id, sla_deadline, delivered_at, scheduled_at, ticket_printed_at",
+      "id, order_number, status, payment_method, delivery_method, total, created_at, store_id, user_id, assigned_driver_id, sla_deadline, delivered_at, receipt_number, scheduled_at, ticket_printed_at",
     )
     .or(visibleOrdersFilter)
     .order("created_at", { ascending: false })
@@ -219,6 +219,7 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
             repartidores={repartidores ?? []}
             customers={customers ?? []}
             items={items ?? []}
+            invoicingEnabled={invoicingOn}
           />
         )}
       </div>

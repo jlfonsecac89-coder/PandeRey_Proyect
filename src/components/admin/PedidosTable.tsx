@@ -37,11 +37,13 @@ export function PedidosTable({
   repartidores,
   customers,
   items,
+  invoicingEnabled,
 }: {
   orders: AdminOrder[];
   repartidores: Person[];
   customers: Person[];
   items: OrderItemRow[];
+  invoicingEnabled: boolean;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -99,8 +101,14 @@ export function PedidosTable({
   // se abandona) con transferencia (necesita confirmación manual) — el bulk
   // solo tiene sentido si la selección es 100% transferencia.
   const allBankTransfer = selectedOrders.every((o) => o.payment_method === "bank_transfer");
+  // Sin facturación del sistema cada retiro necesita su propio N° de boleta,
+  // así que no se puede cerrar en masa.
   const bulkAction =
-    commonStatus && (commonStatus !== "pending_payment" || allBankTransfer) ? BULK_ACTIONS[commonStatus] : undefined;
+    commonStatus &&
+    (commonStatus !== "pending_payment" || allBankTransfer) &&
+    (commonStatus !== "ready_for_pickup" || invoicingEnabled)
+      ? BULK_ACTIONS[commonStatus]
+      : undefined;
 
   async function runBulk() {
     if (!bulkAction) return;
@@ -118,7 +126,7 @@ export function PedidosTable({
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por código o cliente..."
+          placeholder="Buscar por N° de pedido, boleta o cliente..."
           className="w-64 rounded-md border border-charcoal-border bg-background px-3 py-1.5 text-sm outline-none focus:border-gold"
         />
         <p className="text-xs text-foreground-muted">
@@ -187,6 +195,7 @@ export function PedidosTable({
                 items={itemsByOrder.get(order.id) ?? []}
                 selected={selected.has(order.id)}
                 onToggleSelect={() => toggleOne(order.id)}
+                invoicingEnabled={invoicingEnabled}
               />
             ))}
           </tbody>

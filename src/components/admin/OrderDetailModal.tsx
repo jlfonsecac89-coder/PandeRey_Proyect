@@ -112,6 +112,13 @@ export function OrderDetailModal({
             </div>
           </div>
 
+          {order.receipt_number && (
+            <div className="mt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Boleta</p>
+              <p className="mt-1 font-mono text-sm text-foreground">N° {order.receipt_number}</p>
+            </div>
+          )}
+
           <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
             <p className="text-sm font-semibold text-foreground">Total</p>
             <p className="text-sm font-semibold text-gold">{formatCLP(order.total)}</p>

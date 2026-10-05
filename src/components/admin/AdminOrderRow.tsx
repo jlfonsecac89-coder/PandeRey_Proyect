@@ -37,6 +37,7 @@ export type AdminOrder = {
   assigned_driver_id: string | null;
   sla_deadline: string | null;
   delivered_at: string | null;
+  receipt_number: string | null;
   scheduled_at: string | null;
   ticket_printed_at: string | null;
 };
@@ -51,6 +52,7 @@ export function AdminOrderRow({
   items,
   selected = false,
   onToggleSelect,
+  invoicingEnabled = false,
 }: {
   order: AdminOrder;
   drivers: Person[];
@@ -59,13 +61,14 @@ export function AdminOrderRow({
   items: OrderItemSummary[];
   selected?: boolean;
   onToggleSelect?: () => void;
+  invoicingEnabled?: boolean;
 }) {
   const [readyState, readyAction, readyPending] = useActionState<OrderActionState, FormData>(
     () => markOrderReady(order.id),
     null,
   );
   const [pickupState, pickupAction, pickupPending] = useActionState<OrderActionState, FormData>(
-    () => confirmPickup(order.id),
+    (_prev, formData) => confirmPickup(order.id, String(formData.get("receipt_number") || "")),
     null,
   );
   const [returnState, returnAction, returnPending] = useActionState<OrderActionState, FormData>(
@@ -227,14 +230,24 @@ export function AdminOrderRow({
           )}
 
           {order.status === "ready_for_pickup" && (
-            <form action={pickupAction}>
-              {pickupState?.error && <p className="text-xs text-red-400">{pickupState.error}</p>}
+            <form action={pickupAction} className="space-y-1">
+              {!invoicingEnabled && (
+                <input
+                  name="receipt_number"
+                  required
+                  maxLength={20}
+                  placeholder="N° de boleta"
+                  aria-label="N° de boleta"
+                  className="w-28 rounded-md border border-charcoal-border bg-background px-1.5 py-1 text-xs outline-none focus:border-gold"
+                />
+              )}
+              {pickupState?.error && <p className="max-w-40 text-xs text-red-400">{pickupState.error}</p>}
               <button
                 type="submit"
                 disabled={pickupPending}
                 className="rounded-md bg-gold px-2 py-1 text-xs font-medium text-ink hover:bg-gold-hover disabled:opacity-50"
               >
-                Confirmar retiro
+                {pickupPending ? "Confirmando..." : "Confirmar retiro"}
               </button>
             </form>
           )}
