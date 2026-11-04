@@ -3,6 +3,8 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { RefundPolicy } from "@/lib/orders/refund-policy";
 
+export const REFUND_TEMPLATE_KEY = "refund_policy_text";
+
 export type SystemSettings = {
   orderPrepSlaMinutes: number;
   maxDeliveryIssueWaitMinutes: number;
@@ -64,4 +66,17 @@ export async function getRefundPolicy(): Promise<RefundPolicy> {
     debitBusinessDays: s.refundDebitBusinessDays,
     maxDays: s.refundMaxDays,
   };
+}
+
+// Texto de los Términos para cancelaciones y reembolsos que el gerente editó.
+// null = usa la plantilla por defecto (DEFAULT_REFUND_TEMPLATE).
+export async function getCustomRefundTemplate(): Promise<{ template: string; updatedAt: string } | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("system_settings")
+    .select("value, updated_at")
+    .eq("key", REFUND_TEMPLATE_KEY)
+    .maybeSingle();
+  if (!data || !data.value.trim()) return null;
+  return { template: data.value, updatedAt: data.updated_at };
 }

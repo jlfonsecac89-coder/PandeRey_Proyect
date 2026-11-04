@@ -1,13 +1,20 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/rbac";
-import { getSystemSettings } from "@/lib/settings/system-settings";
+import { getSystemSettings, getRefundPolicy, getCustomRefundTemplate } from "@/lib/settings/system-settings";
+import { DEFAULT_REFUND_TEMPLATE } from "@/lib/orders/refund-policy";
 import { getModuleFlags } from "@/lib/settings/modules";
 import { SistemaForm } from "./SistemaForm";
 import { ModulosForm } from "./ModulosForm";
+import { RefundPolicyForm } from "./RefundPolicyForm";
 
 export default async function ConfiguracionSistemaPage() {
   await requireRole(["admin"], "/admin-login");
-  const [settings, moduleFlags] = await Promise.all([getSystemSettings(), getModuleFlags()]);
+  const [settings, moduleFlags, refundPolicy, customRefund] = await Promise.all([
+    getSystemSettings(),
+    getModuleFlags(),
+    getRefundPolicy(),
+    getCustomRefundTemplate(),
+  ]);
 
   return (
     <div className="max-w-2xl">
@@ -29,6 +36,17 @@ export default async function ConfiguracionSistemaPage() {
 
       <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
         <SistemaForm settings={settings} />
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
+        <p className="mb-1 text-sm font-semibold uppercase tracking-wide text-foreground-muted">
+          Términos: cancelaciones, devoluciones y reembolsos
+        </p>
+        <p className="mb-4 text-xs text-foreground/50">
+          Es la sección 7 de los Términos y Condiciones. Los plazos (días mínimo, máximo y de abono en débito) se
+          cambian arriba; aquí editas el texto completo.
+        </p>
+        <RefundPolicyForm template={customRefund?.template ?? DEFAULT_REFUND_TEMPLATE} policy={refundPolicy} />
       </div>
 
       <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-card">

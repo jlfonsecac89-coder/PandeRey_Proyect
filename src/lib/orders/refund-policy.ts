@@ -27,3 +27,29 @@ export function refundPolicySentences(p: RefundPolicy): string[] {
 export function refundPolicyText(p: RefundPolicy): string {
   return refundPolicySentences(p).join(" ");
 }
+
+// Texto de la sección "Cancelaciones, devoluciones y reembolsos" de los Términos.
+// El gerente puede reescribirlo en Ajustes del sistema; vacío = este texto.
+// Marcadores que se reemplazan con los plazos vigentes:
+//   {dias_solicitud} {dias_debito} {dias_maximo}   → los números
+//   {plazos}                                       → las tres frases de plazos
+// Un párrafo se separa con una línea en blanco y **texto** va en negrita.
+export const REFUND_TEMPLATE_MAX_LENGTH = 3000;
+
+export const DEFAULT_REFUND_TEMPLATE = `Para cancelar un pedido ya pagado, contáctanos por los medios indicados al final de estos términos. Si el pedido se cancela —a tu solicitud o porque la tienda no puede prepararlo— te reembolsamos el monto efectivamente pagado al mismo medio de pago, a través de Mercado Pago.
+
+**El reembolso no es instantáneo.** {plazos}
+
+No controlamos los tiempos de tu banco o emisor de tarjeta. Si pasado el plazo no ves el dinero, escríbenos con el N.º de tu pedido y lo revisamos contigo. En pedidos por encargo con retiro en varias fechas, si ya retiraste una parte, el reembolso de la parte pendiente se coordina directamente con la tienda.`;
+
+export function renderRefundTemplate(template: string, p: RefundPolicy): string[] {
+  const filled = template
+    .replaceAll("{plazos}", refundPolicyText(p))
+    .replaceAll("{dias_solicitud}", String(p.requestBusinessDays))
+    .replaceAll("{dias_debito}", String(p.debitBusinessDays))
+    .replaceAll("{dias_maximo}", String(p.maxDays));
+  return filled
+    .split(/\n\s*\n/)
+    .map((para) => para.trim())
+    .filter(Boolean);
+}

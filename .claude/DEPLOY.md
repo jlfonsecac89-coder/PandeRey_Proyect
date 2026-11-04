@@ -3,7 +3,7 @@
 Preparado el 4-nov-2026. **Nada de esto se ejecuta sin aprobación explícita del usuario**: un `git push` a `master` despliega automáticamente en Vercel.
 
 ## 1. Qué se publica
-- 21 commits sobre `origin/master` (`0d5b832`): alcance de lanzamiento (módulos, solo retiro, disponibilidad), N° `PDR-000123`, boleta manual al retiro, campañas con retiro por día, retiros y reportes, cancelación y reembolso, dashboard, colecciones, tuteo, remitente de correo configurable.
+- 22 commits sobre `origin/master` (`0d5b832`): alcance de lanzamiento (módulos, solo retiro, disponibilidad), N° `PDR-000123`, boleta manual al retiro, campañas con retiro por día, retiros y reportes, cancelación y reembolso, dashboard, colecciones, tuteo, remitente de correo configurable.
 - `npm run build` compila sin errores; `tsc` limpio; `eslint` solo con los 6 errores preexistentes (`VariantesSection.tsx`, `DashboardCharts.tsx`).
 - Sin secretos en archivos versionados; `.env.local` está ignorado.
 

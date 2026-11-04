@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { TERMS_VERSION } from "@/lib/legal/terms";
-import { getRefundPolicy } from "@/lib/settings/system-settings";
-import { refundPolicySentences } from "@/lib/orders/refund-policy";
+import { getRefundPolicy, getCustomRefundTemplate } from "@/lib/settings/system-settings";
+import { DEFAULT_REFUND_TEMPLATE, renderRefundTemplate } from "@/lib/orders/refund-policy";
+import { RefundText } from "@/components/legal/RefundText";
 
 export const metadata = {
   title: "Términos y Condiciones — Pan de Rey",
@@ -9,7 +10,8 @@ export const metadata = {
 
 export default async function TerminosPage() {
   const supabase = await createClient();
-  const refundSentences = refundPolicySentences(await getRefundPolicy());
+  const [refundPolicy, customRefund] = await Promise.all([getRefundPolicy(), getCustomRefundTemplate()]);
+  const refundParagraphs = renderRefundTemplate(customRefund?.template ?? DEFAULT_REFUND_TEMPLATE, refundPolicy);
   const { data: store } = await supabase
     .from("stores")
     .select("name, contact_address, contact_phone, contact_email")
@@ -96,22 +98,14 @@ export default async function TerminosPage() {
 
       <section className="mt-6 space-y-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/50">
-          7. Cancelaciones y reembolsos
+          7. Cancelaciones, devoluciones y reembolsos
         </h2>
-        <p>
-          Para cancelar un pedido ya pagado, contáctanos por los medios indicados al final de estos términos. Si
-          el pedido se cancela —a tu solicitud o porque la tienda no puede prepararlo— te reembolsamos el monto
-          efectivamente pagado al mismo medio de pago, a través de Mercado Pago.
-        </p>
-        <p>
-          <strong>El reembolso no es instantáneo.</strong> {refundSentences.join(" ")}
-        </p>
-        <p>
-          No controlamos los tiempos de tu banco o emisor de tarjeta. Si pasado el plazo no ves el dinero,
-          escríbenos con el N.º de tu pedido y lo revisamos contigo. En pedidos por encargo con retiro en varias
-          fechas, si ya retiraste una parte, el reembolso de la parte pendiente se coordina directamente con la
-          tienda.
-        </p>
+        <RefundText paragraphs={refundParagraphs} />
+        {customRefund && (
+          <p className="text-xs text-foreground/40">
+            Sección actualizada el {new Date(customRefund.updatedAt).toLocaleDateString("es-CL")}.
+          </p>
+        )}
       </section>
 
       <section className="mt-6 space-y-2">

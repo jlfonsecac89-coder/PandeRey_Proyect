@@ -11,6 +11,7 @@ export const ACTION_LABELS: Record<string, string> = {
   module_toggled: "Módulo activado/desactivado",
   pickup_confirmed: "Retiro confirmado",
   order_cancelled: "Pedido cancelado",
+  refund_policy_text_changed: "Texto de reembolsos modificado",
   collection_activated: "Colección activada",
   collection_deactivated: "Colección desactivada",
   collection_dates_changed: "Vigencia de colección modificada",

@@ -108,7 +108,7 @@ export function SistemaForm({ settings }: { settings: SystemSettings }) {
         <div className="mt-3 grid grid-cols-3 gap-3">
           <div>
             <label htmlFor="refundRequestBusinessDays" className="mb-1 block text-xs text-foreground/60">
-              Pedimos el reembolso en (días hábiles)
+              Plazo mínimo: pedimos el reembolso en (días hábiles)
             </label>
             <input
               id="refundRequestBusinessDays"
@@ -142,7 +142,7 @@ export function SistemaForm({ settings }: { settings: SystemSettings }) {
           </div>
           <div>
             <label htmlFor="refundMaxDays" className="mb-1 block text-xs text-foreground/60">
-              Plazo máximo total (días)
+              Plazo máximo total (días corridos)
             </label>
             <input
               id="refundMaxDays"
