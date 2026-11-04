@@ -6,6 +6,9 @@ import { getModuleFlags } from "@/lib/settings/modules";
 import { DashboardCharts, type ProductSalesRow, type CategorySalesRow } from "@/components/admin/DashboardCharts";
 import { PIPELINE_GROUPS, PIPELINE_ORDER, type PipelineGroup } from "@/lib/orders/pipeline";
 import { STATUS_LABELS, type OrderStatus } from "@/lib/orders/status";
+import { getCampaignDashboard } from "@/lib/campaigns/dashboard";
+import { getOrderCampaignPickups } from "@/lib/campaigns/order-pickups";
+import { formatPickupDate } from "@/lib/campaigns/types";
 
 const ACTIVE_STATUSES = [
   "paid",
@@ -68,6 +71,33 @@ const STATUS_PILL_COLORS: Record<PipelineGroup, string> = GROUP_COLORS;
 
 type SearchParams = { range?: string; estado?: string };
 
+// Suma de ventas en [from, to). Pagina de a 1000 filas: PostgREST corta ahí y
+// con más pedidos el total quedaría subestimado sin avisar.
+async function sumSales(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  from: string,
+  to?: string,
+): Promise<{ total: number; count: number }> {
+  let total = 0;
+  let count = 0;
+  for (let offset = 0; ; offset += 1000) {
+    let q = supabase
+      .from("orders")
+      .select("total")
+      .gte("created_at", from)
+      .not("status", "in", `(${EXCLUDED_FROM_SALES.join(",")})`)
+      .order("created_at")
+      .range(offset, offset + 999);
+    if (to) q = q.lt("created_at", to);
+    const { data } = await q;
+    const rows = data ?? [];
+    for (const r of rows) total += Number(r.total);
+    count += rows.length;
+    if (rows.length < 1000) break;
+  }
+  return { total, count };
+}
+
 export default async function AdminHomePage({
   searchParams,
 }: {
@@ -84,7 +114,7 @@ export default async function AdminHomePage({
 
   // Mismo criterio que /admin/pedidos: un pedido solo cuenta cuando tiene N°
   // (pago confirmado) y se ocultan los grupos de módulos apagados.
-  const { delivery: deliveryOn, bank_transfer: bankTransferOn } = await getModuleFlags();
+  const { delivery: deliveryOn, bank_transfer: bankTransferOn, inventory: inventoryOn } = await getModuleFlags();
   const visibleOrdersFilter = bankTransferOn
     ? "order_number.not.is.null,and(status.eq.pending_payment,payment_method.eq.bank_transfer)"
     : "order_number.not.is.null";
@@ -107,12 +137,16 @@ export default async function AdminHomePage({
     return qs ? `/admin?${qs}` : "/admin";
   }
 
+  const prevSince = new Date(new Date(rangeSince).getTime() - activeRange.hours * 3600_000).toISOString();
+
   const [
-    { data: salesToday },
-    { data: salesWeek },
-    { data: activeOrders },
+    salesToday,
+    salesRange,
+    salesPrev,
+    { count: activeOrdersCount },
     { data: recentDelivered },
     { data: expiringBatches },
+    { count: newCustomersCount },
     { count: pendingReviewsCount },
     { count: newsletterCount },
     { data: productSales },
@@ -120,16 +154,17 @@ export default async function AdminHomePage({
     pipelineCounts,
     { data: recentOrdersRaw },
   ] = await Promise.all([
-    supabase.from("orders").select("total").gte("created_at", startOfDay(new Date())).not("status", "in", `(${EXCLUDED_FROM_SALES.join(",")})`),
-    supabase.from("orders").select("total").gte("created_at", daysAgo(7)).not("status", "in", `(${EXCLUDED_FROM_SALES.join(",")})`),
+    sumSales(supabase, startOfDay(new Date())),
+    sumSales(supabase, rangeSince),
+    sumSales(supabase, prevSince, rangeSince),
     supabase.from("orders").select("id", { count: "exact", head: true }).in("status", ACTIVE_STATUSES),
     supabase
       .from("orders")
-      .select("delivered_at, sla_deadline")
+      .select("id, delivered_at, sla_deadline")
       .eq("status", "delivered")
       .gte("created_at", daysAgo(30))
       .not("delivered_at", "is", null),
-    isOps
+    isOps && inventoryOn
       ? supabase
           .from("product_batches")
           .select("quantity, expiration_date, product:products(name)")
@@ -139,6 +174,9 @@ export default async function AdminHomePage({
           .order("expiration_date", { ascending: true })
           .limit(8)
       : Promise.resolve({ data: [] as { quantity: number; expiration_date: string; product: { name: string } | { name: string }[] | null }[] }),
+    isMarketingView
+      ? supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "customer").gte("created_at", rangeSince)
+      : Promise.resolve({ count: 0, data: null }),
     isMarketingView
       ? supabase.from("product_reviews").select("id", { count: "exact", head: true }).eq("status", "pending")
       : Promise.resolve({ count: 0, data: null }),
@@ -178,13 +216,22 @@ export default async function AdminHomePage({
       : Promise.resolve({ data: [] as { id: string; order_number: number | null; status: string; delivery_method: string; total: number; created_at: string; user_id: string }[] }),
   ]);
 
-  const sumTotal = (rows: { total: number }[] | null) => (rows ?? []).reduce((sum, o) => sum + Number(o.total), 0);
-  const onTimeDeliveries = (recentDelivered ?? []).filter(
+  // Los pedidos de campaña se entregan por días: su plazo es el primer día de
+  // retiro, así que medirlos contra el SLA los marcaría siempre como atrasados.
+  const campaignOrderIds = isOps
+    ? await getOrderCampaignPickups((recentDelivered ?? []).map((o) => o.id))
+    : new Map();
+  const slaDeliveries = (recentDelivered ?? []).filter((o) => !campaignOrderIds.has(o.id));
+  const onTimeDeliveries = slaDeliveries.filter(
     (o) => o.sla_deadline && new Date(o.delivered_at!) <= new Date(o.sla_deadline),
   );
-  const onTimePct = recentDelivered && recentDelivered.length > 0
-    ? Math.round((onTimeDeliveries.length / recentDelivered.length) * 100)
-    : null;
+  const onTimePct = slaDeliveries.length > 0 ? Math.round((onTimeDeliveries.length / slaDeliveries.length) * 100) : null;
+
+  const rangeDeltaPct =
+    salesPrev.total > 0 ? Math.round(((salesRange.total - salesPrev.total) / salesPrev.total) * 100) : null;
+  const avgTicket = salesRange.count > 0 ? Math.round(salesRange.total / salesRange.count) : null;
+
+  const campaigns = isOps ? await getCampaignDashboard() : [];
 
   // Nombres de cliente para la tabla de pedidos recientes — una consulta
   // aparte porque `orders.user_id` no tiene un embed directo utilizable acá
@@ -223,18 +270,37 @@ export default async function AdminHomePage({
       </div>
 
       {isOps && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
             <p className="text-xs uppercase tracking-wide text-foreground-muted">Ventas hoy</p>
-            <p className="mt-1.5 font-display text-2xl font-medium text-gold">{formatCLP(sumTotal(salesToday))}</p>
+            <p className="mt-1.5 font-display text-2xl font-medium text-gold">{formatCLP(salesToday.total)}</p>
           </div>
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
-            <p className="text-xs uppercase tracking-wide text-foreground-muted">Ventas 7 días</p>
-            <p className="mt-1.5 font-display text-2xl font-medium text-gold">{formatCLP(sumTotal(salesWeek))}</p>
+            <p className="text-xs uppercase tracking-wide text-foreground-muted">Ventas ({activeRange.label})</p>
+            <p className="mt-1.5 font-display text-2xl font-medium text-gold">{formatCLP(salesRange.total)}</p>
+            <p
+              className={`mt-1 text-[11px] ${
+                rangeDeltaPct === null ? "text-foreground-muted" : rangeDeltaPct >= 0 ? "text-green-400" : "text-red-400"
+              }`}
+            >
+              {rangeDeltaPct === null
+                ? "Sin período anterior para comparar"
+                : `${rangeDeltaPct >= 0 ? "▲" : "▼"} ${Math.abs(rangeDeltaPct)}% vs período anterior`}
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
+            <p className="text-xs uppercase tracking-wide text-foreground-muted">Pedidos ({activeRange.label})</p>
+            <p className="mt-1.5 font-display text-2xl font-medium text-foreground">{salesRange.count}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
+            <p className="text-xs uppercase tracking-wide text-foreground-muted">Ticket promedio</p>
+            <p className="mt-1.5 font-display text-2xl font-medium text-foreground">
+              {avgTicket !== null ? formatCLP(avgTicket) : "—"}
+            </p>
           </div>
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
             <p className="text-xs uppercase tracking-wide text-foreground-muted">Pedidos activos</p>
-            <p className="mt-1.5 font-display text-2xl font-medium text-foreground">{activeOrders?.length ?? 0}</p>
+            <p className="mt-1.5 font-display text-2xl font-medium text-foreground">{activeOrdersCount ?? 0}</p>
           </div>
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
             <p className="text-xs uppercase tracking-wide text-foreground-muted">A tiempo (30 días)</p>
@@ -243,6 +309,70 @@ export default async function AdminHomePage({
             </p>
           </div>
         </div>
+      )}
+
+      {isOps && campaigns.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Campañas</h2>
+            <Link href="/admin/retiros" className="text-xs text-gold-hover hover:underline">
+              Retiros por día →
+            </Link>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {campaigns.slice(0, 4).map((c) => {
+              const pct = c.capacity > 0 ? Math.min(Math.round((c.committed / c.capacity) * 100), 100) : 0;
+              return (
+                <div key={c.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{c.name}</p>
+                      <p className="text-xs text-foreground-muted">{c.productName}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-foreground-muted">
+                      {c.phase === "open"
+                        ? "Recibiendo pedidos"
+                        : c.phase === "before"
+                          ? "Aún no abre"
+                          : c.phase === "closed"
+                            ? "Pedidos cerrados"
+                            : "Desactivada"}
+                    </span>
+                  </div>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-gold" style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className="mt-1.5 text-xs text-foreground-muted">
+                    {c.committed} de {c.capacity} unidades vendidas ({pct}% del cupo)
+                  </p>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <p className="font-display text-lg text-gold">{c.todayPending}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-foreground-muted">Retiran hoy</p>
+                    </div>
+                    <div>
+                      <p className="font-display text-lg text-foreground">{c.pending}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-foreground-muted">Por retirar</p>
+                    </div>
+                    <div>
+                      <p className="font-display text-lg text-foreground">{c.pickedUp}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-foreground-muted">Retiradas</p>
+                    </div>
+                  </div>
+                  {c.nextDay && (
+                    <Link
+                      href={`/admin/retiros?dia=${c.nextDay.date}`}
+                      className="mt-3 block text-xs text-gold-hover hover:underline"
+                    >
+                      Próximo retiro: <span className="capitalize">{formatPickupDate(c.nextDay.date)}</span> ·{" "}
+                      {c.nextDay.units} u. →
+                    </Link>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {/* Tarjetas de pipeline — clicables, funcionan como filtro de la tabla
@@ -342,7 +472,7 @@ export default async function AdminHomePage({
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {isOps && (
+        {isOps && inventoryOn && (
           <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">
               Lotes próximos a vencer
@@ -378,6 +508,10 @@ export default async function AdminHomePage({
                 <Link href="/admin/resenas" className="text-gold-hover hover:underline">
                   {pendingReviewsCount ?? 0}
                 </Link>
+              </li>
+              <li className="flex justify-between">
+                <span>Clientes nuevos ({activeRange.label})</span>
+                <span>{newCustomersCount ?? 0}</span>
               </li>
               <li className="flex justify-between">
                 <span>Suscriptores activos del newsletter</span>
