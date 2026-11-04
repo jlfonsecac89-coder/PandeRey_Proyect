@@ -45,7 +45,7 @@ export function purchaseConfirmedTemplate(params: {
         <p style="font-size:13px;color:#F5F5DC;opacity:0.7;">Cuando retires tu pedido te entregamos la boleta impresa.</p>`
       : `
         <p ${P}>Te avisamos cuando salga en camino.</p>
-        <p style="font-size:13px;color:#F5F5DC;opacity:0.7;">Guardá este código — te lo van a pedir al momento de la entrega:</p>
+        <p style="font-size:13px;color:#F5F5DC;opacity:0.7;">Guarda este código — te lo van a pedir al momento de la entrega:</p>
         <p style="font-size:28px;letter-spacing:0.15em;color:#D4AF37;font-weight:bold;text-align:center;margin:16px 0;">${deliveryConfirmationCode}</p>`;
 
   return {
@@ -77,7 +77,7 @@ export function inRouteTemplate(orderLabel: string, deliveryConfirmationCode: st
       "¡Va en camino!",
       `
         <p ${P}>Tu pedido <strong>${orderLabel}</strong> salió en camino.</p>
-        <p style="font-size:13px;color:#F5F5DC;opacity:0.7;">Tené a mano este código — te lo va a pedir el repartidor al momento de la entrega:</p>
+        <p style="font-size:13px;color:#F5F5DC;opacity:0.7;">Ten a mano este código — te lo va a pedir el repartidor al momento de la entrega:</p>
         <p style="font-size:28px;letter-spacing:0.15em;color:#D4AF37;font-weight:bold;text-align:center;margin:16px 0;">${deliveryConfirmationCode}</p>
       `,
     ),
@@ -110,7 +110,7 @@ export function returnedToStoreTemplate(orderLabel: string) {
     html: wrap(
       "Volvió a la tienda",
       `
-        <p ${P}>No pudimos entregar tu pedido <strong>${orderLabel}</strong> y volvió a la tienda. Elegí cómo seguir desde tu página de seguimiento:</p>
+        <p ${P}>No pudimos entregar tu pedido <strong>${orderLabel}</strong> y volvió a la tienda. Elige cómo seguir desde tu página de seguimiento:</p>
         <ul ${P}>
           <li>Reenviar con un costo adicional de envío, o</li>
           <li>Retirarlo gratis en tienda.</li>
@@ -125,7 +125,7 @@ export function paymentFailedTemplate(orderLabel: string) {
     subject: "No pudimos procesar tu pago — Pan de Rey",
     html: wrap(
       "El pago no se pudo completar",
-      `<p ${P}>No pudimos procesar el pago de tu pedido <strong>${orderLabel}</strong>. Podés intentarlo de nuevo desde tu carrito.</p>`,
+      `<p ${P}>No pudimos procesar el pago de tu pedido <strong>${orderLabel}</strong>. Puedes intentarlo de nuevo desde tu carrito.</p>`,
     ),
   };
 }

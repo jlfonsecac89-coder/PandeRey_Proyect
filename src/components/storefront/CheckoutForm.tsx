@@ -256,7 +256,7 @@ export function CheckoutForm({
           // en "Verificando..." para siempre (el .then nunca corre) —
           // pasó de verdad, por eso el catch explícito.
           if (cancelled) return;
-          setCouponPreview({ ok: false, error: "No pudimos validar el cupón. Probá de nuevo." });
+          setCouponPreview({ ok: false, error: "No pudimos validar el cupón. Prueba de nuevo." });
           setCouponPreviewLoading(false);
         });
     }, 500);
@@ -683,7 +683,7 @@ export function CheckoutForm({
                 {deliveryMethod === "pickup" ? "Fecha y hora de retiro" : "Fecha y hora de despacho"}
               </h2>
               <p className="mt-1 text-xs text-foreground-muted">
-                Elegí cuándo {deliveryMethod === "pickup" ? "vas a retirar" : "querés recibir"} tu pedido — hasta 3
+                Elige cuándo {deliveryMethod === "pickup" ? "vas a retirar" : "quieres recibir"} tu pedido — hasta 3
                 días desde hoy, en bloques de 15 minutos.
               </p>
 
@@ -732,7 +732,7 @@ export function CheckoutForm({
                         className={inputClass}
                       >
                         <option value="" disabled>
-                          Elegí un horario...
+                          Elige un horario...
                         </option>
                         {groupSlotsByPeriod(selectedDay.slots).map((group) => (
                           <optgroup key={group.label} label={group.label}>
@@ -747,7 +747,7 @@ export function CheckoutForm({
                       </select>
                       {selectedDay.slots.every((s) => !s.available) && (
                         <p className="mt-1.5 text-xs text-burgundy-hover">
-                          No quedan horarios disponibles ese día — probá otro.
+                          No quedan horarios disponibles ese día — prueba otro.
                         </p>
                       )}
                     </div>
@@ -804,7 +804,7 @@ export function CheckoutForm({
                       value: "bank_transfer" as const,
                       Icon: Landmark,
                       title: "Transferencia bancaria",
-                      desc: "Coordinás el pago por WhatsApp con el pedido y el monto ya listos.",
+                      desc: "Coordinas el pago por WhatsApp con el pedido y el monto ya listos.",
                     },
                   ]
                 )
@@ -980,7 +980,7 @@ export function CheckoutForm({
         <p className="flex items-center justify-center gap-1.5 text-center text-xs text-foreground-muted/70">
           <ShieldCheck className="h-3.5 w-3.5 text-gold-dark" />
           {step === "pago" && paymentMethod === "bank_transfer"
-            ? "Coordinás el pago directo con la tienda por WhatsApp"
+            ? "Coordinas el pago directo con la tienda por WhatsApp"
             : "Pago procesado de forma segura por Mercado Pago"}
         </p>
       </aside>

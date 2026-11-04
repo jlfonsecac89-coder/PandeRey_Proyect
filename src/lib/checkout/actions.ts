@@ -91,7 +91,7 @@ export async function saveAddress(
     return { error: "Tipo de vivienda inválido." };
   }
   if (housingType === "departamento" && !deptoNumero) {
-    return { error: "Indicá el número de departamento." };
+    return { error: "Indica el número de departamento." };
   }
   // Por ahora solo se despacha en la Región Metropolitana — el formulario ya
   // no deja elegir otra región/comuna, pero se revalida acá igual, nunca se
@@ -103,7 +103,7 @@ export async function saveAddress(
   // Sección 16: 10 requests/min por usuario — evita abusar de la cuota
   // gratuita diaria de OpenRouteService.
   const { allowed } = await checkRateLimit("geocodificar", profile.id, 10, 60);
-  if (!allowed) return { error: "Demasiados intentos. Esperá un minuto e intentá de nuevo." };
+  if (!allowed) return { error: "Demasiados intentos. Espera un minuto e intenta de nuevo." };
 
   let geocoded;
   try {
@@ -114,7 +114,7 @@ export async function saveAddress(
   // Nunca se guarda una dirección sin coordenadas si va a usarse para despacho
   // (sección 07 del blueprint).
   if (!geocoded) {
-    return { error: "No pudimos ubicar esa dirección en el mapa. Revisá que esté bien escrita." };
+    return { error: "No pudimos ubicar esa dirección en el mapa. Revisa que esté bien escrita." };
   }
 
   const supabase = await createClient();
@@ -171,9 +171,9 @@ export async function previewShipping(
   const addressId = String(formData.get("address_id") || "") || null;
   const subtotal = Number(formData.get("subtotal") || "0");
 
-  if (!storeId) return { error: "Elegí una sucursal." };
+  if (!storeId) return { error: "Elige una sucursal." };
   if (deliveryMethod !== "pickup" && deliveryMethod !== "shipping") {
-    return { error: "Elegí un método de entrega." };
+    return { error: "Elige un método de entrega." };
   }
   if (deliveryMethod === "shipping" && !(await getModuleFlags()).delivery) {
     return { error: "Por ahora solo atendemos con retiro en tienda." };
@@ -194,7 +194,7 @@ export async function previewShipping(
 
   let address: { lat: number | null; lng: number | null } | null = null;
   if (deliveryMethod === "shipping") {
-    if (!addressId) return { error: "Elegí una dirección de despacho." };
+    if (!addressId) return { error: "Elige una dirección de despacho." };
     const { data: addr } = await supabase
       .from("addresses")
       .select("lat, lng")
@@ -322,7 +322,7 @@ export async function previewCoupon(
   if (!trimmed) return null;
 
   const profile = await getCurrentProfile();
-  if (!profile) return { ok: false, error: "Iniciá sesión para usar un cupón." };
+  if (!profile) return { ok: false, error: "Inicia sesión para usar un cupón." };
 
   const result = await validateCoupon({
     supabase: createAdminClient(),
@@ -354,7 +354,7 @@ export async function createCheckoutPreference(
 
   // Sección 16: 20 requests/min por usuario autenticado.
   const { allowed } = await checkRateLimit("checkout", profile.id, 20, 60);
-  if (!allowed) return { error: "Demasiados intentos de pago. Esperá un minuto e intentá de nuevo." };
+  if (!allowed) return { error: "Demasiados intentos de pago. Espera un minuto e intenta de nuevo." };
 
   const cartItemsRaw = String(formData.get("cart_items") || "[]");
   const deliveryMethod = String(formData.get("delivery_method") || "");
@@ -365,7 +365,7 @@ export async function createCheckoutPreference(
   const paymentMethod = paymentMethodRaw === "bank_transfer" ? "bank_transfer" : "mercadopago";
 
   if (deliveryMethod !== "pickup" && deliveryMethod !== "shipping") {
-    return { error: "Elegí un método de entrega." };
+    return { error: "Elige un método de entrega." };
   }
   // Un módulo apagado se rechaza acá y no solo en la interfaz: el formulario
   // se puede forjar con un POST directo.
@@ -376,9 +376,9 @@ export async function createCheckoutPreference(
   if (paymentMethod === "bank_transfer" && !modules.bank_transfer) {
     return { error: "Por ahora solo se puede pagar con Mercado Pago." };
   }
-  if (!storeId) return { error: "Elegí una sucursal." };
+  if (!storeId) return { error: "Elige una sucursal." };
   if (deliveryMethod === "shipping" && !addressId) {
-    return { error: "Elegí o agregá una dirección de despacho." };
+    return { error: "Elige o agrega una dirección de despacho." };
   }
 
   let cartItems: CartItem[];
@@ -556,10 +556,10 @@ export async function createCheckoutPreference(
       store.delivery_schedule as BusinessHours,
       deliveryMethod,
     );
-    if (!scheduledAtRaw) return { error: "Elegí una fecha y hora de retiro o despacho." };
+    if (!scheduledAtRaw) return { error: "Elige una fecha y hora de retiro o despacho." };
     scheduledAtDate = new Date(scheduledAtRaw);
     if (Number.isNaN(scheduledAtDate.getTime())) return { error: "Fecha/hora programada inválida." };
-    if (scheduledAtDate.getTime() < Date.now()) return { error: "Elegí una fecha y hora futura." };
+    if (scheduledAtDate.getTime() < Date.now()) return { error: "Elige una fecha y hora futura." };
 
     const nowYmd = chileDateYmd(new Date());
     const maxYmd = addDaysToYmd(nowYmd.y, nowYmd.m, nowYmd.d, 3);
@@ -594,7 +594,7 @@ export async function createCheckoutPreference(
       .eq("scheduled_at", scheduledAtDate.toISOString())
       .neq("status", "cancelled");
     if ((slotCount ?? 0) >= store.max_orders_per_slot) {
-      return { error: "Ese horario ya está completo. Elegí otro horario cercano." };
+      return { error: "Ese horario ya está completo. Elige otro horario cercano." };
     }
 
   }
@@ -668,7 +668,7 @@ export async function createCheckoutPreference(
   const discountTotal = couponDiscount + pointsDiscount;
   const total = totalBeforeDiscounts - discountTotal;
   if (total <= 0) {
-    return { error: "El descuento aplicado supera el total del pedido — reducí el cupón o los puntos usados." };
+    return { error: "El descuento aplicado supera el total del pedido — reduce el cupón o los puntos usados." };
   }
 
   const scheduledAtIso = scheduledAtDate.toISOString();

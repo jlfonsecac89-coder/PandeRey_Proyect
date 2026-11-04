@@ -383,7 +383,7 @@ export async function markInRoute(orderId: string): Promise<OrderActionState> {
     .eq("id", orderId)
     .maybeSingle();
   if (!order) return { error: "Pedido no encontrado." };
-  if (order.assigned_driver_id !== profile.id) return { error: "Este pedido no está asignado a vos." };
+  if (order.assigned_driver_id !== profile.id) return { error: "Este pedido no está asignado a ti." };
   if (order.status !== "driver_assigned") return { error: "El pedido no está listo para salir." };
 
   const { error } = await supabase.from("orders").update({ status: "in_route" }).eq("id", orderId);
@@ -412,7 +412,7 @@ export async function markAtAddress(orderId: string): Promise<OrderActionState> 
     .eq("id", orderId)
     .maybeSingle();
   if (!order) return { error: "Pedido no encontrado." };
-  if (order.assigned_driver_id !== profile.id) return { error: "Este pedido no está asignado a vos." };
+  if (order.assigned_driver_id !== profile.id) return { error: "Este pedido no está asignado a ti." };
   if (order.status !== "in_route") return { error: "El pedido no está en camino." };
 
   const { error } = await supabase.from("orders").update({ status: "at_address" }).eq("id", orderId);
@@ -426,7 +426,7 @@ export async function markAtAddress(orderId: string): Promise<OrderActionState> 
 export async function markDeliveryIssue(orderId: string, reason: string): Promise<OrderActionState> {
   const profile = await requireRole(["repartidor"]);
   if (!(await isModuleEnabled("delivery"))) return { error: DELIVERY_OFF_ERROR };
-  if (!reason.trim()) return { error: "Indicá el motivo del problema." };
+  if (!reason.trim()) return { error: "Indica el motivo del problema." };
   const supabase = await createClient();
 
   const { data: order } = await supabase
@@ -435,7 +435,7 @@ export async function markDeliveryIssue(orderId: string, reason: string): Promis
     .eq("id", orderId)
     .maybeSingle();
   if (!order) return { error: "Pedido no encontrado." };
-  if (order.assigned_driver_id !== profile.id) return { error: "Este pedido no está asignado a vos." };
+  if (order.assigned_driver_id !== profile.id) return { error: "Este pedido no está asignado a ti." };
   if (order.status !== "at_address") return { error: "El pedido no está en la dirección." };
 
   const { error } = await supabase
@@ -466,7 +466,7 @@ export async function markReturningToStore(orderId: string): Promise<OrderAction
     .eq("id", orderId)
     .maybeSingle();
   if (!order) return { error: "Pedido no encontrado." };
-  if (order.assigned_driver_id !== profile.id) return { error: "Este pedido no está asignado a vos." };
+  if (order.assigned_driver_id !== profile.id) return { error: "Este pedido no está asignado a ti." };
   if (order.status !== "delivery_issue" || !order.delivery_issue_at) {
     return { error: "El pedido no tiene un problema de entrega abierto." };
   }
@@ -510,7 +510,7 @@ export async function confirmDeliveryCode(
     .eq("id", orderId)
     .maybeSingle();
   if (!order) return { error: "Pedido no encontrado." };
-  if (order.assigned_driver_id !== profile.id) return { error: "Este pedido no está asignado a vos." };
+  if (order.assigned_driver_id !== profile.id) return { error: "Este pedido no está asignado a ti." };
   if (!["at_address", "delivery_issue"].includes(order.status)) {
     return { error: "El pedido no está listo para confirmar entrega." };
   }
@@ -519,7 +519,7 @@ export async function confirmDeliveryCode(
   // cualquier intento — incluso con el código correcto — hasta que
   // Operaciones/Admin regenere el código o confirme manualmente.
   if (order.delivery_code_locked) {
-    return { error: "Se bloqueó el código tras 5 intentos. Pedí a Operaciones que lo regenere.", locked: true };
+    return { error: "Se bloqueó el código tras 5 intentos. Pide a Operaciones que lo regenere.", locked: true };
   }
 
   if (code.trim() !== order.delivery_confirmation_code) {
@@ -551,7 +551,7 @@ export async function confirmDeliveryCode(
 
 export async function choosePickupFree(orderId: string): Promise<OrderActionState> {
   const profile = await getCurrentProfile();
-  if (!profile) return { error: "Necesitás iniciar sesión." };
+  if (!profile) return { error: "Necesitas iniciar sesión." };
 
   // El chequeo de pertenencia/estado se hace con el cliente normal (respeta
   // RLS: si el pedido no es suyo, `order` sale null). La escritura en sí usa
@@ -577,7 +577,7 @@ export async function choosePickupFree(orderId: string): Promise<OrderActionStat
 
   await insertHistory(adminSupabase, orderId, "ready_for_pickup", profile.id, "Cliente eligió retiro gratis");
   revalidatePath(`/pedido/${orderId}`);
-  return { success: "Listo, podés retirarlo en tienda sin costo adicional." };
+  return { success: "Listo, puedes retirarlo en tienda sin costo adicional." };
 }
 
 // ---------- Repetir pedido (Fase 10) ----------

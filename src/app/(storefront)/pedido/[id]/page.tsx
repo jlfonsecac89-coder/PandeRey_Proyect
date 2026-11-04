@@ -98,7 +98,7 @@ export default async function SeguimientoPedidoPage({
       {status === "returned_to_store" && (
         <div className="mt-6 space-y-2 rounded-2xl border border-charcoal-border bg-background-elevated p-5 shadow-card">
           <p className="text-sm text-foreground">
-            No pudimos entregar tu pedido y volvió a la tienda. ¿Cómo querés seguir?
+            No pudimos entregar tu pedido y volvió a la tienda. ¿Cómo quieres seguir?
           </p>
           <form action={payResendShippingForm}>
             <button

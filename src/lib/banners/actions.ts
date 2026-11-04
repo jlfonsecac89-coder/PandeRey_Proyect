@@ -18,7 +18,7 @@ export async function createBanner(
   const file = formData.get("image") as File | null;
 
   if (!title || !file || file.size === 0) {
-    return { error: "Completa el título y elegí una imagen." };
+    return { error: "Completa el título y elige una imagen." };
   }
   if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
     return { error: "Formato no soportado. Usa PNG, JPG o WEBP." };

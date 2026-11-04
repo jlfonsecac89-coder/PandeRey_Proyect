@@ -129,14 +129,14 @@ export async function validatePointsRedemption(params: {
     .single();
 
   if (!profile || pointsToRedeem > profile.points_balance) {
-    return { ok: false, error: "No tenés suficientes puntos disponibles." };
+    return { ok: false, error: "No tienes suficientes puntos disponibles." };
   }
 
   const discountClp = await computePointsDiscountClp(pointsToRedeem);
   if (discountClp >= maxDiscountAllowed) {
     return {
       ok: false,
-      error: "Esa cantidad de puntos cubre más de lo que podés canjear en este pedido — usá menos puntos.",
+      error: "Esa cantidad de puntos cubre más de lo que puedes canjear en este pedido — usa menos puntos.",
     };
   }
 

@@ -18,7 +18,7 @@ export async function lookupOrder(_prev: TrackingState, formData: FormData): Pro
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
 
   if (!codeRaw || !email) {
-    return { error: "Ingresá el código de pedido y el email de la compra." };
+    return { error: "Ingresa el código de pedido y el email de la compra." };
   }
 
   const admin = createAdminClient();

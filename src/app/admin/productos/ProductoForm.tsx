@@ -25,7 +25,7 @@ export function ProductoForm({
   // El producto no existe todavía cuando se eligen las fotos (product_id es
   // FK obligatoria en product_images), así que se guardan en memoria acá y
   // recién se suben apenas createProduct devuelve el id — el usuario lo vive
-  // como un solo paso ("elegí todo y creé"), aunque abajo sean varias
+  // como un solo paso ("elige todo y crea"), aunque abajo sean varias
   // llamadas en cadena. Variantes y stock quedan para después de crear
   // (mismo panel, sin navegar) porque son estructuras más grandes (grupos de
   // opciones, lotes) que no tiene sentido armar dos veces si la creación

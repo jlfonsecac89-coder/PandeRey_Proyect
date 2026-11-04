@@ -69,7 +69,7 @@ export function CategoriaForm({ departments }: { departments: Department[] }) {
       </form>
       {departments.length === 0 && (
         <p className="mt-2 text-xs text-foreground/40">
-          Primero creá al menos un departamento.
+          Primero crea al menos un departamento.
         </p>
       )}
     </div>

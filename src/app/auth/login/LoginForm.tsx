@@ -17,7 +17,7 @@ export function LoginForm({ next, oauthError }: { next?: string; oauthError?: st
       <FormMessage
         error={
           state?.error ??
-          (oauthError ? "No se pudo completar el inicio de sesión. Intentá de nuevo." : undefined)
+          (oauthError ? "No se pudo completar el inicio de sesión. Intenta de nuevo." : undefined)
         }
       />
 
@@ -38,7 +38,7 @@ export function LoginForm({ next, oauthError }: { next?: string; oauthError?: st
         </div>
         <div className="relative flex justify-center">
           <span className="bg-background-alt px-2 text-[10px] uppercase tracking-widest text-foreground-muted">
-            o usá tu email
+            o usa tu email
           </span>
         </div>
       </div>

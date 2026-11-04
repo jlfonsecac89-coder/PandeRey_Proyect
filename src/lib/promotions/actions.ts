@@ -44,7 +44,7 @@ export async function createPromotion(
 
   const scopeCount = [departmentId, categoryId, productId].filter(Boolean).length;
   if (scopeCount > 1) {
-    return { error: "Elegí como máximo un alcance: departamento, categoría o producto." };
+    return { error: "Elige como máximo un alcance: departamento, categoría o producto." };
   }
 
   const startsAt = new Date(startsAtRaw);
@@ -131,7 +131,7 @@ export async function updatePromotion(
 
   const scopeCount = [departmentId, categoryId, productId].filter(Boolean).length;
   if (scopeCount > 1) {
-    return { error: "Elegí como máximo un alcance: departamento, categoría o producto." };
+    return { error: "Elige como máximo un alcance: departamento, categoría o producto." };
   }
 
   const startsAt = new Date(startsAtRaw);

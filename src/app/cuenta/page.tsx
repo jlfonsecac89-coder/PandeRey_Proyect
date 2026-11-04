@@ -24,7 +24,7 @@ export default async function CuentaHomePage() {
       <h1 className="mt-1 font-display text-2xl font-medium text-foreground">
         Hola, {profile.full_name.split(" ")[0]}
       </h1>
-      <p className="mt-1 text-sm text-foreground-muted">Acá tenés un resumen de tu cuenta en Pan de Rey.</p>
+      <p className="mt-1 text-sm text-foreground-muted">Aquí tienes un resumen de tu cuenta en Pan de Rey.</p>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-crust-soft bg-masa p-5 shadow-card">

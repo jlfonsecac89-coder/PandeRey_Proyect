@@ -3,9 +3,9 @@ import { AuthCard } from "@/components/auth/AuthCard";
 
 export default function VerificarEmailPage() {
   return (
-    <AuthCard title="Revisá tu correo">
+    <AuthCard title="Revisa tu correo">
       <p className="text-center text-sm text-foreground/70">
-        Te enviamos un link de confirmación. Hacé clic en él para activar tu
+        Te enviamos un link de confirmación. Haz clic en él para activar tu
         cuenta — vas a poder ingresar apenas lo confirmes.
       </p>
       <p className="mt-6 text-center text-sm">

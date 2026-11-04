@@ -163,7 +163,7 @@ export default async function ProductoDetallePage({
               />
             ) : (
               <p className="mt-1 text-xs text-foreground-muted">
-                Iniciá sesión para canjear este producto con tus puntos.
+                Inicia sesión para canjear este producto con tus puntos.
               </p>
             )}
           </div>

@@ -16,7 +16,7 @@ export async function updateProfileInfo(
   formData: FormData,
 ): Promise<AccountActionState> {
   const profile = await getCurrentProfile();
-  if (!profile) return { error: "Necesitás iniciar sesión." };
+  if (!profile) return { error: "Necesitas iniciar sesión." };
 
   const fullName = String(formData.get("full_name") || "").trim();
   const phone = String(formData.get("phone") || "").trim() || null;
@@ -71,11 +71,11 @@ export async function anonymizeAccount(
   formData: FormData,
 ): Promise<AccountActionState> {
   const profile = await getCurrentProfile();
-  if (!profile) return { error: "Necesitás iniciar sesión." };
+  if (!profile) return { error: "Necesitas iniciar sesión." };
 
   const confirmation = String(formData.get("confirmation") || "").trim().toUpperCase();
   if (confirmation !== "ELIMINAR") {
-    return { error: 'Escribí "ELIMINAR" para confirmar la baja de tu cuenta.' };
+    return { error: 'Escribe "ELIMINAR" para confirmar la baja de tu cuenta.' };
   }
 
   const admin = createAdminClient();

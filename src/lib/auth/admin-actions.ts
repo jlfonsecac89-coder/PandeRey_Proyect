@@ -15,7 +15,7 @@ export async function adminSignIn(_prevState: ActionState, formData: FormData): 
   const ip = await getClientIp();
   const { allowed } = await checkRateLimit("admin-login", `${ip}:${username.toLowerCase()}`, 5, 15 * 60);
   if (!allowed) {
-    return { error: "Demasiados intentos. Esperá unos minutos antes de volver a intentar." };
+    return { error: "Demasiados intentos. Espera unos minutos antes de volver a intentar." };
   }
 
   const supabase = await createClient();

@@ -48,7 +48,7 @@ export function ImagenesSection({
       </div>
       {atLimit ? (
         <p className="mt-3 text-xs text-foreground/40">
-          Ya tenés 5 fotos, el máximo. Eliminá una para subir otra.
+          Ya tienes 5 fotos, el máximo. Elimina una para subir otra.
         </p>
       ) : (
         <form action={formAction} className="mt-3 flex items-center gap-3">

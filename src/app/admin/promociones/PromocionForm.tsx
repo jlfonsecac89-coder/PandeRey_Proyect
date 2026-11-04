@@ -112,7 +112,7 @@ export function PromocionForm({
 
         <div>
           <p className="text-xs text-foreground/60">
-            Alcance (opcional — dejá todo en blanco para que aplique a todo el carrito)
+            Alcance (opcional — deja todo en blanco para que aplique a todo el carrito)
           </p>
           <div className="mt-1 grid grid-cols-3 gap-2">
             <select
@@ -170,7 +170,7 @@ export function PromocionForm({
             </select>
           </label>
           <p className="mt-1 text-[10px] text-foreground/40">
-            Si elegís un segmento, el cupón solo se valida para clientes cuya última segmentación RFM
+            Si eliges un segmento, el cupón solo se valida para clientes cuya última segmentación RFM
             (calculada semanalmente) coincida — un cliente sin segmentación calculada todavía no califica.
           </p>
         </div>

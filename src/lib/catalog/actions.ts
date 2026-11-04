@@ -396,7 +396,7 @@ export async function uploadProductImage(
     .select("id", { count: "exact", head: true })
     .eq("product_id", productId);
   if ((count ?? 0) >= 5) {
-    return { error: "Este producto ya tiene el máximo de 5 fotos. Eliminá una para subir otra." };
+    return { error: "Este producto ya tiene el máximo de 5 fotos. Elimina una para subir otra." };
   }
 
   const ext = file.name.split(".").pop() || "jpg";
@@ -556,7 +556,7 @@ export async function setBatchClearance(
   const discount = discountRaw ? Number(discountRaw) : null;
 
   if (isClearance && (discount === null || Number.isNaN(discount) || discount <= 0 || discount > 90)) {
-    return { error: "Ingresá un porcentaje de descuento válido (1-90) para poner el lote en liquidación." };
+    return { error: "Ingresa un porcentaje de descuento válido (1-90) para poner el lote en liquidación." };
   }
 
   const supabase = await createClient();

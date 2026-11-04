@@ -59,7 +59,7 @@ export default async function PuntosPage() {
           </li>
         ))}
         {(ledger ?? []).length === 0 && (
-          <p className="text-sm text-foreground-muted">Todavía no tenés movimientos de puntos.</p>
+          <p className="text-sm text-foreground-muted">Todavía no tienes movimientos de puntos.</p>
         )}
       </ul>
     </div>

@@ -35,8 +35,8 @@ export default async function TerminosPage() {
       <section className="mt-6 space-y-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground/50">2. Cuenta de usuario</h2>
         <p>
-          Sos responsable de mantener la confidencialidad de tu contraseña y de la información que registrás en tu
-          cuenta (nombre, teléfono, direcciones). Podés editar tus datos personales desde &quot;Mi Cuenta&quot; en
+          Eres responsable de mantener la confidencialidad de tu contraseña y de la información que registras en tu
+          cuenta (nombre, teléfono, direcciones). Puedes editar tus datos personales desde &quot;Mi Cuenta&quot; en
           cualquier momento.
         </p>
       </section>
@@ -65,9 +65,9 @@ export default async function TerminosPage() {
           5. Retiro y despacho
         </h2>
         <p>
-          Podés elegir retirar tu pedido en tienda o recibirlo a domicilio dentro del radio de despacho de la
+          Puedes elegir retirar tu pedido en tienda o recibirlo a domicilio dentro del radio de despacho de la
           sucursal. El costo de envío se calcula según la distancia real hasta tu dirección y se muestra antes de
-          pagar. La confirmación de entrega se hace con un código que solo vos y el repartidor conocen.
+          pagar. La confirmación de entrega se hace con un código que solo tú y el repartidor conocen.
         </p>
       </section>
 
@@ -132,10 +132,10 @@ export default async function TerminosPage() {
         <p>
           Tratamos tus datos personales conforme a la Ley N.º 19.628 sobre Protección de la Vida Privada. Usamos
           cookies necesarias para el funcionamiento del sitio y, solo con tu consentimiento explícito, cookies de
-          analítica y marketing (podés cambiar tu elección desde el aviso de cookies).
+          analítica y marketing (puedes cambiar tu elección desde el aviso de cookies).
         </p>
         <p>
-          Podés solicitar la baja y anonimización de tu cuenta desde &quot;Mi Cuenta&quot;. Al hacerlo, tus datos
+          Puedes solicitar la baja y anonimización de tu cuenta desde &quot;Mi Cuenta&quot;. Al hacerlo, tus datos
           personales (nombre, teléfono, RUT) se eliminan de forma irreversible; tu historial de pedidos y
           comprobantes se conservan de forma anonimizada, por obligaciones legales de retención tributaria.
         </p>

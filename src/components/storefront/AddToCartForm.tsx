@@ -139,7 +139,7 @@ export function AddToCartForm({
               <input
                 type="text"
                 autoFocus
-                placeholder="Escribí lo que necesitás"
+                placeholder="Escribe lo que necesitas"
                 value={customText[group.id] ?? ""}
                 onChange={(e) => {
                   setAdded(false);

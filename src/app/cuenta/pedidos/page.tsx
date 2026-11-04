@@ -67,7 +67,7 @@ export default async function MisPedidosPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Historial</p>
           <h1 className="mt-1 font-display text-2xl font-medium text-foreground">Mis pedidos</h1>
           <p className="mt-1 text-xs text-foreground-muted">
-            Revisá tus compras anteriores y repetí un pedido con un clic.
+            Revisa tus compras anteriores y repite un pedido con un clic.
           </p>
         </div>
         <Link

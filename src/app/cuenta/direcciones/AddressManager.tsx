@@ -97,7 +97,7 @@ export function AddressManager({ addresses }: { addresses: Address[] }) {
           </li>
         ))}
         {addresses.length === 0 && (
-          <p className="text-sm text-foreground/50">Todavía no tenés direcciones guardadas.</p>
+          <p className="text-sm text-foreground/50">Todavía no tienes direcciones guardadas.</p>
         )}
       </ul>
 

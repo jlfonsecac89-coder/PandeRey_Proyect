@@ -15,7 +15,7 @@ export function UsuarioForm({ stores }: { stores: Store[] }) {
       {state?.tempPassword && (
         <div className="mb-4 rounded-md border border-gold/30 bg-gold/5 p-3 text-sm">
           <p className="text-foreground/70">
-            Contraseña temporal — compartila una sola vez, no se vuelve a mostrar:
+            Contraseña temporal — compártela una sola vez, no se vuelve a mostrar:
           </p>
           <p className="mt-1 font-mono text-gold">{state.tempPassword}</p>
         </div>

@@ -29,7 +29,7 @@ export function DeleteAccountForm() {
       </p>
       <form action={formAction} className="mt-3 space-y-2">
         <label htmlFor="confirmation" className="block text-xs text-foreground/60">
-          Escribí <span className="font-mono text-red-400">ELIMINAR</span> para confirmar
+          Escribe <span className="font-mono text-red-400">ELIMINAR</span> para confirmar
         </label>
         <input
           id="confirmation"

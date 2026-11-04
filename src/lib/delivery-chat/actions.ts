@@ -21,10 +21,10 @@ export async function sendDeliveryMessage(orderId: string, message: string): Pro
   const profile = await requireRole(["repartidor", "admin", "operaciones"]);
 
   const trimmed = message.trim();
-  if (!trimmed) return { error: "Escribí un mensaje antes de enviar." };
+  if (!trimmed) return { error: "Escribe un mensaje antes de enviar." };
   if (trimmed.length > 500) return { error: "El mensaje es demasiado largo (máximo 500 caracteres)." };
   if (SIX_DIGIT_CODE.test(trimmed)) {
-    return { error: "No envíes el código de entrega por el chat — pedile al cliente que te lo diga y usalo en el formulario de confirmación." };
+    return { error: "No envíes el código de entrega por el chat — pídele al cliente que te lo diga y úsalo en el formulario de confirmación." };
   }
 
   const supabase = await createClient();
@@ -44,7 +44,7 @@ export async function sendDeliveryMessage(orderId: string, message: string): Pro
   const senderRole: "repartidor" | "tienda" = profile.role === "repartidor" ? "repartidor" : "tienda";
 
   if (senderRole === "repartidor" && order.assigned_driver_id !== profile.id) {
-    return { error: "Este pedido no está asignado a vos." };
+    return { error: "Este pedido no está asignado a ti." };
   }
   if (senderRole === "tienda" && profile.role === "operaciones" && order.store_id !== profile.store_id) {
     return { error: "Este pedido no pertenece a tu sucursal." };
@@ -79,7 +79,7 @@ export async function sendDeliveryMessage(orderId: string, message: string): Pro
     return { success: "Mensaje enviado.", message: created as DeliveryMessage };
   } catch (err) {
     console.error("sendDeliveryMessage failed", err);
-    return { error: "Ocurrió un error al enviar el mensaje. Intentá de nuevo." };
+    return { error: "Ocurrió un error al enviar el mensaje. Intenta de nuevo." };
   }
 }
 

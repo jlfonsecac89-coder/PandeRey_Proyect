@@ -31,7 +31,7 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
       >
         <h1 style={{ fontSize: "1.25rem", fontWeight: 600 }}>Ocurrió un error inesperado</h1>
         <p style={{ fontSize: "0.875rem", color: "#a3a3a3", maxWidth: "28rem" }}>
-          Ya quedó registrado. Probá recargar la página o volvé más tarde.
+          Ya quedó registrado. Prueba recargar la página o vuelve más tarde.
         </p>
       </body>
     </html>

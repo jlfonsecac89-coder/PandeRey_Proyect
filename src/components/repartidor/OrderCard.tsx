@@ -195,7 +195,7 @@ export function OrderCard({
               required
               className="w-full rounded-md border border-charcoal-border bg-background px-2 py-1.5 text-xs"
             >
-              <option value="">Elegí un motivo</option>
+              <option value="">Elige un motivo</option>
               <option value="cliente_ausente">Cliente ausente</option>
               <option value="direccion_no_ubicable">Dirección no ubicable</option>
               <option value="cliente_rechaza_pedido">Cliente rechaza el pedido</option>

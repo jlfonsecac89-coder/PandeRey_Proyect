@@ -158,7 +158,7 @@ export function ProductosTable({
 
       {faltantes !== "todos" && (
         <p className="mt-2 text-xs text-foreground-muted">
-          Copiá el id de cada producto (📋) y usalo con la{" "}
+          Copia el id de cada producto (📋) y úsalo con la{" "}
           <Link href="/admin/productos/importar" className="text-gold-dark hover:text-gold hover:underline">
             carga masiva de fotos
           </Link>{" "}

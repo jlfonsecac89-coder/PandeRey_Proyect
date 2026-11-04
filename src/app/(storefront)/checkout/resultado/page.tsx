@@ -98,7 +98,7 @@ export default async function CheckoutResultadoPage({
       ) : (
         <>
           <h1 className="font-display text-2xl font-medium text-burgundy-hover">El pago no se pudo completar</h1>
-          <p className="mt-2 text-sm text-foreground-muted">Podés intentarlo de nuevo desde tu carrito.</p>
+          <p className="mt-2 text-sm text-foreground-muted">Puedes intentarlo de nuevo desde tu carrito.</p>
         </>
       )}
       <p className="mt-6">

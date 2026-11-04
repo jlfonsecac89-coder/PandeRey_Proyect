@@ -49,7 +49,7 @@ export function ActualizarForm() {
 
   if (sessionState === "invalid") {
     return (
-      <FormMessage error="El link de recuperación ya no es válido — puede haber expirado o ya haberse usado. Pedí uno nuevo." />
+      <FormMessage error="El link de recuperación ya no es válido — puede haber expirado o ya haberse usado. Pide uno nuevo." />
     );
   }
 

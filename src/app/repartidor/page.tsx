@@ -57,7 +57,7 @@ export default async function RepartidorHomePage() {
           <OrderCard key={order.id} order={order} issueWaitMinutes={issueWaitMinutes} />
         ))}
         {enriched.length === 0 && (
-          <p className="text-sm text-foreground/50">No tenés pedidos asignados por ahora.</p>
+          <p className="text-sm text-foreground/50">No tienes pedidos asignados por ahora.</p>
         )}
       </div>
     </div>

@@ -12,8 +12,8 @@ export default async function CambiarPasswordPage() {
 
   return (
     <AuthCard
-      title="Cambiá tu contraseña"
-      subtitle="Es tu primer ingreso — necesitás elegir una contraseña nueva antes de continuar"
+      title="Cambia tu contraseña"
+      subtitle="Es tu primer ingreso — necesitas elegir una contraseña nueva antes de continuar"
     >
       <CambiarForm />
     </AuthCard>

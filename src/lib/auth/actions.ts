@@ -24,28 +24,28 @@ export type ActionState = { error?: string; success?: string } | null;
 function friendlyAuthError(message: string): string {
   const m = message.toLowerCase();
   if (m.includes("email rate limit") || m.includes("rate limit exceeded")) {
-    return "No pudimos enviarte el email de confirmación en este momento. Volvé a intentar en unos minutos o escribinos para activar tu cuenta.";
+    return "No pudimos enviarte el email de confirmación en este momento. Vuelve a intentar en unos minutos o escríbenos para activar tu cuenta.";
   }
   if (m.includes("already registered") || m.includes("already been registered")) {
-    return "Ya existe una cuenta con ese email. Probá iniciar sesión o recuperar tu contraseña.";
+    return "Ya existe una cuenta con ese email. Prueba iniciar sesión o recuperar tu contraseña.";
   }
   if (m.includes("invalid login credentials")) {
     return "Email o contraseña incorrectos.";
   }
   if (m.includes("email not confirmed")) {
-    return "Tenés que confirmar tu email antes de iniciar sesión. Revisá tu bandeja de entrada y el correo no deseado.";
+    return "Tienes que confirmar tu email antes de iniciar sesión. Revisa tu bandeja de entrada y el correo no deseado.";
   }
   if (m.includes("password should be") || m.includes("weak password")) {
-    return "La contraseña es demasiado débil. Usá al menos 10 caracteres, con letras y números.";
+    return "La contraseña es demasiado débil. Usa al menos 10 caracteres, con letras y números.";
   }
   if (m.includes("error sending") || m.includes("smtp") || m.includes("could not send email")) {
-    return "No pudimos enviar el email en este momento. Intentá de nuevo en unos minutos.";
+    return "No pudimos enviar el email en este momento. Intenta de nuevo en unos minutos.";
   }
   // Supabase a veces devuelve errores sin texto útil para el usuario (ej.
   // AuthRetryableFetchError con cuerpo "{}" cuando el proveedor SMTP
   // rechaza el envío) — mostrar eso tal cual confunde más que ayuda.
   if (!message.trim() || message.trim() === "{}") {
-    return "Ocurrió un error inesperado. Intentá de nuevo en unos minutos.";
+    return "Ocurrió un error inesperado. Intenta de nuevo en unos minutos.";
   }
   return message;
 }
@@ -101,7 +101,7 @@ export async function signUp(
   const ip = await getClientIp();
   const { allowed } = await checkRateLimit("registro", ip, 10, 60 * 60);
   if (!allowed) {
-    return { error: "Demasiados intentos de registro. Probá de nuevo más tarde." };
+    return { error: "Demasiados intentos de registro. Prueba de nuevo más tarde." };
   }
 
   const safeNext = safeNextPath(next);
@@ -164,7 +164,7 @@ export async function signUp(
   }
 
   // Si el proyecto tiene desactivada la confirmación por email, signUp
-  // devuelve sesión activa y mandar al cliente a "revisá tu correo" lo deja
+  // devuelve sesión activa y mandar al cliente a "revisa tu correo" lo deja
   // esperando un email que nunca va a llegar.
   if (data.session) {
     redirect(safeNext ?? "/");
@@ -188,7 +188,7 @@ export async function signIn(
   const ip = await getClientIp();
   const { allowed } = await checkRateLimit("login", `${ip}:${email}`, 5, 15 * 60);
   if (!allowed) {
-    return { error: "Demasiados intentos. Esperá unos minutos antes de volver a intentar." };
+    return { error: "Demasiados intentos. Espera unos minutos antes de volver a intentar." };
   }
 
   const supabase = await createClient();

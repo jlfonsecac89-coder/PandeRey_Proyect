@@ -185,7 +185,7 @@ function NuevoGrupoForm({
       <div className="mt-3 space-y-2">
         {reusable.length > 0 && (
           <div>
-            <p className="mb-1.5 text-xs text-foreground/50">Reutilizar un grupo que ya usás en otros productos:</p>
+            <p className="mb-1.5 text-xs text-foreground/50">Reutilizar un grupo que ya usas en otros productos:</p>
             <div className="flex flex-wrap gap-1.5">
               {reusable.map((c) => (
                 <button

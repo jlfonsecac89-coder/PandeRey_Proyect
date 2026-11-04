@@ -33,7 +33,7 @@ export async function importProductsCsv(_prev: ImportState, formData: FormData):
   const profile = await requireRole(["admin", "operaciones"]);
 
   const file = formData.get("file") as File | null;
-  if (!file || file.size === 0) return { error: "Seleccioná un archivo CSV." };
+  if (!file || file.size === 0) return { error: "Selecciona un archivo CSV." };
 
   const text = await file.text();
   const rows = parseCsv(text) as CsvRow[];
@@ -373,7 +373,7 @@ export async function bulkUploadProductImages(
   await requireRole(["admin", "operaciones"]);
 
   const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
-  if (files.length === 0) return { error: "Seleccioná al menos una foto." };
+  if (files.length === 0) return { error: "Selecciona al menos una foto." };
 
   files.sort((a, b) => a.name.localeCompare(b.name));
 

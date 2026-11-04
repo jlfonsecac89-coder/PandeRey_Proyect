@@ -15,15 +15,15 @@ export async function subscribeNewsletter(
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const consent = formData.get("consent") === "on";
 
-  if (!email) return { error: "Ingresá tu email." };
+  if (!email) return { error: "Ingresa tu email." };
   if (!consent) {
-    return { error: "Tenés que aceptar recibir novedades para suscribirte." };
+    return { error: "Tienes que aceptar recibir novedades para suscribirte." };
   }
 
   // Sección 16: 5 requests/hora por IP.
   const ip = await getClientIp();
   const { allowed } = await checkRateLimit("newsletter", ip, 5, 60 * 60);
-  if (!allowed) return { error: "Demasiados intentos. Probá de nuevo más tarde." };
+  if (!allowed) return { error: "Demasiados intentos. Prueba de nuevo más tarde." };
 
   const supabase = await createClient();
   const { error } = await supabase.from("newsletter_subscribers").insert({

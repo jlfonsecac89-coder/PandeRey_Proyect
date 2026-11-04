@@ -68,7 +68,7 @@ export function CookieConsentBanner() {
       <div className="mx-auto max-w-3xl">
         <p className="text-sm text-foreground/80">
           Usamos cookies necesarias para que el sitio funcione (carrito, sesión) y, si nos das permiso, cookies de
-          analítica y marketing. Podés elegir qué aceptar.
+          analítica y marketing. Puedes elegir qué aceptar.
         </p>
 
         {customizing && (

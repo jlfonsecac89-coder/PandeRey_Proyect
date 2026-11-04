@@ -54,7 +54,7 @@ export function ColeccionForm() {
         </button>
       </form>
       <p className="mt-2 text-xs text-foreground/40">
-        Dejá inicio/fin vacíos para una colección permanente (ej. &quot;Sin
+        Deja inicio/fin vacíos para una colección permanente (ej. &quot;Sin
         Gluten&quot;). Con fechas, se activa y desactiva sola (ej.
         &quot;Navidad&quot;).
       </p>

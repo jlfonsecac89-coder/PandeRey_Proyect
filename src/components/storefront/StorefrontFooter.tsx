@@ -79,7 +79,7 @@ export function StorefrontFooter({
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.15em] text-gold-dark">¿Ya pediste?</p>
             <p className="mt-3 text-sm leading-relaxed text-foreground-muted">
-              Consultá el estado de tu pedido con el código y el email de la compra.
+              Consulta el estado de tu pedido con el código y el email de la compra.
             </p>
             <Link
               href="/seguimiento"

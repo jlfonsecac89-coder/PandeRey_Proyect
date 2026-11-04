@@ -150,7 +150,7 @@ export function PedidosTable({
             </button>
           ) : (
             <p className="text-xs text-foreground-muted">
-              Seleccioná pedidos con el mismo estado para aplicar una acción masiva.
+              Selecciona pedidos con el mismo estado para aplicar una acción masiva.
             </p>
           )}
           <button

@@ -14,7 +14,7 @@ export type ReviewActionState = { error?: string; success?: string } | null;
 // igual fallaría contra la base.
 export async function submitReview(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
   const profile = await getCurrentProfile();
-  if (!profile) return { error: "Necesitás iniciar sesión." };
+  if (!profile) return { error: "Necesitas iniciar sesión." };
 
   const orderItemId = String(formData.get("order_item_id") || "");
   const productId = String(formData.get("product_id") || "");
@@ -24,7 +24,7 @@ export async function submitReview(_prev: ReviewActionState, formData: FormData)
 
   if (!orderItemId || !productId || !orderId) return { error: "Reseña inválida." };
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-    return { error: "Elegí una valoración de 1 a 5 estrellas." };
+    return { error: "Elige una valoración de 1 a 5 estrellas." };
   }
 
   const supabase = await createClient();
@@ -39,7 +39,7 @@ export async function submitReview(_prev: ReviewActionState, formData: FormData)
 
   if (error) {
     if (error.code === "23505") return { error: "Ya dejaste una reseña para este producto." };
-    return { error: "No se pudo guardar la reseña — verificá que el pedido ya esté entregado." };
+    return { error: "No se pudo guardar la reseña — verifica que el pedido ya esté entregado." };
   }
 
   revalidatePath("/cuenta/pedidos");

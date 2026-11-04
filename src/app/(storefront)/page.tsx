@@ -127,7 +127,7 @@ export default async function Home() {
       </>
     ),
     subtitle:
-      "Pan, pastelería y café de elaboración artesanal — pedí online con retiro en tienda o despacho a domicilio.",
+      "Pan, pastelería y café de elaboración artesanal — pide online con retiro en tienda o despacho a domicilio.",
   };
 
   return (
@@ -415,7 +415,7 @@ export default async function Home() {
         <Reveal><section className="mx-auto max-w-5xl px-6">
           <div className="text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-dark">Catálogo</p>
-            <h2 className="mt-2 font-display text-3xl font-medium text-foreground">Explorá por categoría</h2>
+            <h2 className="mt-2 font-display text-3xl font-medium text-foreground">Explora por categoría</h2>
           </div>
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
             {departments.map((dept) => (

@@ -17,9 +17,9 @@ export default async function CanjeDePuntosPage() {
       <div>
         <h1 className="text-xl font-semibold text-gold">Canje de puntos</h1>
         <p className="mt-1 text-sm text-foreground/60">
-          Marcá qué productos son canjeables por puntos y su costo. Esta es la
+          Marca qué productos son canjeables por puntos y su costo. Esta es la
           única escritura de Marketing sobre el catálogo (sección 13 del
-          blueprint) — dejá el campo vacío para que un producto no sea
+          blueprint) — deja el campo vacío para que un producto no sea
           canjeable.
         </p>
       </div>

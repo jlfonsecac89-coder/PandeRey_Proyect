@@ -48,7 +48,7 @@ export function ReviewForm({
       </div>
       <textarea
         name="comment"
-        placeholder="Contanos qué te pareció (opcional)"
+        placeholder="Cuéntanos qué te pareció (opcional)"
         rows={2}
         className="mt-2 w-full rounded-md border border-charcoal-border bg-charcoal-light px-2 py-1.5 text-sm outline-none focus:border-gold"
       />
