@@ -42,8 +42,8 @@ Crons (`vercel.json`): `order-sla` diario 09:00 UTC y `rfm-recompute` lunes 03:0
 - Correo de orden de compra llega a un correo que **no** sea el del dueño de Resend.
 - Un pago real pequeño: reembolsarlo desde Mercado Pago y registrarlo; si se quiere validar el reembolso automático, hacerlo con ese pago.
 
-## 6. Datos de prueba que hoy están en la base (limpiar solo con permiso)
-Pedidos `PDR-000001` a `PDR-000004` y ~17 borradores `pending_payment`; campaña "PRUEBA - no usar"; colección "PRUEBA coleccion"; cuenta "Admin Prueba" con puntos y compras; cupón `PRUEBA10`. El próximo pedido real tendría el N° `PDR-000005`; si se limpian los de prueba conviene decidir si se reinicia la secuencia `order_number_seq`.
+## 6. Datos de prueba — LIMPIADOS el 4-nov-2026 (queda reiniciar la secuencia)
+Se borraron los 21 pedidos de prueba y sus dependientes, el cupón `PRUEBA10`, la campaña y la colección de prueba y los snapshots RFM. Queda en el SQL Editor: `select setval('order_number_seq', 1, false);` para que el primer pedido real sea `PDR-000001`. Las cuentas (19 clientes y 5 admin) no se tocaron: revisar si hay cuentas de prueba que dar de baja.
 
 ## 7. Marcha atrás
 - Vercel → Deployments → el despliegue anterior → **Promote to Production** (inmediato, sin tocar la base).
