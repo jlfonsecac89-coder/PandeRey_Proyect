@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { formatCLP, formatOrderNumber } from "@/lib/format";
 import { STATUS_LABELS, type OrderStatus } from "@/lib/orders/status";
 import { DeliveryChatPanel } from "@/components/delivery-chat/DeliveryChatPanel";
+import { formatPickupDate } from "@/lib/campaigns/types";
 import type { AdminOrder } from "./AdminOrderRow";
 import type { OrderItemSummary } from "./OrderRowDetail";
 
@@ -111,6 +112,22 @@ export function OrderDetailModal({
               {items.length === 0 && <p className="px-3 py-2 text-sm text-foreground-muted">Sin ítems.</p>}
             </div>
           </div>
+
+          {order.campaign_pickups && order.campaign_pickups.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Retiro por día</p>
+              <ul className="mt-1 space-y-0.5 text-sm text-foreground">
+                {order.campaign_pickups.map((p) => (
+                  <li key={p.date} className="flex justify-between">
+                    <span className="capitalize">{formatPickupDate(p.date)}</span>
+                    <span className={p.pickedUp ? "text-gold-hover" : "text-foreground-muted"}>
+                      {p.quantity} u. · {p.pickedUp ? "retirado" : "pendiente"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {order.receipt_number && (
             <div className="mt-4">

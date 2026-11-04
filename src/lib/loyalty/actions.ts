@@ -7,6 +7,7 @@ import { getCurrentProfile } from "@/lib/auth/session";
 import { generateDeliveryCode } from "@/lib/orders/status";
 import { orderPrepSlaMinutes } from "@/lib/orders/status-server";
 import { assignOrderNumber } from "@/lib/orders/order-number";
+import { getProductCampaigns } from "@/lib/campaigns/campaigns";
 
 export type RedeemProductState = { error?: string } | null;
 
@@ -26,11 +27,21 @@ export async function redeemProductForPoints(
 
   const { data: product } = await supabase
     .from("products")
-    .select("id, name, price, points_cost, is_active")
+    .select("id, name, price, points_cost, is_active, is_available")
     .eq("id", productId)
     .maybeSingle();
   if (!product || !product.is_active || !product.points_cost) {
     return { error: "Este producto no está disponible para canje." };
+  }
+  if (!product.is_available) {
+    return { error: "Este producto no está disponible por ahora." };
+  }
+
+  // Un producto en campaña por encargo (pedidos abiertos o cerrados) necesita el
+  // reparto por día y el cupo diario, que el canje no maneja: no se canjea.
+  const campaign = (await getProductCampaigns([product.id])).get(product.id);
+  if (campaign && (campaign.phase === "open" || campaign.phase === "closed")) {
+    return { error: "Este producto se vende por encargo y no se puede canjear con puntos." };
   }
 
   const { data: store } = await supabase
@@ -49,7 +60,7 @@ export async function redeemProductForPoints(
     .eq("id", profile.id)
     .single();
   if (!freshProfile || freshProfile.points_balance < product.points_cost) {
-    return { error: "No tenés suficientes puntos para canjear este producto." };
+    return { error: "No tienes suficientes puntos para canjear este producto." };
   }
 
   const adminSupabase = createAdminClient();

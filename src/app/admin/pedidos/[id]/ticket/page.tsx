@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP, formatOrderNumber } from "@/lib/format";
+import { formatPickupDate } from "@/lib/campaigns/types";
+import { getOrderCampaignPickups } from "@/lib/campaigns/order-pickups";
 import { STATUS_LABELS, type OrderStatus } from "@/lib/orders/status";
 import { TicketPrintController } from "./TicketPrintController";
 
@@ -41,6 +43,7 @@ export default async function OrderTicketPage({
     .maybeSingle();
 
   if (!order) notFound();
+  const campaignPickups = (await getOrderCampaignPickups([order.id])).get(order.id) ?? [];
 
   const [{ data: customer }, { data: items }, { data: address }] = await Promise.all([
     supabase.from("profiles").select("full_name, phone").eq("id", order.user_id).maybeSingle(),
@@ -80,13 +83,26 @@ export default async function OrderTicketPage({
         <p>
           <span className="font-semibold">Entrega:</span> {order.delivery_method === "pickup" ? "Retiro en tienda" : "Envío a domicilio"}
         </p>
-        {order.scheduled_at && (
-          <p>
-            <span className="font-semibold">Cliente pidió recibirlo:</span>{" "}
-            {new Date(order.scheduled_at).toLocaleString("es-CL")}
-          </p>
+        {campaignPickups.length > 0 ? (
+          <div>
+            <p className="font-semibold">Retiro por día:</p>
+            {campaignPickups.map((p) => (
+              <p key={p.date}>
+                <span className="capitalize">{formatPickupDate(p.date)}</span>:{" "}
+                <span className="font-semibold">{p.quantity} unidades</span>
+                {p.pickedUp ? " (retirado)" : ""}
+              </p>
+            ))}
+          </div>
+        ) : (
+          order.scheduled_at && (
+            <p>
+              <span className="font-semibold">Cliente pidió recibirlo:</span>{" "}
+              {new Date(order.scheduled_at).toLocaleString("es-CL")}
+            </p>
+          )
         )}
-        {order.sla_deadline && (
+        {campaignPickups.length === 0 && order.sla_deadline && (
           <p>
             <span className="font-semibold">
               {order.ticket_printed_at ? "Preparar antes de:" : "Hora comprometida:"}

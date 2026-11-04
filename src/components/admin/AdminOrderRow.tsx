@@ -12,6 +12,8 @@ import {
   confirmBankTransferPayment,
   type OrderActionState,
 } from "@/lib/orders/actions";
+import Link from "next/link";
+import { formatPickupDate, type OrderCampaignPickup } from "@/lib/campaigns/types";
 import { OrderStepper } from "./OrderStepper";
 import { OrderRowDetail, type OrderItemSummary } from "./OrderRowDetail";
 import { OrderDetailModal } from "./OrderDetailModal";
@@ -40,6 +42,8 @@ export type AdminOrder = {
   receipt_number: string | null;
   scheduled_at: string | null;
   ticket_printed_at: string | null;
+  // Reparto por día de un pedido de campaña (null si no lo es).
+  campaign_pickups?: OrderCampaignPickup[] | null;
 };
 
 type Person = { id: string; full_name: string; phone: string | null };
@@ -98,11 +102,14 @@ export function AdminOrderRow({
     }
   }, [readyState, pickupState, returnState, assignState, transferState, router]);
 
+  // Un pedido de campaña se retira en varios días: su hora "pedida" y su SLA no
+  // significan nada, y se gestiona desde Retiros por día.
+  const isCampaign = !!order.campaign_pickups?.length;
   const isOnTime =
-    order.status === "delivered" && order.delivered_at && order.sla_deadline
+    !isCampaign && order.status === "delivered" && order.delivered_at && order.sla_deadline
       ? new Date(order.delivered_at) <= new Date(order.sla_deadline)
       : null;
-  const sla = slaCountdown(order);
+  const sla = isCampaign ? null : slaCountdown(order);
 
   return (
     <>
@@ -140,6 +147,11 @@ export function AdminOrderRow({
         </td>
         <td className="py-2 pr-3 text-sm">
           {STATUS_LABELS[order.status as OrderStatus] ?? order.status}
+          {isCampaign && (
+            <span className="ml-1.5 rounded-full border border-gold-dark px-1.5 py-0.5 text-[10px] text-gold-hover">
+              Por encargo
+            </span>
+          )}
           {isOnTime !== null && (
             <span
               className={`ml-1.5 rounded-full border px-1.5 py-0.5 text-[10px] ${
@@ -158,10 +170,21 @@ export function AdminOrderRow({
         </td>
         <td className="py-2 pr-3 text-sm">{order.delivery_method === "pickup" ? "Retiro" : "Envío"}</td>
         <td className="py-2 pr-3">
-          {order.scheduled_at && (
-            <p className="text-[10px] text-foreground/50">
-              Pidió para: {new Date(order.scheduled_at).toLocaleString("es-CL")}
-            </p>
+          {isCampaign ? (
+            <ul className="text-[10px] text-foreground/60">
+              {order.campaign_pickups!.map((p) => (
+                <li key={p.date} className={p.pickedUp ? "text-gold-hover" : ""}>
+                  {p.pickedUp ? "✓ " : ""}
+                  <span className="capitalize">{formatPickupDate(p.date)}</span>: {p.quantity} u.
+                </li>
+              ))}
+            </ul>
+          ) : (
+            order.scheduled_at && (
+              <p className="text-[10px] text-foreground/50">
+                Pidió para: {new Date(order.scheduled_at).toLocaleString("es-CL")}
+              </p>
+            )
           )}
           <OrderStepper status={order.status} deliveryMethod={order.delivery_method} />
           {sla && <p className={`mt-1 text-[10px] ${sla.className}`}>{sla.label}</p>}
@@ -191,7 +214,7 @@ export function AdminOrderRow({
           {order.status === "pending_payment" && order.payment_method === "mercadopago" && (
             <span className="text-xs text-foreground/40">Esperando pago</span>
           )}
-          {order.status === "preparing" && (
+          {order.status === "preparing" && !isCampaign && (
             <form action={readyAction}>
               {readyState?.error && <p className="text-xs text-red-400">{readyState.error}</p>}
               <button
@@ -229,7 +252,16 @@ export function AdminOrderRow({
             </form>
           )}
 
-          {order.status === "ready_for_pickup" && (
+          {isCampaign && ["paid", "preparing", "ready_for_pickup"].includes(order.status) && (
+            <Link
+              href={`/admin/retiros?dia=${(order.campaign_pickups!.find((p) => !p.pickedUp) ?? order.campaign_pickups![0]).date}`}
+              className="text-xs text-gold-hover underline"
+            >
+              Gestionar retiros →
+            </Link>
+          )}
+
+          {order.status === "ready_for_pickup" && !isCampaign && (
             <form action={pickupAction} className="space-y-1">
               {!invoicingEnabled && (
                 <input

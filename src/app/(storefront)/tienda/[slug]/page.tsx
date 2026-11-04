@@ -53,8 +53,12 @@ export default async function ProductoDetallePage({
     .limit(1)
     .maybeSingle();
 
+  // Mismo criterio que el canje del servidor: no se ofrece canje de un producto
+  // no disponible ni de uno en campaña por encargo.
+  const redeemable = product.is_available && campaign?.phase !== "open" && campaign?.phase !== "closed";
+
   let redeemInfo: { pointsBalance: number; storeId: string } | null = null;
-  if (product.points_cost) {
+  if (product.points_cost && redeemable) {
     const profile = await getCurrentProfile();
     if (profile && store) {
       redeemInfo = { pointsBalance: profile.points_balance, storeId: store.id };
@@ -145,7 +149,7 @@ export default async function ProductoDetallePage({
           />
         </div>
 
-        {product.points_cost != null && (
+        {product.points_cost != null && redeemable && (
           <div className="mt-5 rounded-xl border border-gold-dark/30 bg-gold/5 p-4">
             <p className="text-sm text-foreground">
               Canjeable por <span className="font-semibold text-gold">{product.points_cost} puntos</span>

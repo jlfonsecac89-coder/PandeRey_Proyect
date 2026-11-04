@@ -38,3 +38,6 @@ export function formatPickupDate(ymd: string): string {
   const [y, m, d] = ymd.split("-").map(Number);
   return DATE_LABEL.format(new Date(Date.UTC(y, m - 1, d, 12)));
 }
+
+// Parte de un pedido de campaña asignada a un día de retiro.
+export type OrderCampaignPickup = { date: string; quantity: number; pickedUp: boolean };

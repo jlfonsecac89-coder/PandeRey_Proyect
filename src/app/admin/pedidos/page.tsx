@@ -5,6 +5,7 @@ import { PIPELINE_GROUPS, PIPELINE_ORDER, type PipelineGroup } from "@/lib/order
 import { PedidosTable } from "@/components/admin/PedidosTable";
 import { KanbanBoard } from "@/components/admin/KanbanBoard";
 import { getModuleFlags } from "@/lib/settings/modules";
+import { getOrderCampaignPickups } from "@/lib/campaigns/order-pickups";
 
 function startOfDay(date: Date): string {
   const d = new Date(date);
@@ -83,6 +84,8 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
   const { data: orders } = await query;
 
   const orderIds = (orders ?? []).map((o) => o.id);
+  const campaignPickups = await getOrderCampaignPickups(orderIds);
+  const ordersWithCampaign = (orders ?? []).map((o) => ({ ...o, campaign_pickups: campaignPickups.get(o.id) ?? null }));
   const customerIds = [...new Set((orders ?? []).map((o) => o.user_id))];
 
   const [{ data: repartidores }, { data: customers }, { data: items }] = await Promise.all([
@@ -212,10 +215,10 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
 
       <div className="mt-5">
         {activeVista === "kanban" ? (
-          <KanbanBoard orders={orders ?? []} customers={customers ?? []} groups={pipelineKeys} />
+          <KanbanBoard orders={ordersWithCampaign} customers={customers ?? []} groups={pipelineKeys} />
         ) : (
           <PedidosTable
-            orders={orders ?? []}
+            orders={ordersWithCampaign}
             repartidores={repartidores ?? []}
             customers={customers ?? []}
             items={items ?? []}
