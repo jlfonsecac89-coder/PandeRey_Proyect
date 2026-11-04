@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getClearanceDiscounts, getClearanceProductIds, applyClearanceDiscount } from "@/lib/catalog/clearance";
 import { getProductCampaigns } from "@/lib/campaigns/campaigns";
+import { collectionStatus } from "@/lib/catalog/collections";
 import { SortSelect } from "@/components/storefront/SortSelect";
 import { TiendaFilterBar } from "@/components/storefront/TiendaFilterBar";
 import { ProductGridCard, type ProductGridCardData } from "@/components/storefront/ProductGridCard";
@@ -26,6 +27,7 @@ type SearchParams = {
   precio?: string;
   singluten?: string;
   orden?: string;
+  coleccion?: string;
 };
 
 const PRICE_BUCKETS = [
@@ -98,7 +100,7 @@ async function resolveOfferedProductIds(
 }
 
 export default async function TiendaPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const { departamento, categoria, filtro, precio, singluten, orden } = await searchParams;
+  const { departamento, categoria, filtro, precio, singluten, orden, coleccion } = await searchParams;
   const supabase = await createClient();
 
   const { data: activeStore } = await supabase
@@ -115,6 +117,28 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
     .select("id, name, slug")
     .eq("is_active", true)
     .order("sort_order");
+
+  // Colecciones visibles: activas, dentro de su vigencia y con al menos un
+  // producto activo (la política de la base solo mira is_active; las fechas y
+  // el conteo se aplican acá para no mostrar vitrinas vacías o vencidas).
+  const { data: collectionRows } = await supabase
+    .from("collections")
+    .select("id, name, slug, is_active, starts_at, ends_at, product_collections(product:products(is_active))")
+    .eq("is_active", true)
+    .order("name");
+  const collections = (collectionRows ?? [])
+    .filter((c) => collectionStatus(c) === "live")
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      count: (c.product_collections ?? []).filter((pc) => {
+        const product = Array.isArray(pc.product) ? pc.product[0] : pc.product;
+        return product?.is_active;
+      }).length,
+    }))
+    .filter((c) => c.count > 0);
+  const currentCollection = coleccion ? (collections.find((c) => c.slug === coleccion) ?? null) : null;
 
   const currentDept = departamento ? (departments ?? []).find((d) => d.slug === departamento) : null;
 
@@ -151,6 +175,14 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
 
   if (categoryIds) {
     query = query.in("category_id", categoryIds.length ? categoryIds : ["00000000-0000-0000-0000-000000000000"]);
+  }
+  if (currentCollection) {
+    const { data: members } = await supabase
+      .from("product_collections")
+      .select("product_id")
+      .eq("collection_id", currentCollection.id);
+    const memberIds = (members ?? []).map((m) => m.product_id as string);
+    query = query.in("id", memberIds.length ? memberIds : ["00000000-0000-0000-0000-000000000000"]);
   }
   if (filtro === "evento") {
     query = query.eq("is_special_event", true);
@@ -189,7 +221,7 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
   const publicBaseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images`;
 
   function buildHref(overrides: Partial<SearchParams>) {
-    const current: SearchParams = { departamento, categoria, filtro, precio, singluten, orden };
+    const current: SearchParams = { departamento, categoria, filtro, precio, singluten, orden, coleccion };
     const merged = { ...current, ...overrides };
     const params = new URLSearchParams();
     if (merged.departamento) params.set("departamento", merged.departamento);
@@ -198,6 +230,7 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
     if (merged.precio) params.set("precio", merged.precio);
     if (merged.singluten) params.set("singluten", merged.singluten);
     if (merged.orden) params.set("orden", merged.orden);
+    if (merged.coleccion) params.set("coleccion", merged.coleccion);
     const qs = params.toString();
     return qs ? `/tienda?${qs}` : "/tienda";
   }
@@ -267,6 +300,30 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
         ))}
       </div>
 
+      {collections.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-foreground-muted">
+            Colecciones
+          </span>
+          {collections.map((c) => {
+            const active = currentCollection?.slug === c.slug;
+            return (
+              <Link
+                key={c.id}
+                href={buildHref({ coleccion: active ? undefined : c.slug })}
+                className={`rounded-full border px-3 py-1 text-xs transition ${
+                  active
+                    ? "border-gold bg-gold/10 text-gold"
+                    : "border-white/10 text-foreground-muted hover:border-gold-dark/60 hover:text-gold"
+                }`}
+              >
+                {c.name}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
       <TiendaFilterBar
         currentDept={currentDept}
         categoriesInDept={categoriesInDept}
@@ -288,7 +345,7 @@ export default async function TiendaPage({ searchParams }: { searchParams: Promi
           <SortSelect
             current={orden ?? "nombre"}
             options={SORT_OPTIONS}
-            currentParams={{ departamento, categoria, filtro, precio, singluten }}
+            currentParams={{ departamento, categoria, filtro, precio, singluten, coleccion }}
           />
         </div>
 

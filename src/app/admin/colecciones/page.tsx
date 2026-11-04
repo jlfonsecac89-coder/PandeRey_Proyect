@@ -1,16 +1,37 @@
 import { requireRole } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/server";
 import { CatalogoTabs } from "@/components/admin/CatalogoTabs";
+import { collectionStatus, isoToChileLocal } from "@/lib/catalog/collections";
 import { ColeccionForm } from "./ColeccionForm";
+import { ColeccionCard, type ColeccionView } from "./ColeccionCard";
 
 export default async function ColeccionesPage() {
   const profile = await requireRole(["admin", "marketing"], "/admin-login");
 
   const supabase = await createClient();
-  const { data: collections } = await supabase
-    .from("collections")
-    .select("id, name, starts_at, ends_at, is_active")
-    .order("name");
+  const [{ data: collections }, { data: products }, { data: links }] = await Promise.all([
+    supabase.from("collections").select("id, name, slug, starts_at, ends_at, is_active").order("name"),
+    supabase.from("products").select("id, name, is_active").order("name"),
+    supabase.from("product_collections").select("collection_id, product_id"),
+  ]);
+
+  const productsByCollection = new Map<string, string[]>();
+  for (const l of links ?? []) {
+    const list = productsByCollection.get(l.collection_id) ?? [];
+    list.push(l.product_id);
+    productsByCollection.set(l.collection_id, list);
+  }
+
+  const views: ColeccionView[] = (collections ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    isActive: c.is_active,
+    status: collectionStatus(c),
+    startsAt: isoToChileLocal(c.starts_at),
+    endsAt: isoToChileLocal(c.ends_at),
+    productIds: productsByCollection.get(c.id) ?? [],
+  }));
 
   return (
     <div className="space-y-6">
@@ -21,38 +42,17 @@ export default async function ColeccionesPage() {
       <CatalogoTabs active="colecciones" role={profile.role} />
       <p className="text-sm text-foreground-muted">
         Vitrinas transversales (Sin Gluten, Para Compartir, Navidad...). Un producto puede estar en varias a la vez.
+        Las colecciones activas y vigentes aparecen como filtro en la tienda.
       </p>
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-card">
         <ColeccionForm />
       </div>
-      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.03] shadow-card">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-charcoal-border text-xs uppercase tracking-wide text-foreground-muted">
-              <th className="px-4 py-3 font-normal">Nombre</th>
-              <th className="px-4 py-3 font-normal">Vigencia</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(collections ?? []).map((c) => (
-              <tr key={c.id} className="border-b border-charcoal-border/50 last:border-0">
-                <td className="px-4 py-2.5 text-foreground">{c.name}</td>
-                <td className="px-4 py-2.5 text-foreground-muted">
-                  {c.starts_at || c.ends_at
-                    ? `${c.starts_at ? new Date(c.starts_at).toLocaleDateString("es-CL") : "…"} — ${c.ends_at ? new Date(c.ends_at).toLocaleDateString("es-CL") : "…"}`
-                    : "Permanente"}
-                </td>
-              </tr>
-            ))}
-            {(collections ?? []).length === 0 && (
-              <tr>
-                <td colSpan={2} className="px-4 py-6 text-center text-sm text-foreground-muted">
-                  Todavía no hay colecciones.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+
+      <div className="space-y-4">
+        {views.map((c) => (
+          <ColeccionCard key={c.id} collection={c} products={products ?? []} />
+        ))}
+        {views.length === 0 && <p className="text-sm text-foreground-muted">Todavía no hay colecciones.</p>}
       </div>
     </div>
   );

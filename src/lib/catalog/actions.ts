@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth/rbac";
 import { logAction } from "@/lib/audit/log-action";
 import { normalizeName, slugify } from "./normalize";
 import { generateUniqueSku } from "./sku";
+import { chileLocalToIso } from "./collections";
 
 export type CatalogActionState = { error?: string; success?: string; id?: string } | null;
 
@@ -122,10 +123,16 @@ export async function createCollection(
   await requireRole(["admin", "marketing"]);
 
   const name = String(formData.get("name") || "").trim();
-  const startsAt = String(formData.get("starts_at") || "") || null;
-  const endsAt = String(formData.get("ends_at") || "") || null;
+  const startsRaw = String(formData.get("starts_at") || "");
+  const endsRaw = String(formData.get("ends_at") || "");
+  const startsAt = startsRaw ? chileLocalToIso(startsRaw) : null;
+  const endsAt = endsRaw ? chileLocalToIso(endsRaw) : null;
 
   if (!name) return { error: "Ingresa un nombre." };
+  if ((startsRaw && !startsAt) || (endsRaw && !endsAt)) return { error: "Fecha inválida." };
+  if (startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)) {
+    return { error: "El fin debe ser posterior al inicio." };
+  }
 
   const supabase = await createClient();
 

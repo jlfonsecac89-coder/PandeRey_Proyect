@@ -11,6 +11,10 @@ export const ACTION_LABELS: Record<string, string> = {
   module_toggled: "Módulo activado/desactivado",
   pickup_confirmed: "Retiro confirmado",
   order_cancelled: "Pedido cancelado",
+  collection_activated: "Colección activada",
+  collection_deactivated: "Colección desactivada",
+  collection_dates_changed: "Vigencia de colección modificada",
+  collection_products_changed: "Productos de colección modificados",
   order_refund_requested: "Reembolso solicitado",
   order_refund_marked_manual: "Reembolso registrado manualmente",
   campaign_pickup_marked: "Retiro de campaña marcado",
@@ -37,6 +41,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   order: "Pedido",
   system_setting: "Ajuste del sistema",
   campaign: "Campaña",
+  collection: "Colección",
   campaign_pickup_date: "Fecha de retiro de campaña",
 };
 
