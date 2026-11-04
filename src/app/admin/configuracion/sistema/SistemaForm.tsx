@@ -97,6 +97,69 @@ export function SistemaForm({ settings }: { settings: SystemSettings }) {
         </div>
       </div>
 
+      <div>
+        <p className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">
+          Cancelaciones y reembolsos
+        </p>
+        <p className="mt-1 text-xs text-foreground/50">
+          Mercado Pago no devuelve el dinero al instante. Estos plazos se publican en los Términos y Condiciones, en
+          el correo de cancelación y en la página del pedido. Ajústalos a lo que de verdad puedas cumplir.
+        </p>
+        <div className="mt-3 grid grid-cols-3 gap-3">
+          <div>
+            <label htmlFor="refundRequestBusinessDays" className="mb-1 block text-xs text-foreground/60">
+              Pedimos el reembolso en (días hábiles)
+            </label>
+            <input
+              id="refundRequestBusinessDays"
+              name="refundRequestBusinessDays"
+              type="number"
+              min={0}
+              max={15}
+              step="1"
+              defaultValue={settings.refundRequestBusinessDays}
+              required
+              className="w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm outline-none focus:border-gold"
+            />
+            <p className="mt-1 text-xs text-foreground/40">Lo que depende de la tienda.</p>
+          </div>
+          <div>
+            <label htmlFor="refundDebitBusinessDays" className="mb-1 block text-xs text-foreground/60">
+              Abono en débito hasta (días hábiles)
+            </label>
+            <input
+              id="refundDebitBusinessDays"
+              name="refundDebitBusinessDays"
+              type="number"
+              min={1}
+              max={30}
+              step="1"
+              defaultValue={settings.refundDebitBusinessDays}
+              required
+              className="w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm outline-none focus:border-gold"
+            />
+            <p className="mt-1 text-xs text-foreground/40">Depende del banco. Con crédito, va al próximo estado de cuenta.</p>
+          </div>
+          <div>
+            <label htmlFor="refundMaxDays" className="mb-1 block text-xs text-foreground/60">
+              Plazo máximo total (días)
+            </label>
+            <input
+              id="refundMaxDays"
+              name="refundMaxDays"
+              type="number"
+              min={1}
+              max={45}
+              step="1"
+              defaultValue={settings.refundMaxDays}
+              required
+              className="w-full rounded-md border border-charcoal-border bg-background px-3 py-2 text-sm outline-none focus:border-gold"
+            />
+            <p className="mt-1 text-xs text-foreground/40">Máximo 45, el tope que fija la ley.</p>
+          </div>
+        </div>
+      </div>
+
       <button
         type="submit"
         disabled={pending}

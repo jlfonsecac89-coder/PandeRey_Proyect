@@ -1,12 +1,16 @@
 import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import type { RefundPolicy } from "@/lib/orders/refund-policy";
 
 export type SystemSettings = {
   orderPrepSlaMinutes: number;
   maxDeliveryIssueWaitMinutes: number;
   loyaltyPointsPerClp: number;
   loyaltyPointsToClpRate: number;
+  refundRequestBusinessDays: number;
+  refundDebitBusinessDays: number;
+  refundMaxDays: number;
 };
 
 // Fallback si la fila de la base todavía no existe (ej. justo después de
@@ -18,6 +22,12 @@ export const DEFAULTS: SystemSettings = {
   maxDeliveryIssueWaitMinutes: Number(process.env.MAX_DELIVERY_ISSUE_WAIT_MINUTES ?? 10),
   loyaltyPointsPerClp: Number(process.env.LOYALTY_POINTS_PER_CLP ?? 0.001),
   loyaltyPointsToClpRate: Number(process.env.LOYALTY_POINTS_TO_CLP_RATE ?? 10),
+  // Días hábiles para pedir el reembolso a Mercado Pago, días hábiles que
+  // puede tardar el abono en débito, y tope total en días corridos (la ley
+  // fija 45 como máximo para devolver lo pagado).
+  refundRequestBusinessDays: 3,
+  refundDebitBusinessDays: 12,
+  refundMaxDays: 45,
 };
 
 export const KEY_MAP: Record<keyof SystemSettings, string> = {
@@ -25,6 +35,9 @@ export const KEY_MAP: Record<keyof SystemSettings, string> = {
   maxDeliveryIssueWaitMinutes: "max_delivery_issue_wait_minutes",
   loyaltyPointsPerClp: "loyalty_points_per_clp",
   loyaltyPointsToClpRate: "loyalty_points_to_clp_rate",
+  refundRequestBusinessDays: "refund_request_business_days",
+  refundDebitBusinessDays: "refund_debit_business_days",
+  refundMaxDays: "refund_max_days",
 };
 
 // cache() deduplica dentro de un mismo request/render — este archivo se
@@ -43,3 +56,12 @@ export const getSystemSettings = cache(async (): Promise<SystemSettings> => {
   }
   return result;
 });
+
+export async function getRefundPolicy(): Promise<RefundPolicy> {
+  const s = await getSystemSettings();
+  return {
+    requestBusinessDays: s.refundRequestBusinessDays,
+    debitBusinessDays: s.refundDebitBusinessDays,
+    maxDays: s.refundMaxDays,
+  };
+}

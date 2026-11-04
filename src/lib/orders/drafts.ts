@@ -56,7 +56,9 @@ export async function cancelAbandonedDrafts(): Promise<number> {
   return cancelled;
 }
 
-async function revertDraftConsumption(draft: { id: string; user_id: string; promotion_id: string | null }) {
+// También lo usa la cancelación de un pedido pagado (cancel-actions.ts): el
+// cupón, los puntos del descuento y el cupo de edición limitada se devuelven igual.
+export async function revertDraftConsumption(draft: { id: string; user_id: string; promotion_id: string | null }) {
   const admin = createAdminClient();
 
   // Cupón: libera el uso del cliente y el contador de la promoción.

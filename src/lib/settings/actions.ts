@@ -18,6 +18,10 @@ export async function updateSystemSettings(
     { field: "maxDeliveryIssueWaitMinutes", min: 1, max: 120, label: "Espera máxima en problema de entrega" },
     { field: "loyaltyPointsPerClp", min: 0, max: 1, label: "Puntos por CLP gastado" },
     { field: "loyaltyPointsToClpRate", min: 0, max: 1000, label: "Valor en CLP de 1 punto" },
+    { field: "refundRequestBusinessDays", min: 0, max: 15, label: "Días hábiles para solicitar el reembolso" },
+    { field: "refundDebitBusinessDays", min: 1, max: 30, label: "Días hábiles de abono en débito" },
+    // La ley chilena fija 45 días como máximo para devolver lo pagado.
+    { field: "refundMaxDays", min: 1, max: 45, label: "Plazo máximo de reembolso (días)" },
   ];
 
   const rows: { key: string; value: string }[] = [];
@@ -32,7 +36,10 @@ export async function updateSystemSettings(
 
   const supabase = await createClient();
   const { error } = await supabase.from("system_settings").upsert(rows, { onConflict: "key" });
-  if (error) return { error: "No se pudieron guardar los ajustes." };
+  if (error) {
+    console.error("[updateSystemSettings]", error);
+    return { error: "No se pudieron guardar los ajustes." };
+  }
 
   revalidatePath("/admin/configuracion/sistema");
   return { success: "Ajustes guardados." };

@@ -28,7 +28,8 @@ const RANGO_OPTIONS: { key: string; label: string; since: () => string | null }[
 type SearchParams = { grupo?: string; entrega?: string; rango?: string; vista?: string };
 
 export default async function AdminPedidosPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  await requireRole(["admin", "operaciones"], "/admin-login");
+  const profile = await requireRole(["admin", "operaciones"], "/admin-login");
+  const isAdmin = profile.role === "admin";
   const { grupo, entrega, rango, vista } = await searchParams;
   const activeVista = vista === "kanban" ? "kanban" : "tabla";
   const supabase = await createClient();
@@ -68,7 +69,7 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
   let query = supabase
     .from("orders")
     .select(
-      "id, order_number, status, payment_method, delivery_method, total, created_at, store_id, user_id, assigned_driver_id, sla_deadline, delivered_at, receipt_number, scheduled_at, ticket_printed_at",
+      "id, order_number, status, payment_method, delivery_method, total, created_at, store_id, user_id, assigned_driver_id, sla_deadline, delivered_at, receipt_number, scheduled_at, ticket_printed_at, cancel_reason, refund_status, refund_amount, refund_requested_at",
     )
     .or(visibleOrdersFilter)
     .order("created_at", { ascending: false })
@@ -223,6 +224,7 @@ export default async function AdminPedidosPage({ searchParams }: { searchParams:
             customers={customers ?? []}
             items={items ?? []}
             invoicingEnabled={invoicingOn}
+            canManageRefunds={isAdmin}
           />
         )}
       </div>

@@ -129,3 +129,31 @@ export function paymentFailedTemplate(orderLabel: string) {
     ),
   };
 }
+
+// Cancelación de un pedido pagado. `refund` describe qué pasó con el dinero: un
+// reembolso ya solicitado a Mercado Pago (con los plazos vigentes, porque no es
+// inmediato), uno que todavía se está gestionando, o ninguno.
+export function orderCancelledTemplate(params: {
+  orderLabel: string;
+  refund: { state: "requested"; amount: number; policy: string[] } | { state: "processing" } | null;
+}) {
+  const { orderLabel, refund } = params;
+
+  let refundBlock = "";
+  if (refund?.state === "requested") {
+    refundBlock = `
+      <p ${P}>Solicitamos el reembolso de <strong>${formatCLP(refund.amount)}</strong> a tu medio de pago.</p>
+      <p ${P}>${refund.policy.join(" ")}</p>`;
+  } else if (refund?.state === "processing") {
+    refundBlock = `<p ${P}>Estamos gestionando tu reembolso y te avisaremos apenas lo hayamos solicitado a Mercado Pago.</p>`;
+  }
+
+  return {
+    subject: `Pedido ${orderLabel} cancelado — Pan de Rey`,
+    html: wrap(
+      "Pedido cancelado",
+      `<p ${P}>Tu pedido <strong>${orderLabel}</strong> fue cancelado.</p>${refundBlock}
+       <p ${P}>Si tienes dudas, responde este correo o escríbenos a la tienda.</p>`,
+    ),
+  };
+}

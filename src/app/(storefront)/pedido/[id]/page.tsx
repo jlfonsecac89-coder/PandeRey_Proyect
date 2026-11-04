@@ -4,6 +4,8 @@ import { formatCLP, formatOrderNumber } from "@/lib/format";
 import { STATUS_LABELS, type OrderStatus } from "@/lib/orders/status";
 import { payResendShipping } from "@/lib/checkout/actions";
 import { choosePickupFree } from "@/lib/orders/actions";
+import { getRefundPolicy } from "@/lib/settings/system-settings";
+import { refundPolicySentences } from "@/lib/orders/refund-policy";
 
 export default async function SeguimientoPedidoPage({
   params,
@@ -19,7 +21,7 @@ export default async function SeguimientoPedidoPage({
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, delivery_method, total, delivery_confirmation_code, scheduled_at, created_at",
+      "id, order_number, status, delivery_method, total, delivery_confirmation_code, scheduled_at, created_at, refund_status, refund_amount, refund_requested_at",
     )
     .eq("id", id)
     .maybeSingle();
@@ -34,6 +36,8 @@ export default async function SeguimientoPedidoPage({
     .order("created_at", { ascending: true });
 
   const status = order.status as OrderStatus;
+  const refundSentences =
+    status === "cancelled" && order.refund_status ? refundPolicySentences(await getRefundPolicy()) : [];
   const showCode = order.delivery_method === "shipping" && !["delivered", "cancelled"].includes(status);
 
   // Server Actions usadas directo como `action` de un <form> (sin
@@ -56,6 +60,31 @@ export default async function SeguimientoPedidoPage({
         <p className="font-mono text-xs text-foreground-muted">{formatOrderNumber(order.order_number, order.id)}</p>
       </div>
       <p className="mt-1 text-sm text-foreground-muted">Total: {formatCLP(order.total)}</p>
+
+      {status === "cancelled" && order.refund_status === "requested" && (
+        <div className="mt-6 space-y-1.5 rounded-2xl border border-charcoal-border bg-background-elevated p-5 text-sm shadow-card">
+          <p className="text-foreground">
+            Solicitamos el reembolso de {formatCLP(Number(order.refund_amount ?? order.total))} a tu medio de pago
+            {order.refund_requested_at
+              ? ` el ${new Date(order.refund_requested_at).toLocaleDateString("es-CL")}`
+              : ""}
+            .
+          </p>
+          {refundSentences.slice(1).map((sentence) => (
+            <p key={sentence} className="text-xs text-foreground-muted">
+              {sentence}
+            </p>
+          ))}
+        </div>
+      )}
+      {status === "cancelled" && order.refund_status === "failed" && (
+        <div className="mt-6 rounded-2xl border border-charcoal-border bg-background-elevated p-5 text-sm shadow-card">
+          <p className="text-foreground">Estamos gestionando el reembolso de tu pedido.</p>
+          <p className="mt-1 text-xs text-foreground-muted">
+            Te avisaremos por correo apenas lo hayamos solicitado a Mercado Pago.
+          </p>
+        </div>
+      )}
 
       {showCode && order.delivery_confirmation_code && (
         <div className="mt-6 rounded-2xl border border-charcoal-border bg-background-elevated p-5 text-center shadow-card">

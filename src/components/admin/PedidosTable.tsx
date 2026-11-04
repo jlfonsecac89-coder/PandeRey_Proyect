@@ -38,12 +38,14 @@ export function PedidosTable({
   customers,
   items,
   invoicingEnabled,
+  canManageRefunds,
 }: {
   orders: AdminOrder[];
   repartidores: Person[];
   customers: Person[];
   items: OrderItemRow[];
   invoicingEnabled: boolean;
+  canManageRefunds: boolean;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -196,6 +198,7 @@ export function PedidosTable({
                 selected={selected.has(order.id)}
                 onToggleSelect={() => toggleOne(order.id)}
                 invoicingEnabled={invoicingEnabled}
+                canManageRefunds={canManageRefunds}
               />
             ))}
           </tbody>

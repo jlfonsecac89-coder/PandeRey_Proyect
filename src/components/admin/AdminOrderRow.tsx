@@ -44,6 +44,10 @@ export type AdminOrder = {
   ticket_printed_at: string | null;
   // Reparto por día de un pedido de campaña (null si no lo es).
   campaign_pickups?: OrderCampaignPickup[] | null;
+  cancel_reason?: string | null;
+  refund_status?: "requested" | "failed" | null;
+  refund_amount?: number | null;
+  refund_requested_at?: string | null;
 };
 
 type Person = { id: string; full_name: string; phone: string | null };
@@ -57,6 +61,7 @@ export function AdminOrderRow({
   selected = false,
   onToggleSelect,
   invoicingEnabled = false,
+  canManageRefunds = false,
 }: {
   order: AdminOrder;
   drivers: Person[];
@@ -66,6 +71,7 @@ export function AdminOrderRow({
   selected?: boolean;
   onToggleSelect?: () => void;
   invoicingEnabled?: boolean;
+  canManageRefunds?: boolean;
 }) {
   const [readyState, readyAction, readyPending] = useActionState<OrderActionState, FormData>(
     () => markOrderReady(order.id),
@@ -304,6 +310,7 @@ export function AdminOrderRow({
           order={order}
           customer={customer}
           items={items}
+          canManageRefunds={canManageRefunds}
           onClose={() => setShowDetailModal(false)}
         />
       )}

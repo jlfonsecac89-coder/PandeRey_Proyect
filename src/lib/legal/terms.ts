@@ -4,4 +4,4 @@
 // tanto el registro (src/lib/auth/actions.ts) como la página pública
 // /terminos importan esta constante, para que lo que el cliente aceptó y lo
 // que se le muestra nunca queden desincronizados.
-export const TERMS_VERSION = "2026-08-10-v2";
+export const TERMS_VERSION = "2026-11-03-v3";

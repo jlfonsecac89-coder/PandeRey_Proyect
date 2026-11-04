@@ -7,6 +7,7 @@ import { STATUS_LABELS, type OrderStatus } from "@/lib/orders/status";
 import { DeliveryChatPanel } from "@/components/delivery-chat/DeliveryChatPanel";
 import { formatPickupDate } from "@/lib/campaigns/types";
 import type { AdminOrder } from "./AdminOrderRow";
+import { CancelOrderPanel } from "./CancelOrderPanel";
 import type { OrderItemSummary } from "./OrderRowDetail";
 
 // Popup centrado (no drawer lateral) — mismo patrón de overlay que
@@ -19,11 +20,13 @@ export function OrderDetailModal({
   order,
   customer,
   items,
+  canManageRefunds = false,
   onClose,
 }: {
   order: AdminOrder;
   customer: { full_name: string; phone: string | null } | null;
   items: OrderItemSummary[];
+  canManageRefunds?: boolean;
   onClose: () => void;
 }) {
   const [visible, setVisible] = useState(false);
@@ -145,6 +148,8 @@ export function OrderDetailModal({
               Suma de productos: {formatCLP(total)} (el total del pedido puede incluir envío, descuentos o puntos)
             </p>
           )}
+
+          <CancelOrderPanel order={order} canManage={canManageRefunds} />
 
           {order.status === "delivery_issue" && (
             <div className="mt-4 border-t border-white/10 pt-3">
