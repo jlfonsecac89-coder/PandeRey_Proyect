@@ -2,10 +2,11 @@ import "server-only";
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// Sandbox sender de Resend — funciona sin verificar un dominio propio. Antes
-// de producción, reemplazar por una dirección del dominio verificado
-// (sección 20 del blueprint: dato pendiente de confirmar con el cliente).
-const FROM_ADDRESS = "Pan de Rey <onboarding@resend.dev>";
+// Sin dominio verificado en Resend solo se puede enviar a la cuenta dueña del
+// API key (sandbox "onboarding@resend.dev"). Al verificar el dominio de la
+// tienda basta con definir RESEND_FROM_ADDRESS (ej. "Pan de Rey
+// <pedidos@tudominio.cl>") en Vercel, sin tocar código.
+const FROM_ADDRESS = process.env.RESEND_FROM_ADDRESS || "Pan de Rey <onboarding@resend.dev>";
 
 let cachedClient: Resend | null = null;
 
