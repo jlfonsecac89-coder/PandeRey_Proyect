@@ -12,6 +12,7 @@ export const ACTION_LABELS: Record<string, string> = {
   pickup_confirmed: "Retiro confirmado",
   order_cancelled: "Pedido cancelado",
   order_refund_requested: "Reembolso solicitado",
+  order_refund_marked_manual: "Reembolso registrado manualmente",
   campaign_pickup_marked: "Retiro de campaña marcado",
   campaign_pickup_undone: "Retiro de campaña deshecho",
   campaign_created: "Campaña creada",

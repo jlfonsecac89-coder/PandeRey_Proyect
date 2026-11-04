@@ -242,6 +242,51 @@ export async function retryOrderRefund(orderId: string): Promise<CancelActionSta
   return { success: "Reembolso solicitado a Mercado Pago." };
 }
 
+// Deja registrado un reembolso que el gerente hizo por fuera de la plataforma
+// (desde el panel de Mercado Pago o una transferencia): sirve cuando la API
+// rechaza el reembolso o cuando es parcial (pedido de campaña con retiros
+// entregados). Solo registra: el dinero ya lo movió el gerente.
+export async function markOrderRefundedManually(orderId: string): Promise<CancelActionState> {
+  const profile = await requireRole(["admin"]);
+  const supabase = await createClient();
+
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, user_id, status, total, refund_status")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (!order || order.status !== "cancelled" || order.refund_status !== "failed") {
+    return { error: "Este pedido no tiene un reembolso pendiente de registrar." };
+  }
+
+  const nowIso = new Date().toISOString();
+  const { data: updated, error } = await createAdminClient()
+    .from("orders")
+    .update({ refund_status: "requested", refund_requested_at: nowIso })
+    .eq("id", orderId)
+    .eq("refund_status", "failed")
+    .select("id")
+    .maybeSingle();
+  if (error || !updated) return { error: "No se pudo registrar el reembolso." };
+
+  await supabase.from("order_status_history").insert({
+    order_id: orderId,
+    status: "cancelled",
+    changed_by: profile.id,
+    note: "Reembolso gestionado manualmente fuera de la plataforma",
+  });
+  await logAction({
+    actor: profile,
+    action: "order_refund_marked_manual",
+    entityType: "order",
+    entityId: orderId,
+    after: { amount: Number(order.total) },
+  });
+  await notifyCancellation(orderId, order.user_id, { state: "requested", amount: Number(order.total) });
+  revalidateOrders(orderId);
+  return { success: "Reembolso registrado como gestionado manualmente." };
+}
+
 // Los puntos ganados por la compra se descuentan y los canjeados por el
 // producto se devuelven, con movimientos compensatorios (el ledger no se edita).
 async function reverseLoyaltyPoints(orderId: string, userId: string) {

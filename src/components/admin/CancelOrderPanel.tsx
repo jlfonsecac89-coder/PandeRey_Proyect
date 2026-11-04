@@ -4,7 +4,12 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatCLP } from "@/lib/format";
 import { CANCEL_REASONS } from "@/lib/orders/cancel-reasons";
-import { cancelOrder, retryOrderRefund, type CancelActionState } from "@/lib/orders/cancel-actions";
+import {
+  cancelOrder,
+  retryOrderRefund,
+  markOrderRefundedManually,
+  type CancelActionState,
+} from "@/lib/orders/cancel-actions";
 import type { AdminOrder } from "./AdminOrderRow";
 
 const CANCELABLE = ["paid", "preparing", "ready", "ready_for_pickup"];
@@ -21,6 +26,7 @@ export function CancelOrderPanel({ order, canManage }: { order: AdminOrder; canM
   const [note, setNote] = useState("");
   const [refund, setRefund] = useState(true);
   const [confirming, setConfirming] = useState(false);
+  const [confirmingManual, setConfirmingManual] = useState(false);
   const [message, setMessage] = useState<CancelActionState>(null);
   const [pending, startTransition] = useTransition();
 
@@ -63,6 +69,43 @@ export function CancelOrderPanel({ order, canManage }: { order: AdminOrder; canM
               >
                 {pending ? "Reintentando..." : "Reintentar reembolso"}
               </button>
+            )}
+            {canManage && (
+              <div className="mt-2">
+                {!confirmingManual ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingManual(true)}
+                    className="text-xs text-foreground-muted underline hover:text-gold"
+                  >
+                    Ya lo reembolsé por fuera de la plataforma
+                  </button>
+                ) : (
+                  <div className="space-y-1.5 rounded-md border border-charcoal-border p-2">
+                    <p className="text-xs text-foreground-muted">
+                      Confirma solo si ya devolviste el dinero al cliente (por ejemplo desde el panel de Mercado
+                      Pago). Esto solo lo deja registrado y avisa al cliente.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => run(() => markOrderRefundedManually(order.id))}
+                        className="rounded-md bg-gold px-3 py-1 text-xs font-semibold text-ink hover:bg-gold-hover disabled:opacity-50"
+                      >
+                        {pending ? "Registrando..." : "Sí, ya lo reembolsé"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingManual(false)}
+                        className="rounded-md border border-charcoal-border px-3 py-1 text-xs text-foreground-muted"
+                      >
+                        Volver
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
