@@ -22,7 +22,20 @@ export type CancelActionState = { error?: string; success?: string } | null;
 const CANCELABLE_STATUSES = ["paid", "preparing", "ready", "ready_for_pickup"];
 
 
-type RefundResult = { ok: true; amount: number } | { ok: false };
+type RefundResult = { ok: true; amount: number } | { ok: false; reason: string };
+
+// El SDK de Mercado Pago lanza el cuerpo JSON de la respuesta (no un Error):
+// se extrae el mensaje para mostrárselo al gerente, que si no solo vería
+// "falló" y no sabría si es un problema de credenciales, de monto o del pago.
+function describeMpError(err: unknown): string {
+  if (err && typeof err === "object") {
+    const e = err as { message?: unknown; cause?: unknown };
+    const cause = Array.isArray(e.cause) ? (e.cause[0] as { description?: unknown } | undefined)?.description : undefined;
+    const parts = [e.message, cause].filter((v): v is string => typeof v === "string" && v.length > 0);
+    if (parts.length > 0) return [...new Set(parts)].join(" — ");
+  }
+  return "respuesta inesperada";
+}
 
 // Pide a Mercado Pago el reembolso total de los pagos aprobados del pedido. La
 // llave de idempotencia hace seguro reintentar: la misma llamada no reembolsa
@@ -35,7 +48,7 @@ async function requestMercadoPagoRefund(orderId: string): Promise<RefundResult> 
     .select("mp_payment_id, amount")
     .eq("order_id", orderId)
     .eq("status", "approved");
-  if (!payments || payments.length === 0) return { ok: false };
+  if (!payments || payments.length === 0) return { ok: false, reason: "no hay un pago aprobado registrado" };
 
   const refunds = new PaymentRefund(getMercadoPagoClient());
   let amount = 0;
@@ -48,7 +61,7 @@ async function requestMercadoPagoRefund(orderId: string): Promise<RefundResult> 
       amount += Number(payment.amount);
     } catch (err) {
       Sentry.captureException(err, { extra: { context: "mp-refund", orderId, paymentId: payment.mp_payment_id } });
-      return { ok: false };
+      return { ok: false, reason: describeMpError(err) };
     }
   }
   return { ok: true, amount };
@@ -154,6 +167,7 @@ export async function cancelOrder(
   }
 
   let refundState: { state: "requested"; amount: number } | { state: "processing" } | null = null;
+  let refundFailureReason = "";
   const admin = createAdminClient();
   if (wantsRefund) {
     const result = await requestMercadoPagoRefund(orderId);
@@ -166,6 +180,7 @@ export async function cancelOrder(
     } else {
       await admin.from("orders").update({ refund_status: "failed", refund_amount: Number(order.total) }).eq("id", orderId);
       refundState = { state: "processing" };
+      refundFailureReason = result.reason;
     }
   }
 
@@ -186,7 +201,9 @@ export async function cancelOrder(
     };
   }
   if (refundState?.state === "processing") {
-    return { success: "Pedido cancelado, pero Mercado Pago no aceptó el reembolso. Puedes reintentarlo desde el detalle del pedido." };
+    return {
+      success: `Pedido cancelado, pero Mercado Pago no aceptó el reembolso (${refundFailureReason}). Puedes reintentarlo desde el detalle del pedido.`,
+    };
   }
   return { success: "Pedido cancelado sin reembolso automático." };
 }
@@ -206,7 +223,7 @@ export async function retryOrderRefund(orderId: string): Promise<CancelActionSta
   }
 
   const result = await requestMercadoPagoRefund(orderId);
-  if (!result.ok) return { error: "Mercado Pago volvió a rechazar el reembolso. Revisa el pago en su panel." };
+  if (!result.ok) return { error: `Mercado Pago rechazó el reembolso: ${result.reason}.` };
 
   await createAdminClient()
     .from("orders")
