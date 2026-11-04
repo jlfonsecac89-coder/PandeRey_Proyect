@@ -2,6 +2,7 @@ import "server-only";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
+import * as Sentry from "@sentry/nextjs";
 
 let redisClient: Redis | null | undefined;
 
@@ -49,8 +50,17 @@ export async function checkRateLimit(
     console.warn(`[rate-limit] Upstash no configurado — "${name}" no está protegido todavía.`);
     return { allowed: true };
   }
-  const result = await limiter.limit(key);
-  return { allowed: result.success };
+  try {
+    const result = await limiter.limit(key);
+    return { allowed: result.success };
+  } catch (err) {
+    // Redis caído o eliminado (el host de Upstash dejó de resolver y el login y
+    // el pago fallaban con "fetch failed"): el límite de peticiones es una
+    // protección, no puede ser un punto único de falla de pagos y acceso. Se
+    // deja pasar y se avisa a Sentry para reponer el servicio.
+    Sentry.captureException(err, { extra: { context: "rate-limit-unavailable", name } });
+    return { allowed: true };
+  }
 }
 
 // Vercel (y la mayoría de los hosts serios) setean x-forwarded-for con la IP

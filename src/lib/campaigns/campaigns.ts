@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { chileDateYmd } from "@/lib/stores/schedule";
 import { campaignPhase, type CampaignPhase, type CheckoutCampaign } from "./types";
 
 export type ProductCampaign = { campaignId: string; name: string; phase: CampaignPhase };
@@ -35,11 +36,16 @@ export async function getOpenCampaigns(): Promise<CheckoutCampaign[]> {
   const open = (campaigns ?? []).filter((c) => campaignPhase(c) === "open");
   if (open.length === 0) return [];
 
+  // Los días que ya pasaron no se ofrecen (el servidor tampoco los acepta).
+  const today = chileDateYmd(new Date());
+  const todayKey = `${today.y}-${String(today.m).padStart(2, "0")}-${String(today.d).padStart(2, "0")}`;
+
   const { data: dates } = await admin
     .from("campaign_pickup_dates")
     .select("id, campaign_id, pickup_date, daily_capacity_units")
     .in("campaign_id", open.map((c) => c.id))
     .eq("is_open", true)
+    .gte("pickup_date", todayKey)
     .order("pickup_date");
 
   const withRemaining = await Promise.all(
